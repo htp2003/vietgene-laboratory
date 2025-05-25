@@ -1,14 +1,20 @@
 import React from 'react';
+import RegisterForm from '../../components/auth/RegisterForm';
 
 const Register = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Register Page</h1>
-        <p className="text-gray-600">Coming Soon...</p>
-      </div>
-    </div>
-  );
+    const handleRegister = (registerData) => {
+        console.log('Register attempt:', registerData);
+
+        if (registerData.fullName && registerData.email && registerData.password) {
+            alert('Đăng ký thành công! (Mock)');
+        }
+    };
+
+    return (
+        <div>
+            <RegisterForm onSubmit={handleRegister} />
+        </div>
+    );
 };
 
 export default Register;

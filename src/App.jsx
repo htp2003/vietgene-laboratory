@@ -12,23 +12,25 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          {/* publicc route */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          {/* Pages với Layout (kèm head+foot) */}
+          <Route path="/" element={
+            <Layout>
+              <Home />
+            </Layout>
+          } />
           
-          {/* Protected Routes - mốt thêm sau */}
           <Route path="/dashboard" element={
             <Layout>
               <div className="p-8 text-center">
                 <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
                 <p className="text-gray-600 mt-2">Dashboard content will be here</p>
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                  <p className="text-blue-800">🎉 Tailwind CSS đã hoạt động!</p>
-                </div>
               </div>
             </Layout>
           } />
+          
+          {/* auth pages*/}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           
           {/* all route */}
           <Route path="*" element={<Navigate to="/" replace />} />
