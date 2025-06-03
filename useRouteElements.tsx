@@ -4,7 +4,7 @@ import MainLayout from './layouts/MainLayout/MainLayout'
 import Home from './src/pages/Home'
 import Login from './src/pages/auth/Login'
 import Register from './src/pages/auth/Register'
-
+import Appointment from './src/pages/staff/appointment'
 
 export default function useRouteElements() {
     const routeElemets = useRoutes([
@@ -29,6 +29,13 @@ export default function useRouteElements() {
             index: true,
             element: (
                 <Register />
+            )
+        },
+        {
+            path: "/appointment",
+            index: true,
+            element: (
+                <Appointment />
             )
         },
     ])
