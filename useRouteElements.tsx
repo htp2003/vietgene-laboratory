@@ -10,6 +10,8 @@ import OrderBooking from "./src/pages/order/OrderBooking";
 import OrderSuccess from "./src/pages/order/OrderSuccess";
 import CustomerDashboard from "./src/pages/dashboard/CustomerDashboard";
 import OrderDetail from "./src/pages/order/OrderDetail";
+import About from "./src/pages/About";
+import Contact from "./src/pages/Contact";
 
 export default function useRouteElements() {
   const routeElemets = useRoutes([
@@ -77,6 +79,22 @@ export default function useRouteElements() {
       element: (
         <MainLayout>
           <OrderDetail />
+        </MainLayout>
+      ),
+    },
+    {
+      path: "/about",
+      element: (
+        <MainLayout>
+          <About />
+        </MainLayout>
+      ),
+    },
+    {
+      path: "/contact",
+      element: (
+        <MainLayout>
+          <Contact />
         </MainLayout>
       ),
     },
