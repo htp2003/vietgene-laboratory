@@ -72,7 +72,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       {/* Sidebar */}
       <nav
         className={`
-          fixed top-0 left-0 h-full bg-gray-800 text-white shadow-lg
+          fixed top-0 left-0 h-full bg-red-400 text-white shadow-lg
           transition-all duration-300 ease-in-out
           ${isExpanded ? "w-64" : "w-20"}
           ${
@@ -84,11 +84,11 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <div className="flex items-center justify-between p-4 border-b border-white-700">
             {isExpanded && <div className="text-xl font-bold">Vietgene</div>}
             <button
               onClick={toggleSidebar}
-              className="p-2 hover:bg-gray-700 rounded-md hidden md:block"
+              className="p-2 hover:bg-red-500 rounded-md hidden md:block"
             >
               {isExpanded ? <FaTimes size={20} /> : <FaBars size={20} />}
             </button>
