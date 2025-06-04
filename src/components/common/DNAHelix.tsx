@@ -1,13 +1,17 @@
-
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 
-const DNAHelix = ({ width = 400, height = 500 }) => {
-  const mountRef = useRef(null);
-  const sceneRef = useRef(null);
-  const rendererRef = useRef(null);
-  const dnaGroupRef = useRef(null);
-  const animationIdRef = useRef(null);
+interface DNAHelixProps {
+  width?: number;
+  height?: number;
+}
+
+const DNAHelix: React.FC<DNAHelixProps> = ({ width = 400, height = 500 }) => {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const dnaGroupRef = useRef<THREE.Group | null>(null);
+  const animationIdRef = useRef<number | null>(null);
   const isMouseDownRef = useRef(false);
   const mouseRef = useRef({ x: 0, y: 0 });
   const targetRotationRef = useRef({ x: 0, y: 0 });
@@ -16,16 +20,18 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
   useEffect(() => {
     if (!mountRef.current) return;
 
+    // Clear any existing canvas first
+    mountRef.current.innerHTML = '';
+
     // Scene setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     
     renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0); // transparent background
+    renderer.setClearColor(0x000000, 0);
     mountRef.current.appendChild(renderer.domElement);
 
-    // Store refs
     sceneRef.current = scene;
     rendererRef.current = renderer;
 
@@ -37,16 +43,16 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
     const segmentsPerTurn = 16;
     const totalSegments = turns * segmentsPerTurn;
 
-    // Materials - more realistic colors
-    const backboneMaterial1 = new THREE.MeshBasicMaterial({ color: 0xe74c3c }); // softer red
-    const backboneMaterial2 = new THREE.MeshBasicMaterial({ color: 0x2c3e50 }); // dark blue-gray
-    const basePairMaterial1 = new THREE.MeshBasicMaterial({ color: 0x3498db }); // blue
-    const basePairMaterial2 = new THREE.MeshBasicMaterial({ color: 0xf39c12 }); // orange
-    const connectMaterial = new THREE.MeshBasicMaterial({ color: 0x95a5a6 }); // light gray
+    // Materials
+    const backboneMaterial1 = new THREE.MeshBasicMaterial({ color: 0xe74c3c });
+    const backboneMaterial2 = new THREE.MeshBasicMaterial({ color: 0x2c3e50 });
+    const basePairMaterial1 = new THREE.MeshBasicMaterial({ color: 0x3498db });
+    const basePairMaterial2 = new THREE.MeshBasicMaterial({ color: 0xf39c12 });
+    const connectMaterial = new THREE.MeshBasicMaterial({ color: 0x95a5a6 });
 
-    // Create backbone points first
-    const backbone1Points = [];
-    const backbone2Points = [];
+    // Create backbone points
+    const backbone1Points: THREE.Vector3[] = [];
+    const backbone2Points: THREE.Vector3[] = [];
     
     for (let i = 0; i <= totalSegments; i++) {
       const angle = (i / segmentsPerTurn) * Math.PI * 2;
@@ -74,8 +80,8 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
     dnaGroup.add(backbone1);
     dnaGroup.add(backbone2);
 
-    // Add base pairs (connecting rungs)
-    for (let i = 0; i < totalSegments; i += 4) { // every 4th segment
+    // Add base pairs
+    for (let i = 0; i < totalSegments; i += 4) {
       const angle = (i / segmentsPerTurn) * Math.PI * 2;
       const y = (i / totalSegments) * helixHeight - helixHeight / 2;
 
@@ -84,19 +90,16 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
       const x2 = Math.cos(angle + Math.PI) * helixRadius;
       const z2 = Math.sin(angle + Math.PI) * helixRadius;
 
-      // Base pair connection
       const distance = Math.sqrt((x2-x1)**2 + (z2-z1)**2);
       const geometry = new THREE.CylinderGeometry(0.04, 0.04, distance * 0.8, 6);
       const basePair = new THREE.Mesh(geometry, connectMaterial);
       
-      // Position and orient the base pair
       basePair.position.set((x1+x2)/2, y, (z1+z2)/2);
       basePair.lookAt(new THREE.Vector3(x2, y, z2));
       basePair.rotateX(Math.PI / 2);
       
       dnaGroup.add(basePair);
 
-      // Add colored base spheres
       const base1 = new THREE.SphereGeometry(0.12, 8, 8);
       const base2 = new THREE.SphereGeometry(0.12, 8, 8);
       
@@ -113,20 +116,16 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
     dnaGroupRef.current = dnaGroup;
     scene.add(dnaGroup);
 
-    // Position camera - better angle
     camera.position.set(3, 2, 5);
     camera.lookAt(0, 0, 0);
 
-    // Mouse controls
-    const handleMouseDown = (event) => {
+    // Event handlers
+    const handleMouseDown = (event: MouseEvent) => {
       isMouseDownRef.current = true;
-      mouseRef.current = {
-        x: event.clientX,
-        y: event.clientY
-      };
+      mouseRef.current = { x: event.clientX, y: event.clientY };
     };
 
-    const handleMouseMove = (event) => {
+    const handleMouseMove = (event: MouseEvent) => {
       if (!isMouseDownRef.current) return;
 
       const deltaX = event.clientX - mouseRef.current.x;
@@ -134,22 +133,16 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
 
       targetRotationRef.current.y += deltaX * 0.01;
       targetRotationRef.current.x += deltaY * 0.01;
-
-      // Limit vertical rotation
       targetRotationRef.current.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, targetRotationRef.current.x));
 
-      mouseRef.current = {
-        x: event.clientX,
-        y: event.clientY
-      };
+      mouseRef.current = { x: event.clientX, y: event.clientY };
     };
 
     const handleMouseUp = () => {
       isMouseDownRef.current = false;
     };
 
-    // Touch controls for mobile
-    const handleTouchStart = (event) => {
+    const handleTouchStart = (event: TouchEvent) => {
       if (event.touches.length === 1) {
         isMouseDownRef.current = true;
         mouseRef.current = {
@@ -159,7 +152,7 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
       }
     };
 
-    const handleTouchMove = (event) => {
+    const handleTouchMove = (event: TouchEvent) => {
       if (!isMouseDownRef.current || event.touches.length !== 1) return;
       
       event.preventDefault();
@@ -194,14 +187,12 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
       animationIdRef.current = requestAnimationFrame(animate);
 
       if (dnaGroupRef.current) {
-        // Smooth rotation interpolation
         currentRotationRef.current.x += (targetRotationRef.current.x - currentRotationRef.current.x) * 0.1;
         currentRotationRef.current.y += (targetRotationRef.current.y - currentRotationRef.current.y) * 0.1;
 
         dnaGroupRef.current.rotation.x = currentRotationRef.current.x;
         dnaGroupRef.current.rotation.y = currentRotationRef.current.y;
 
-        // Auto-rotation when not interacting - slower
         if (!isMouseDownRef.current) {
           targetRotationRef.current.y += 0.003;
         }
@@ -214,14 +205,12 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
 
     animate();
 
-    // Cleanup
+    // Cleanup function
     return () => {
-      // Stop animation loop
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);
       }
 
-      // Remove event listeners
       const canvas = rendererRef.current?.domElement;
       if (canvas) {
         canvas.removeEventListener('mousedown', handleMouseDown);
@@ -232,28 +221,26 @@ const DNAHelix = ({ width = 400, height = 500 }) => {
         canvas.removeEventListener('touchend', handleTouchEnd);
       }
 
-      // Clean up Three.js objects
       if (dnaGroupRef.current) {
-        // Dispose geometries and materials
         dnaGroupRef.current.traverse((child) => {
-          if (child.geometry) child.geometry.dispose();
-          if (child.material) {
-            if (Array.isArray(child.material)) {
-              child.material.forEach(material => material.dispose());
-            } else {
-              child.material.dispose();
+          if (child instanceof THREE.Mesh) {
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach((material: THREE.Material) => material.dispose());
+              } else {
+                child.material.dispose();
+              }
             }
           }
         });
         sceneRef.current?.remove(dnaGroupRef.current);
       }
 
-      // Remove canvas from DOM
       if (mountRef.current && rendererRef.current?.domElement) {
         mountRef.current.removeChild(rendererRef.current.domElement);
       }
       
-      // Dispose renderer
       if (rendererRef.current) {
         rendererRef.current.dispose();
       }
