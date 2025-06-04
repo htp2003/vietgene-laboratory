@@ -12,7 +12,10 @@ import CustomerDashboard from "./pages/dashboard/CustomerDashboard";
 import OrderDetail from "./pages/order/OrderDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
-
+import AdminLayout from "./layouts/AdminLayout/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import ServicesManagement from "./pages/admin/ServicesManagement";
+import BlogManagement from "./pages/admin/BlogManagement";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -34,6 +37,8 @@ export default function useRouteElements() {
       index: true,
       element: <Register />,
     },
+
+    // Customer
     {
       path: "/services",
       element: (
@@ -98,7 +103,32 @@ export default function useRouteElements() {
         </MainLayout>
       ),
     },
-    
+
+    // Admin
+    {
+      path: "/admin",
+      element: (
+        <AdminLayout>
+          <AdminDashboard />
+        </AdminLayout>
+      ),
+    },
+    {
+      path: "/admin/services",
+      element: (
+        <AdminLayout>
+          <ServicesManagement />
+        </AdminLayout>
+      ),
+    },
+    {
+      path: "/admin/blog",
+      element: (
+        <AdminLayout>
+          <BlogManagement />
+        </AdminLayout>
+      ),
+    },
   ]);
   return routeElemets;
 }
