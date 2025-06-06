@@ -20,7 +20,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
   const navLinks = [
     {
       name: "Lịch hẹn",
-      href: "/staff/appointments",
+      href: "/staff",
       icon: <FaCalendarAlt size={20} />,
     },
     {
