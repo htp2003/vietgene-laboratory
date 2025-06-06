@@ -19,6 +19,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { title: 'Dashboard', path: '/admin', icon: <FaHome size={20} /> },
   { title: 'Users', path: '/admin/users', icon: <FaUsers size={20} /> },
+  { title: 'Doctors', path: '/admin/doctors', icon: <FaUsers size={20} /> },
   { title: 'Services', path: '/admin/services', icon: <FaVial size={20} /> },
   { title: 'Blog', path: '/admin/blog', icon: <FaBlog size={20} /> },
   { title: 'Appointments', path: '/admin/appointments', icon: <FaCalendarAlt size={20} /> },

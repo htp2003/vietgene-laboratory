@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { FaPlus } from 'react-icons/fa'
-import ServiceModal from '../../components/admin/ServiceModal'
-import ServiceList from '../../components/admin/ServiceList'
-import ServiceSearchBar from '../../components/admin/ServiceSearchBar'
+import ServiceModal from '../../components/admin/service/ServiceModal'
+import ServiceList from '../../components/admin/service/ServiceList'
+import ServiceSearchBar from '../../components/admin/service/ServiceSearchBar'
 import { useServices } from '../../hooks/useServices'
 import { Service } from '../../api/services.api'
 

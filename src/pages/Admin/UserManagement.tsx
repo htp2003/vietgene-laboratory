@@ -2,9 +2,9 @@ import React, { useState } from 'react'
 import { FaPlus } from 'react-icons/fa'
 import { useUsers } from '../../hooks/useUsers'
 import { User } from '../../api/users.api'
-import UserModal from '../../components/admin/UserModal'
-import UserList from '../../components/admin/UserList'
-import UserSearchBar from '../../components/admin/UserSearchBar'
+import UserModal from '../../components/admin/user/UserModal'
+import UserList from '../../components/admin/user/UserList'
+import UserSearchBar from '../../components/admin/user/UserSearchBar'
 
 export default function UserManagement() {
   const {loading, error, users, createUsers, updateUser, deleteUser, searchUsers} = useUsers()

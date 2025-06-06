@@ -1,5 +1,5 @@
 import React from 'react'
-import { User } from '../../api/users.api'
+import { User } from '../../../api/users.api'
 import { FaEdit, FaTrash } from 'react-icons/fa'
 
 interface UserListProps {
