@@ -16,6 +16,7 @@ import AdminLayout from "./layouts/AdminLayout/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ServicesManagement from "./pages/admin/ServicesManagement";
 import BlogManagement from "./pages/admin/BlogManagement";
+import UserManagement from "./pages/Admin/UserManagement";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -110,6 +111,14 @@ export default function useRouteElements() {
       element: (
         <AdminLayout>
           <AdminDashboard />
+        </AdminLayout>
+      ),
+    },
+    {
+      path: "/admin/users",
+      element: (
+        <AdminLayout>
+          <UserManagement />
         </AdminLayout>
       ),
     },
