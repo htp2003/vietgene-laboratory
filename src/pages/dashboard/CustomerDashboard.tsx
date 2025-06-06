@@ -15,7 +15,6 @@ import {
   Phone,
   Mail,
   Settings,
-  LogOut,
   TrendingUp,
 } from "lucide-react";
 
@@ -96,7 +95,6 @@ const CustomerDashboard: React.FC = () => {
   const [user] = useState(mockUser);
   const [orders] = useState(mockOrders);
   const [notifications, setNotifications] = useState(mockNotifications);
-  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     // Check if user is logged in
@@ -171,11 +169,6 @@ const CustomerDashboard: React.FC = () => {
     );
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    navigate("/");
-  };
-
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
   const completedOrders = orders.filter((o) => o.status === "completed").length;
   const activeOrders = orders.filter(
@@ -184,57 +177,6 @@ const CustomerDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/" className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">VG</span>
-                </div>
-                <span className="text-xl font-bold text-gray-900">
-                  VietGene Lab
-                </span>
-              </Link>
-              <span className="text-gray-400">|</span>
-              <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-                <Bell className="w-5 h-5" />
-                {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadNotifications}
-                  </span>
-                )}
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5 text-red-600" />
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium text-gray-900">
-                    {user.fullName}
-                  </p>
-                  <p className="text-xs text-gray-500">{user.email}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={handleLogout}
-                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                title="Đăng xuất"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
