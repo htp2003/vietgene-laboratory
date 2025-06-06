@@ -1,5 +1,5 @@
 // Mock data
-const mockServices: Service[] = [
+export const mockServices: Service[] = [
   {
     id: '1',
     name: 'Paternity DNA Test',

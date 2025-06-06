@@ -1,4 +1,4 @@
-const mockUsers: User[] = [
+export const mockUsers: User[] = [
     {
         id: '1',
         username: 'doiphandev',
