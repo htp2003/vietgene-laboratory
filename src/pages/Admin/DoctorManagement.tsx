@@ -5,6 +5,7 @@ import { FaPlus } from 'react-icons/fa'
 import DoctorSearchBar from '../../components/admin/doctor/DoctorSearchBar'
 import DoctorList from '../../components/admin/doctor/DoctorList'
 import DoctorModal from '../../components/admin/doctor/DoctorModal'
+import DoctorTimeSlotManagement from '../../components/admin/doctor/DoctorTimeSlotManagement'
 
 export default function DoctorManagement() {
     const {loading, error, doctor, createDoctor, updateDoctor, deleteDoctor, searchDoctors} = useDoctor()
@@ -14,6 +15,8 @@ export default function DoctorManagement() {
     const [isModalOpen, setIsModalOpen] = useState(false)
 
     const filteredDoctors = searchDoctors(searchTerm)
+
+    // Khi chọn bác sĩ ở DoctorList, sẽ setSelectedDoctor và truyền xuống DoctorTimeSlotManagement
 
     const handleAddDoctor = () => {
         setSelectedDoctor(undefined)
@@ -79,6 +82,8 @@ export default function DoctorManagement() {
                 doctors={filteredDoctors}
                 onEdit={handleEditDoctor}
                 onDelete={handleDeleteDoctor}
+                onSelect={setSelectedDoctor}
+                selectedDoctor={selectedDoctor}
             />
         )}
 
@@ -89,7 +94,20 @@ export default function DoctorManagement() {
             onSave={handleSaveDoctor}
             doctor={selectedDoctor}
         />
-        
+
+        {/* Quản lý khung giờ bác sĩ */}
+        {selectedDoctor && (
+          <DoctorTimeSlotManagement 
+          doctorId={selectedDoctor.id} 
+          doctorInfo={{
+            full_name: selectedDoctor.fullName ?? "",
+            phone: selectedDoctor.phone ?? "",
+            email: selectedDoctor.email ?? "",
+            is_active: selectedDoctor.is_active,
+            licensce_number: selectedDoctor.licensce_number
+          }}
+        />
+        )}
     </div>
   )
 }
