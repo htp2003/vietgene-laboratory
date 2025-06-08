@@ -1,26 +1,29 @@
 import React from 'react'
 import { Doctor } from '../../../api/doctors.api'
+import { FaEdit, FaTrash } from 'react-icons/fa'
 
 interface DoctorListProps {
     doctors: Doctor[]
     onEdit: (doctor: Doctor) => void
     onDelete: (id: number) => void
+    onSelect: (doctor: Doctor) => void
+    selectedDoctor?: Doctor | null
 }
 
-export default function DoctorList({ doctors, onEdit, onDelete }: DoctorListProps) {
+export default function DoctorList({ doctors, onEdit, onDelete, onSelect, selectedDoctor }: DoctorListProps) {
   return (
     <div className='overflow-x-auto'>
-      <table className='min-w-full bg-white border border-gray-200 rounded-lg'>
+      <table className='min-w-full bg-white'>
         <thead>
-          <tr className='bg-gray-100'>
-            <th className='px-4 py-2 border-b'>STT</th>
-            <th className='px-4 py-2 border-b'>Họ tên</th>
-            <th className='px-4 py-2 border-b'>Email</th>
-            <th className='px-4 py-2 border-b'>Số điện thoại</th>
-            <th className='px-4 py-2 border-b'>Mã bác sĩ</th>
-            <th className='px-4 py-2 border-b'>License</th>
-            <th className='px-4 py-2 border-b'>Trạng thái</th>
-            <th className='px-4 py-2 border-b'>Hành động</th>
+          <tr>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>STT</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>Full Name</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>Email</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>Phone</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>Doctor Code</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>License Number</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>Status</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -30,34 +33,43 @@ export default function DoctorList({ doctors, onEdit, onDelete }: DoctorListProp
             </tr>
           ) : (
             doctors.map((doctor, idx) => (
-              <tr key={doctor.id} className='hover:bg-gray-50'>
-                <td className='px-4 py-2 border-b text-center'>{idx + 1}</td>
-                <td className='px-4 py-2 border-b'>{doctor.fullName || '-'}</td>
-                <td className='px-4 py-2 border-b'>{doctor.email || '-'}</td>
-                <td className='px-4 py-2 border-b'>{doctor.phone || '-'}</td>
-                <td className='px-4 py-2 border-b'>{doctor.doctor_code}</td>
-                <td className='px-4 py-2 border-b'>{doctor.licensce_number}</td>
-                <td className='px-4 py-2 border-b'>
+              <tr key={doctor.id}
+                  className={`cursor-pointer hover:bg-blue-50 ${selectedDoctor?.id === doctor.id ? 'bg-blue-100' : ''}`}
+                  onClick={e => {
+                    // Nếu click vào nút Edit/Delete thì không gọi onSelect
+                    if ((e.target as HTMLElement).closest('button')) return;
+                    onSelect(doctor);
+                  }}
+              >
+                <td className='px-6 py-3 text-center'>{idx + 1}</td>
+                <td className='px-6 py-3'>{doctor.fullName || '-'}</td>
+                <td className='px-6 py-3'>{doctor.email || '-'}</td>
+                <td className='px-6 py-3'>{doctor.phone || '-'}</td>
+                <td className='px-6 py-3'>{doctor.doctor_code}</td>
+                <td className='px-6 py-3'>{doctor.licensce_number}</td>
+                <td className='px-6 py-3'>
                   {doctor.is_active ? (
                     <span className='text-green-600 font-semibold'>Hoạt động</span>
                   ) : (
                     <span className='text-red-500 font-semibold'>Ngưng</span>
                   )}
                 </td>
-                <td className='px-4 py-2 border-b flex gap-2 justify-center'>
-                  <button
-                    className='px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-white rounded'
-                    onClick={() => onEdit(doctor)}
-                  >
-                    Sửa
+                <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
+                  <div className="flex items-center gap-3">
+                    <button
+                      className='text-blue-600 hover:text-blue-900'
+                      onClick={() => onEdit(doctor)}
+                    >
+                    <FaEdit size={18} />
                   </button>
                   <button
-                    className='px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded'
+                    className='text-red-600 hover:text-red-900'
                     onClick={() => onDelete(doctor.id)}
                   >
-                    Xóa
+                    <FaTrash size={18} />
                   </button>
-                </td>
+                  </div>
+                  </td>
               </tr>
             ))
           )}

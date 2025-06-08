@@ -1,5 +1,6 @@
 import React from 'react'
 import { FaUsers, FaVial, FaCalendarAlt, FaMoneyBillWave } from 'react-icons/fa'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 
 const StatCard = ({ title, value, icon, color }) => (
   <div className='bg-white rounded-lg shadow-md p-8 flex items-center justify-between hover:shadow-lg transition-shadow'>
@@ -42,6 +43,22 @@ export default function AdminDashboard() {
     }
   ]
 
+  // Dữ liệu mẫu cho doanh thu từng tháng
+  const revenueData = [
+    { month: 'Jan', revenue: 12000 },
+    { month: 'Feb', revenue: 15000 },
+    { month: 'Mar', revenue: 18000 },
+    { month: 'Apr', revenue: 22000 },
+    { month: 'May', revenue: 20000 },
+    { month: 'Jun', revenue: 25000 },
+    { month: 'Jul', revenue: 23000 },
+    { month: 'Aug', revenue: 27000 },
+    { month: 'Sep', revenue: 30000 },
+    { month: 'Oct', revenue: 32000 },
+    { month: 'Nov', revenue: 35000 },
+    { month: 'Dec', revenue: 40000 }
+  ]
+
   return (
     <div>
       <div className='mb-8'>
@@ -53,6 +70,21 @@ export default function AdminDashboard() {
         {stats.map((stat, index) => (
           <StatCard key={index} {...stat} />
         ))}
+      </div>
+
+      {/* Biểu đồ doanh thu theo tháng */}
+      <div className='bg-white rounded-lg shadow-md p-6 mt-8'>
+        <h2 className='text-lg font-semibold mb-4'>Doanh thu theo tháng</h2>
+        <ResponsiveContainer width='100%' height={300}>
+          <BarChart data={revenueData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray='3 3' />
+            <XAxis dataKey='month' />
+            <YAxis />
+            <Tooltip formatter={(value) => `$${value.toLocaleString()}`}/>
+            <Legend />
+            <Bar dataKey='revenue' fill='#8884d8' name='Doanh thu' />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8'>

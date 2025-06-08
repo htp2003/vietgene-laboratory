@@ -7,6 +7,13 @@ const mockDocters: Doctor[] = [
         licensce_number: "ABC123",
         is_active: true,
         created_at: new Date(),
+      },
+      {
+        id: 2,
+        doctor_code: "BS002",
+        licensce_number: "ABC1234",
+        is_active: true,
+        created_at: new Date(),
       }
 ]
 

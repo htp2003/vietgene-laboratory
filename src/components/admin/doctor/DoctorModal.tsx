@@ -87,7 +87,7 @@ export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorM
           </div>
 
           <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Họ tên</label>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>Full Name</label>
             <input
               type='text'
               value={selectedUser?.fullName || ''}
@@ -105,7 +105,7 @@ export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorM
           </div>
 
           <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Số điện thoại</label>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>Phone</label>
             <input
               type='text'
               value={selectedUser?.phone || ''}
@@ -114,7 +114,7 @@ export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorM
           </div>
 
           <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Mã bác sĩ</label>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>Doctor Code</label>
             <input
               type='text'
               name='doctor_code'
@@ -125,7 +125,7 @@ export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorM
           </div>
 
           <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>License</label>
+            <label className='block text-sm font-medium text-gray-700 mb-1'>License Number</label>
             <input
               type='text'
               name='licensce_number'
@@ -142,7 +142,7 @@ export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorM
               checked={formData.is_active}
               onChange={handleChange}
               className='h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500'/>
-            <label className='text-sm font-medium text-gray-700'>Hoạt động</label>
+            <label className='text-sm font-medium text-gray-700'>Active</label>
           </div>
 
           <div className='flex justify-end gap-3 mt-6'>
@@ -150,12 +150,12 @@ export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorM
               type='button'
               onClick={onClose}
               className='px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200'>
-              Hủy
+              Cancel
             </button>
             <button
               type='submit'
               className='px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600'>
-              {doctor ? 'Lưu thay đổi' : 'Thêm bác sĩ'}
+              {doctor ? 'Save Changes' : 'Add Doctor'}
             </button>
           </div>
         </form>

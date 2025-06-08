@@ -8,7 +8,7 @@ export const mockUsers: User[] = [
         address: 'Ho Chi Minh',
         role: 'admin',
         createdAt: new Date(),
-        doctor_id: null
+        doctor_id: 1
     },
     {
         id: '2',
@@ -19,7 +19,7 @@ export const mockUsers: User[] = [
         address: 'Ho Chi Minh',
         role: 'staff',
         createdAt: new Date(),
-        doctor_id: 1
+        doctor_id: 2
     }
 
 ]
