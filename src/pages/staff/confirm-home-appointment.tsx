@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Box, Button, Step, StepLabel, Stepper, Typography, Paper } from '@mui/material';
+import { useParams, useNavigate } from 'react-router-dom';
 
-// Giả lập dữ liệu lịch đặt xét nghiệm tại nhà
+// Giả lập dữ liệu lịch đặt xét nghiệm tại nhà (có thể thay bằng API thực tế)
 const mockAppointment = {
   id: 'APT12345',
   customerName: 'Nguyễn Văn A',
@@ -10,15 +11,20 @@ const mockAppointment = {
   phone: '0901234567',
   preferredDate: '2025-06-08',
   preferredTime: '09:00-11:00',
-  status: 'Chờ xác nhận',
+  status: 'DeliveringKit',
 };
 
 const steps = ['Xem chi tiết', 'Xác nhận & phân công giao kit', 'Cập nhật trạng thái'];
 
 const ConfirmHomeAppointment: React.FC = () => {
+  const { appointmentId } = useParams<{ appointmentId: string }>();
+  const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState(0);
   const [deliveryPerson, setDeliveryPerson] = useState('');
-  const [status, setStatus] = useState(mockAppointment.status);
+  const [status, setStatus] = useState<'DeliveringKit' | 'KitDelivered'>(mockAppointment.status as any);
+
+  // TODO: Lấy thông tin appointment thực tế bằng appointmentId nếu có API
+  const appointment = { ...mockAppointment, id: appointmentId || mockAppointment.id };
 
   const handleNext = () => {
     if (activeStep === 1 && !deliveryPerson) {
@@ -26,7 +32,11 @@ const ConfirmHomeAppointment: React.FC = () => {
       return;
     }
     if (activeStep === 2) {
-      setStatus('Đã xác nhận & đang giao kit');
+      setStatus('KitDelivered');
+      setTimeout(() => {
+        navigate('/staff/appointments');
+      }, 1000);
+      return;
     }
     setActiveStep((prev) => prev + 1);
   };
@@ -51,12 +61,12 @@ const ConfirmHomeAppointment: React.FC = () => {
         {activeStep === 0 && (
           <>
             <Typography variant="subtitle1" fontWeight={600}>Thông tin khách hàng</Typography>
-            <Typography>Họ tên: {mockAppointment.customerName}</Typography>
-            <Typography>Địa chỉ: {mockAppointment.address}</Typography>
-            <Typography>Điện thoại: {mockAppointment.phone}</Typography>
-            <Typography>Loại xét nghiệm: {mockAppointment.testType}</Typography>
-            <Typography>Thời gian mong muốn: {mockAppointment.preferredDate} ({mockAppointment.preferredTime})</Typography>
-            <Typography>Trạng thái: {status}</Typography>
+            <Typography>Họ tên: {appointment.customerName}</Typography>
+            <Typography>Địa chỉ: {appointment.address}</Typography>
+            <Typography>Điện thoại: {appointment.phone}</Typography>
+            <Typography>Loại xét nghiệm: {appointment.testType}</Typography>
+            <Typography>Thời gian mong muốn: {appointment.preferredDate} ({appointment.preferredTime})</Typography>
+            <Typography>Trạng thái: {status === 'DeliveringKit' ? 'Đang chuyển kit' : 'Đã giao kit'}</Typography>
           </>
         )}
         {activeStep === 1 && (
@@ -81,8 +91,17 @@ const ConfirmHomeAppointment: React.FC = () => {
             <Typography variant="subtitle1" fontWeight={600} mb={2}>
               Cập nhật trạng thái
             </Typography>
-            <Typography>Đã xác nhận, nhân viên <b>{deliveryPerson}</b> sẽ giao kit đến khách hàng.</Typography>
-            <Typography mt={2}>Trạng thái: <b>{status}</b></Typography>
+            {status === 'KitDelivered' ? (
+              <>
+                <Typography>Đã giao kit cho khách hàng. Hoàn thành luồng giao kit!</Typography>
+                <Typography mt={2}>Trạng thái: <b>Đã giao kit</b></Typography>
+              </>
+            ) : (
+              <>
+                <Typography>Nhân viên <b>{deliveryPerson}</b> đang giao kit đến khách hàng.</Typography>
+                <Typography mt={2}>Trạng thái: <b>Đang chuyển kit</b></Typography>
+              </>
+            )}
           </>
         )}
         <Box mt={4} display="flex" justifyContent="space-between">
@@ -94,7 +113,7 @@ const ConfirmHomeAppointment: React.FC = () => {
               Tiếp tục
             </Button>
           ) : (
-            <Button variant="contained" color="success" disabled>
+            <Button variant="contained" color="success" disabled={status !== 'KitDelivered'}>
               Đã hoàn tất
             </Button>
           )}

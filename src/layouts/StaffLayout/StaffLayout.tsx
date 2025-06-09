@@ -6,6 +6,7 @@ import {
   FaFlask,
   FaHeadset,
   FaUser,
+  FaHome,
 } from "react-icons/fa";
 import { Link } from "react-router-dom";
 

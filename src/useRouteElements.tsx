@@ -19,6 +19,7 @@ import BlogManagement from "./pages/admin/BlogManagement";
 import StaffAppointments from "./pages/staff/appointment";
 import StaffLayout from "./layouts/StaffLayout/StaffLayout";
 import ConfirmHomeAppointment from "./pages/staff/confirm-home-appointment";
+import TestRequestPage from "./pages/staff/test-requests/[appointmentId]";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -143,10 +144,10 @@ export default function useRouteElements() {
       ),
     },
     {
-      path: "/staff/test-requests",
+      path: "/staff/test-requests/:appointmentId",
       element: (
         <StaffLayout>
-          <ConfirmHomeAppointment/>
+          <TestRequestPage/>
         </StaffLayout>
       ),
     },
