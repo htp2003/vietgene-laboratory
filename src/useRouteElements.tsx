@@ -16,6 +16,10 @@ import AdminLayout from "./layouts/AdminLayout/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ServicesManagement from "./pages/Admin/ServicesManagement";
 import BlogManagement from "./pages/admin/BlogManagement";
+import StaffAppointments from "./pages/staff/appointment";
+import StaffLayout from "./layouts/StaffLayout/StaffLayout";
+import ConfirmHomeAppointment from "./pages/staff/confirm-home-appointment";
+import TestRequestPage from "./pages/staff/test-requests/[appointmentId]";
 import UserManagement from "./pages/Admin/UserManagement";
 import DoctorManagement from "./pages/Admin/DoctorManagement";
 export default function useRouteElements() {
@@ -145,6 +149,24 @@ export default function useRouteElements() {
         <AdminLayout>
           <BlogManagement />
         </AdminLayout>
+      ),
+    },
+
+    // Staff
+    {
+      path: "/staff",
+      element: (
+        <StaffLayout>
+          <StaffAppointments/>
+        </StaffLayout>
+      ),
+    },
+    {
+      path: "/staff/test-requests/:appointmentId",
+      element: (
+        <StaffLayout>
+          <TestRequestPage/>
+        </StaffLayout>
       ),
     },
   ]);
