@@ -1,14 +1,27 @@
-const mockUsers: User[] = [
+export const mockUsers: User[] = [
     {
         id: '1',
         username: 'doiphandev',
-        email: 'doiphandev@gmail.com',
         fullName: 'Doi Phan',
+        email: 'doiphandev@gmail.com',
         phone: '0123456789',
         address: 'Ho Chi Minh',
         role: 'admin',
-        createdAt: new Date()
+        createdAt: new Date(),
+        doctor_id: 1
+    },
+    {
+        id: '2',
+        username: 'doiphandev2',
+        fullName: 'Doi Phan 2',
+        email: 'doiphandev2@gmail.com',
+        phone: '0123456789',
+        address: 'Ho Chi Minh',
+        role: 'staff',
+        createdAt: new Date(),
+        doctor_id: 2
     }
+
 ]
 
 // Type
@@ -21,6 +34,7 @@ export interface User {
     address?: string;
     role: 'customer' | 'staff' | 'admin';
     createdAt: Date;
+    doctor_id: number | null;
 }
 
 export const usersApi = {

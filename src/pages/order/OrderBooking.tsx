@@ -38,6 +38,164 @@ const services = [
   },
 ];
 
+// Mock doctors data based on database schema
+const mockDoctors = [
+  {
+    id: 1,
+    user_id: 10,
+    doctor_code: "DOC001",
+    user: {
+      full_name: "TS. Nguyễn Văn Minh",
+      email: "dr.minh@vietgene.vn",
+      phone: "0901234567",
+    },
+    specialization: "Di truyền học",
+    is_active: true,
+    time_slots: [
+      {
+        id: 1,
+        day_of_week: 1,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 2,
+        day_of_week: 1,
+        start_time: "13:00",
+        end_time: "17:00",
+        is_available: true,
+      },
+      {
+        id: 3,
+        day_of_week: 2,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 4,
+        day_of_week: 3,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: false,
+      },
+      {
+        id: 5,
+        day_of_week: 4,
+        start_time: "13:00",
+        end_time: "17:00",
+        is_available: true,
+      },
+      {
+        id: 6,
+        day_of_week: 5,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+    ],
+  },
+  {
+    id: 2,
+    user_id: 11,
+    doctor_code: "DOC002",
+    user: {
+      full_name: "ThS. Trần Thị Lan",
+      email: "dr.lan@vietgene.vn",
+      phone: "0901234568",
+    },
+    specialization: "Công nghệ sinh học",
+    is_active: true,
+    time_slots: [
+      {
+        id: 7,
+        day_of_week: 1,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 8,
+        day_of_week: 2,
+        start_time: "13:00",
+        end_time: "17:00",
+        is_available: true,
+      },
+      {
+        id: 9,
+        day_of_week: 3,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 10,
+        day_of_week: 4,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 11,
+        day_of_week: 5,
+        start_time: "13:00",
+        end_time: "17:00",
+        is_available: false,
+      },
+    ],
+  },
+  {
+    id: 3,
+    user_id: 12,
+    doctor_code: "DOC003",
+    user: {
+      full_name: "BS. Lê Quang Hùng",
+      email: "dr.hung@vietgene.vn",
+      phone: "0901234569",
+    },
+    specialization: "Tư vấn di truyền",
+    is_active: true,
+    time_slots: [
+      {
+        id: 12,
+        day_of_week: 2,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 13,
+        day_of_week: 3,
+        start_time: "13:00",
+        end_time: "17:00",
+        is_available: true,
+      },
+      {
+        id: 14,
+        day_of_week: 4,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 15,
+        day_of_week: 5,
+        start_time: "08:00",
+        end_time: "12:00",
+        is_available: true,
+      },
+      {
+        id: 16,
+        day_of_week: 6,
+        start_time: "09:00",
+        end_time: "13:00",
+        is_available: true,
+      },
+    ],
+  },
+];
+
 interface OrderForm {
   customerInfo: {
     fullName: string;
@@ -50,6 +208,9 @@ interface OrderForm {
     quantity: number;
     collectionMethod: "self_collect" | "facility_collect";
     appointmentDate: string;
+    appointmentTime: string;
+    doctorId: number | null;
+    timeSlotId: number | null;
     notes: string;
   };
   participantInfo: {
@@ -82,6 +243,9 @@ const OrderBooking: React.FC = () => {
       quantity: 1,
       collectionMethod: "self_collect",
       appointmentDate: "",
+      appointmentTime: "",
+      doctorId: null,
+      timeSlotId: null,
       notes: "",
     },
     participantInfo: {
@@ -94,6 +258,8 @@ const OrderBooking: React.FC = () => {
       method: "transfer",
     },
   });
+  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<any[]>([]);
 
   if (!service) {
     return (
@@ -138,6 +304,47 @@ const OrderBooking: React.FC = () => {
       ...prev,
       participantInfo: { participants: newParticipants },
     }));
+  };
+
+  const handleDoctorSelect = (doctorId: number) => {
+    const doctor = mockDoctors.find((d) => d.id === doctorId);
+    setSelectedDoctor(doctor);
+    updateFormData("serviceInfo", {
+      doctorId,
+      timeSlotId: null,
+      appointmentTime: "",
+    });
+
+    if (doctor) {
+      setAvailableTimeSlots(
+        doctor.time_slots.filter((slot) => slot.is_available)
+      );
+    } else {
+      setAvailableTimeSlots([]);
+    }
+  };
+
+  const handleTimeSlotSelect = (timeSlotId: number) => {
+    const timeSlot = availableTimeSlots.find((slot) => slot.id === timeSlotId);
+    if (timeSlot) {
+      updateFormData("serviceInfo", {
+        timeSlotId,
+        appointmentTime: `${timeSlot.start_time} - ${timeSlot.end_time}`,
+      });
+    }
+  };
+
+  const getDayName = (dayOfWeek: number) => {
+    const days = [
+      "Chủ nhật",
+      "Thứ 2",
+      "Thứ 3",
+      "Thứ 4",
+      "Thứ 5",
+      "Thứ 6",
+      "Thứ 7",
+    ];
+    return days[dayOfWeek];
   };
 
   const addParticipant = () => {
@@ -457,21 +664,106 @@ const OrderBooking: React.FC = () => {
       </div>
 
       {formData.serviceInfo.collectionMethod === "facility_collect" && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Ngày hẹn lấy mẫu *
-          </label>
-          <input
-            type="date"
-            required
-            min={new Date().toISOString().split("T")[0]}
-            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-            value={formData.serviceInfo.appointmentDate}
-            onChange={(e) =>
-              updateFormData("serviceInfo", { appointmentDate: e.target.value })
-            }
-          />
-        </div>
+        <>
+          {/* Doctor Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Chọn bác sĩ tư vấn *
+            </label>
+            <div className="grid md:grid-cols-2 gap-4">
+              {mockDoctors
+                .filter((doctor) => doctor.is_active)
+                .map((doctor) => (
+                  <div
+                    key={doctor.id}
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      formData.serviceInfo.doctorId === doctor.id
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => handleDoctorSelect(doctor.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {doctor.user.full_name}
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-2">
+                          {doctor.specialization}
+                        </p>
+                        <div className="space-y-1 text-xs text-gray-500">
+                          <p>Mã BS: {doctor.doctor_code}</p>
+                          <p>{doctor.user.email}</p>
+                          <p>{doctor.user.phone}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Time Slot Selection */}
+          {selectedDoctor && availableTimeSlots.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Chọn khung giờ *
+              </label>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {availableTimeSlots.map((slot) => (
+                  <div
+                    key={slot.id}
+                    className={`p-3 border-2 rounded-lg cursor-pointer transition-all text-center ${
+                      formData.serviceInfo.timeSlotId === slot.id
+                        ? "border-red-500 bg-red-50 text-red-700"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => handleTimeSlotSelect(slot.id)}
+                  >
+                    <div className="font-medium text-sm">
+                      {getDayName(slot.day_of_week)}
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {slot.start_time} - {slot.end_time}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {availableTimeSlots.length === 0 && selectedDoctor && (
+                <p className="text-gray-500 text-sm">
+                  Bác sĩ này hiện không có khung giờ trống
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Appointment Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ngày hẹn *
+            </label>
+            <input
+              type="date"
+              required
+              min={new Date().toISOString().split("T")[0]}
+              className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              value={formData.serviceInfo.appointmentDate}
+              onChange={(e) =>
+                updateFormData("serviceInfo", {
+                  appointmentDate: e.target.value,
+                })
+              }
+            />
+            {formData.serviceInfo.appointmentTime && (
+              <p className="text-sm text-gray-600 mt-2">
+                Thời gian: {formData.serviceInfo.appointmentTime}
+              </p>
+            )}
+          </div>
+        </>
       )}
 
       <div>
@@ -509,6 +801,7 @@ const OrderBooking: React.FC = () => {
             label: "Tiền mặt",
             desc: "Thanh toán khi nhận dịch vụ",
           },
+          { value: "card", label: "Thẻ tín dụng", desc: "Thanh toán online" },
         ].map((method) => (
           <div
             key={method.value}
@@ -540,6 +833,26 @@ const OrderBooking: React.FC = () => {
           <div className="flex justify-between">
             <span className="text-gray-600">Số lượng:</span>
             <span className="font-medium">{formData.serviceInfo.quantity}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Bác sĩ tư vấn:</span>
+            <span className="font-medium">
+              {selectedDoctor ? selectedDoctor.user.full_name : "Không có"}
+            </span>
+          </div>
+          {formData.serviceInfo.appointmentTime && (
+            <div className="flex justify-between">
+              <span className="text-gray-600">Khung giờ hẹn:</span>
+              <span className="font-medium">
+                {formData.serviceInfo.appointmentTime}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-gray-600">Ngày hẹn:</span>
+            <span className="font-medium">
+              {formData.serviceInfo.appointmentDate || "Chưa chọn"}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Đơn giá:</span>
