@@ -14,66 +14,68 @@ interface Appointment {
   legalType: 'Pháp Lý' | 'Dân Sự';
   address?: string;
   notes?: string;
+  doctor?: string;
 }
 
 const appointmentsData: Appointment[] = [
-  { 
-    id: 'appt-001', 
-    customerName: 'Nguyễn Văn A', 
+  {
+    id: 'appt-001',
+    customerName: 'Nguyễn Văn A',
     phone: '0901234567',
-    date: '2025-06-08', 
-    time: '10:00', 
-    serviceType: 'Huyết thống', 
-    status: 'Pending', 
-    locationType: 'Tại nhà', 
+    date: '2025-06-08',
+    time: '10:00',
+    serviceType: 'Huyết thống',
+    status: 'Pending',
+    locationType: 'Tại nhà',
     legalType: 'Pháp Lý',
     address: '123 Đường ABC, Quận 1, TP.HCM',
-    notes: 'Khách yêu cầu gọi trước 30 phút'
+    notes: 'Khách yêu cầu gọi trước 30 phút',
+    doctor: 'Bác sĩ Nguyễn Văn A'
   },
-  { 
-    id: 'appt-002', 
-    customerName: 'Trần Thị B', 
+  {
+    id: 'appt-002',
+    customerName: 'Trần Thị B',
     phone: '0987654321',
-    date: '2025-06-09', 
-    time: '14:30', 
-    serviceType: 'Sức khỏe tổng quát', 
-    status: 'Confirmed', 
-    locationType: 'Cơ sở y tế', 
-    legalType: 'Dân Sự' 
+    date: '2025-06-09',
+    time: '14:30',
+    serviceType: 'Sức khỏe tổng quát',
+    status: 'Confirmed',
+    locationType: 'Cơ sở y tế',
+    legalType: 'Dân Sự'
   },
-  { 
-    id: 'appt-003', 
-    customerName: 'Lê Văn C', 
+  {
+    id: 'appt-003',
+    customerName: 'Lê Văn C',
     phone: '0912345678',
-    date: '2025-06-10', 
-    time: '09:00', 
-    serviceType: 'ADN Cha con', 
-    status: 'DeliveringKit', 
-    locationType: 'Tại nhà', 
+    date: '2025-06-10',
+    time: '09:00',
+    serviceType: 'ADN Cha con',
+    status: 'DeliveringKit',
+    locationType: 'Tại nhà',
     legalType: 'Dân Sự',
     address: '456 Đường XYZ, Quận 3, TP.HCM'
   },
-  { 
-    id: 'appt-004', 
-    customerName: 'Phạm Thị D', 
+  {
+    id: 'appt-004',
+    customerName: 'Phạm Thị D',
     phone: '0923456789',
-    date: '2025-06-11', 
-    time: '11:00', 
-    serviceType: 'Pháp Y', 
-    status: 'KitDelivered', 
-    locationType: 'Cơ sở y tế', 
-    legalType: 'Pháp Lý' 
+    date: '2025-06-11',
+    time: '11:00',
+    serviceType: 'Pháp Y',
+    status: 'KitDelivered',
+    locationType: 'Cơ sở y tế',
+    legalType: 'Pháp Lý'
   },
-  { 
-    id: 'appt-005', 
-    customerName: 'Hoàng Văn E', 
+  {
+    id: 'appt-005',
+    customerName: 'Hoàng Văn E',
     phone: '0934567890',
-    date: '2025-06-12', 
-    time: '15:30', 
-    serviceType: 'ADN Anh em', 
-    status: 'Completed', 
-    locationType: 'Tại nhà', 
-    legalType: 'Dân Sự' 
+    date: '2025-06-12',
+    time: '15:30',
+    serviceType: 'ADN Anh em',
+    status: 'Completed',
+    locationType: 'Tại nhà',
+    legalType: 'Dân Sự'
   },
 ];
 
@@ -90,10 +92,10 @@ const StaffAppointments: React.FC = () => {
     const matchesLocation = locationFilter === 'Tất cả' || a.locationType === locationFilter;
     const matchesLegal = legalFilter === 'Tất cả' || a.legalType === legalFilter;
     const matchesStatus = statusFilter === 'Tất cả' || a.status === statusFilter;
-    const matchesSearch = a.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         a.phone.includes(searchTerm) || 
-                         a.id.toLowerCase().includes(searchTerm.toLowerCase());
-    
+    const matchesSearch = a.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.phone.includes(searchTerm) ||
+      a.id.toLowerCase().includes(searchTerm.toLowerCase());
+
     return matchesLocation && matchesLegal && matchesStatus && matchesSearch;
   });
 
@@ -113,30 +115,30 @@ const StaffAppointments: React.FC = () => {
 
   const handleConfirm = (appointment: Appointment) => {
     if (appointment.locationType === 'Tại nhà') {
-      setAppointments(prev => prev.map(a => 
+      setAppointments(prev => prev.map(a =>
         a.id === appointment.id ? { ...a, status: 'DeliveringKit' } : a
       ));
-      navigate(`/staff/test-requests/${appointment.id}`);
+      // navigate(`/staff/test-requests/${appointment.id}`);
     } else {
-      setAppointments(prev => prev.map(a => 
+      setAppointments(prev => prev.map(a =>
         a.id === appointment.id ? { ...a, status: 'Confirmed' } : a
       ));
     }
   };
 
   const handleCancel = (appointmentId: string) => {
-    setAppointments(prev => prev.map(a => 
+    setAppointments(prev => prev.map(a =>
       a.id === appointmentId ? { ...a, status: 'Cancelled' } : a
     ));
   };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN', { 
-      weekday: 'short', 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric' 
+    return date.toLocaleDateString('vi-VN', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
     });
   };
 
@@ -169,7 +171,7 @@ const StaffAppointments: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -181,7 +183,7 @@ const StaffAppointments: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -193,7 +195,7 @@ const StaffAppointments: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -231,9 +233,9 @@ const StaffAppointments: React.FC = () => {
                 value={locationFilter}
                 onChange={e => setLocationFilter(e.target.value as any)}
               >
-                <option value="Tất cả">📍 Tất cả địa điểm</option>
-                <option value="Tại nhà">🏠 Tại nhà</option>
-                <option value="Cơ sở y tế">🏥 Cơ sở y tế</option>
+                <option value="Tất cả">Tất cả địa điểm</option>
+                <option value="Tại nhà">Tại nhà</option>
+                <option value="Cơ sở y tế">Cơ sở y tế</option>
               </select>
 
               <select
@@ -241,9 +243,9 @@ const StaffAppointments: React.FC = () => {
                 value={legalFilter}
                 onChange={e => setLegalFilter(e.target.value as any)}
               >
-                <option value="Tất cả">⚖️ Tất cả loại</option>
-                <option value="Pháp Lý">⚖️ Pháp Lý</option>
-                <option value="Dân Sự">👥 Dân Sự</option>
+                <option value="Tất cả">Tất cả loại</option>
+                <option value="Pháp Lý">Pháp Lý</option>
+                <option value="Dân Sự">Dân Sự</option>
               </select>
 
               <select
@@ -251,15 +253,15 @@ const StaffAppointments: React.FC = () => {
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value as any)}
               >
-                <option value="Tất cả">🔄 Tất cả trạng thái</option>
-                <option value="Pending">⏳ Chờ xử lý</option>
-                <option value="Confirmed">✅ Đã xác nhận</option>
-                <option value="DeliveringKit">🚚 Đang giao kit</option>
-                <option value="KitDelivered">📦 Đã giao kit</option>
-                <option value="SampleReceived">🧪 Đã nhận mẫu</option>
-    <option value="Testing">🔬 Đang xét nghiệm</option>
-    <option value="Completed">✅ Hoàn thành</option>
-                <option value="Cancelled">❌ Đã hủy</option>
+                <option value="Tất cả">Tất cả trạng thái</option>
+                <option value="Pending">Chờ xử lý</option>
+                <option value="Confirmed">Đã xác nhận</option>
+                <option value="DeliveringKit">Đang giao kit</option>
+                <option value="KitDelivered">Đã giao kit</option>
+                <option value="SampleReceived">Đã nhận mẫu</option>
+                <option value="Testing">Đang xét nghiệm</option>
+                <option value="Completed">Hoàn thành</option>
+                <option value="Cancelled">Đã hủy</option>
               </select>
             </div>
           </div>
@@ -270,7 +272,7 @@ const StaffAppointments: React.FC = () => {
           {filteredAppointments.map((appointment) => {
             const statusConfig = getStatusConfig(appointment.status);
             const StatusIcon = statusConfig.icon;
-            
+
             return (
               <div key={appointment.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
                 <div className="p-6">
@@ -310,6 +312,10 @@ const StaffAppointments: React.FC = () => {
                           <User className="w-4 h-4" />
                           <span className="text-sm">{appointment.serviceType}</span>
                         </div>
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <User className="w-4 h-4" />
+                          <span className="text-sm">{appointment.doctor}</span>
+                        </div>
                       </div>
 
                       {appointment.address && (
@@ -325,11 +331,10 @@ const StaffAppointments: React.FC = () => {
                       )}
 
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          appointment.legalType === 'Pháp Lý' 
-                            ? 'bg-red-100 text-red-800' 
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${appointment.legalType === 'Pháp Lý'
+                            ? 'bg-red-100 text-red-800'
                             : 'bg-green-100 text-green-800'
-                        }`}>
+                          }`}>
                           {appointment.legalType}
                         </span>
                         <span className="text-xs text-gray-500">ID: {appointment.id}</span>
@@ -344,7 +349,7 @@ const StaffAppointments: React.FC = () => {
                         <Eye className="w-4 h-4" />
                         Chi tiết
                       </button>
-                      
+
                       {appointment.status === 'Pending' && (
                         <>
                           <button
@@ -393,19 +398,26 @@ const StaffAppointments: React.FC = () => {
 
         {/* Detail Modal */}
         {selectedAppointment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div
+            className="fixed inset-0 flex items-center justify-center p-4 z-50 pt-8 overflow-y-auto"
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+            onClick={() => setSelectedAppointment(null)} // Click outside to close
+          >
+            <div
+              className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto my-8"
+              onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+            >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold text-gray-900">Chi tiết lịch hẹn</h2>
                   <button
                     onClick={() => setSelectedAppointment(null)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 p-1"
                   >
                     <XCircle className="w-6 h-6" />
                   </button>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -421,7 +433,7 @@ const StaffAppointments: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Khách hàng</label>
@@ -432,7 +444,7 @@ const StaffAppointments: React.FC = () => {
                       <p className="text-gray-900">{selectedAppointment.phone}</p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Ngày hẹn</label>
@@ -443,7 +455,7 @@ const StaffAppointments: React.FC = () => {
                       <p className="text-gray-900">{selectedAppointment.time}</p>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Loại xét nghiệm</label>
@@ -454,27 +466,34 @@ const StaffAppointments: React.FC = () => {
                       <p className="text-gray-900">{selectedAppointment.locationType}</p>
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="text-sm font-medium text-gray-500">Loại dịch vụ</label>
                     <p className="text-gray-900">{selectedAppointment.legalType}</p>
                   </div>
-                  
+
                   {selectedAppointment.address && (
                     <div>
                       <label className="text-sm font-medium text-gray-500">Địa chỉ</label>
                       <p className="text-gray-900">{selectedAppointment.address}</p>
                     </div>
                   )}
-                  
+
                   {selectedAppointment.notes && (
                     <div>
                       <label className="text-sm font-medium text-gray-500">Ghi chú</label>
                       <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedAppointment.notes}</p>
                     </div>
                   )}
+
+                  {selectedAppointment.doctor && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Bác sĩ phụ trách</label>
+                      <p className="text-gray-900">{selectedAppointment.doctor}</p>
+                    </div>
+                  )}
                 </div>
-                
+
                 <div className="flex gap-3 mt-6 pt-6 border-t">
                   {selectedAppointment.status === 'Pending' && (
                     <>
