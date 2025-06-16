@@ -6,6 +6,7 @@ import DoctorSearchBar from '../../components/admin/doctor/DoctorSearchBar'
 import DoctorList from '../../components/admin/doctor/DoctorList'
 import DoctorModal from '../../components/admin/doctor/DoctorModal'
 import DoctorTimeSlotManagement from '../../components/admin/doctor/DoctorTimeSlotManagement'
+import DoctorCertificateManagement from '../../components/admin/doctor/DoctorCertificateManagement'
 
 export default function DoctorManagement() {
     const {loading, error, doctor, createDoctor, updateDoctor, deleteDoctor, searchDoctors} = useDoctor()
@@ -95,19 +96,25 @@ export default function DoctorManagement() {
             doctor={selectedDoctor}
         />
 
-        {/* Quản lý khung giờ bác sĩ */}
+        {/* Quản lý khung giờ và chứng chỉ bác sĩ */}
         {selectedDoctor && (
-          <DoctorTimeSlotManagement 
-          doctorId={selectedDoctor.id} 
-          doctorInfo={{
-            full_name: selectedDoctor.fullName ?? "",
-            phone: selectedDoctor.phone ?? "",
-            email: selectedDoctor.email ?? "",
-            is_active: selectedDoctor.is_active,
-            licensce_number: selectedDoctor.licensce_number
-          }}
-        />
+          <>
+            <DoctorTimeSlotManagement 
+              doctorId={selectedDoctor.id} 
+              doctorInfo={{
+                full_name: selectedDoctor.fullName ?? "",
+                phone: selectedDoctor.phone ?? "",
+                email: selectedDoctor.email ?? "",
+                is_active: selectedDoctor.is_active,
+                licensce_number: selectedDoctor.licensce_number
+              }}
+            />
+            <div className="mt-6">
+              <DoctorCertificateManagement doctorId={selectedDoctor.id} />
+            </div>
+          </>
         )}
     </div>
   )
 }
+
