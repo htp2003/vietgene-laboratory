@@ -20,15 +20,20 @@ import StaffAppointments from "./pages/staff/appointment";
 import StaffLayout from "./layouts/StaffLayout/StaffLayout";
 import UserManagement from "./pages/Admin/UserManagement";
 import DoctorManagement from "./pages/Admin/DoctorManagement";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Profile from "./pages/profile/Profile";
+import News from "./pages/News/News";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
       path: "/",
       index: true,
       element: (
-        <MainLayout>
-          <Home />
-        </MainLayout>
+        <ProtectedRoute>
+          <MainLayout>
+            <Home />
+          </MainLayout>
+        </ProtectedRoute>
       ),
     },
     {
@@ -107,6 +112,24 @@ export default function useRouteElements() {
         </MainLayout>
       ),
     },
+    {
+      path: "/profile",
+      element: (
+        <ProtectedRoute>
+          <MainLayout>
+            <Profile />
+          </MainLayout>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/news",
+      element: (
+        <MainLayout>
+          <News />
+        </MainLayout>
+      ),
+    },
 
     // Admin
     {
@@ -155,7 +178,7 @@ export default function useRouteElements() {
       path: "/staff",
       element: (
         <StaffLayout>
-          <StaffAppointments/>
+          <StaffAppointments />
         </StaffLayout>
       ),
     },
