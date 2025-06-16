@@ -70,10 +70,13 @@ export function useServices() {
 
   // Search services
   const searchServices = useCallback((searchTerm: string) => {
+    const lower = searchTerm.toLowerCase();
     return services.filter(service =>
-      service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.description.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+      (service.service_name && service.service_name.toLowerCase().includes(lower)) ||
+      (service.service_type && service.service_type.toLowerCase().includes(lower)) ||
+      (service.test_category && service.test_category.toLowerCase().includes(lower)) ||
+      (service.description && service.description.toLowerCase().includes(lower))
+    );
   }, [services])
 
   return {

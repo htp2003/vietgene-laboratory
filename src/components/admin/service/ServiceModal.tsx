@@ -2,49 +2,58 @@ import React from 'react'
 import { FaTimes } from 'react-icons/fa'
 
 interface Service {
-  id: string
-  name: string
-  description: string
-  price: number
-  category: string
-  status: 'active' | 'inactive'
+  id: string;
+  service_name: string;
+  service_type: string;
+  test_category: string;
+  description: string;
+  price: number;
+  duration_days: number;
+  collection_methods: string[];
+  requires_legal_documents: boolean;
+  is_active: boolean;
+  created_at: string;
 }
 
 interface ServiceModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onSave: (service: Omit<Service, 'id'>) => void
-  service?: Service
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (service: Omit<Service, 'id' | 'created_at'>) => void;
+  service?: Service;
 }
 
 export default function ServiceModal({ isOpen, onClose, onSave, service }: ServiceModalProps) {
-  const [formData, setFormData] = React.useState<Omit<Service, 'id'>>({
-    name: service?.name || '',
+  const defaultForm: Omit<Service, 'id' | 'created_at'> = {
+    service_name: service?.service_name || '',
+    service_type: service?.service_type || '',
+    test_category: service?.test_category || '',
     description: service?.description || '',
     price: service?.price || 0,
-    category: service?.category || '',
-    status: service?.status || 'active'
-  })
+    duration_days: service?.duration_days || 0,
+    collection_methods: service?.collection_methods || [],
+    requires_legal_documents: service?.requires_legal_documents || false,
+    is_active: service?.is_active ?? true,
+  };
+
+  const [formData, setFormData] = React.useState<Omit<Service, 'id' | 'created_at'>>(defaultForm);
 
   React.useEffect(() => {
     if (service) {
       setFormData({
-        name: service.name,
+        service_name: service.service_name,
+        service_type: service.service_type,
+        test_category: service.test_category,
         description: service.description,
         price: service.price,
-        category: service.category,
-        status: service.status
-      })
+        duration_days: service.duration_days,
+        collection_methods: service.collection_methods,
+        requires_legal_documents: service.requires_legal_documents,
+        is_active: service.is_active,
+      });
     } else {
-      setFormData({
-        name: '',
-        description: '',
-        price: 0,
-        category: '',
-        status: 'active'
-      })
+      setFormData(defaultForm);
     }
-  }, [service])
+  }, [service]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,92 +80,112 @@ export default function ServiceModal({ isOpen, onClose, onSave, service }: Servi
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Service Name
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tên dịch vụ</label>
             <input
               type="text"
               required
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.service_name}
+              onChange={e => setFormData({ ...formData, service_name: e.target.value })}
               className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Loại dịch vụ</label>
+            <input
+              type="text"
+              required
+              value={formData.service_type}
+              onChange={e => setFormData({ ...formData, service_type: e.target.value })}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nhóm xét nghiệm</label>
+            <input
+              type="text"
+              required
+              value={formData.test_category}
+              onChange={e => setFormData({ ...formData, test_category: e.target.value })}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
             <textarea
               required
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
               className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
               rows={3}
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Price
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Giá</label>
             <input
               type="number"
               required
               min="0"
               step="0.01"
               value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })}
+              onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) })}
               className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Category
-            </label>
-            <select
+            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian (ngày)</label>
+            <input
+              type="number"
               required
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              min="1"
+              step="1"
+              value={formData.duration_days}
+              onChange={e => setFormData({ ...formData, duration_days: parseInt(e.target.value, 10) })}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phương thức lấy mẫu</label>
+            <select
+              multiple
+              value={formData.collection_methods}
+              onChange={e => setFormData({ ...formData, collection_methods: Array.from(e.target.selectedOptions, opt => opt.value) })}
               className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
-              <option value="">Select a category</option>
-              <option value="Relationship Testing">Relationship Testing</option>
-              <option value="Ancestry Testing">Ancestry Testing</option>
-              <option value="Health Testing">Health Testing</option>
-              <option value="Other">Other</option>
+              <option value="In-Clinic">In-Clinic</option>
+              <option value="Home Kit">Home Kit</option>
             </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              required
-              value={formData.status}
-              onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formData.requires_legal_documents}
+              onChange={e => setFormData({ ...formData, requires_legal_documents: e.target.checked })}
+              id="requires_legal_documents"
+            />
+            <label htmlFor="requires_legal_documents" className="text-sm font-medium text-gray-700">Yêu cầu giấy tờ pháp lý</label>
           </div>
-
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formData.is_active}
+              onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+              id="is_active"
+            />
+            <label htmlFor="is_active" className="text-sm font-medium text-gray-700">Đang hoạt động</label>
+          </div>
           <div className="flex justify-end gap-3 mt-6">
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
             >
-              Cancel
+              Huỷ
             </button>
             <button
               type="submit"
               className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600"
             >
-              {service ? 'Save Changes' : 'Add Service'}
+              {service ? 'Lưu thay đổi' : 'Thêm dịch vụ'}
             </button>
           </div>
         </form>
