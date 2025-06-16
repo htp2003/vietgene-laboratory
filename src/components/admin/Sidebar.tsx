@@ -34,9 +34,10 @@ interface SidebarProps {
   onToggleSidebar: () => void;
   isMobileOpen: boolean;
   onToggleMobileSidebar: () => void;
+  pendingBlogCount?: number;
 }
 
-export default function Sidebar({ isExpanded, onToggleSidebar, isMobileOpen, onToggleMobileSidebar }: SidebarProps) {
+export default function Sidebar({ isExpanded, onToggleSidebar, isMobileOpen, onToggleMobileSidebar, pendingBlogCount }: SidebarProps) {
   const location = useLocation();
 
   return (
@@ -104,6 +105,12 @@ export default function Sidebar({ isExpanded, onToggleSidebar, isMobileOpen, onT
                 {isExpanded && (
                   <span className="ml-4 whitespace-nowrap font-medium text-red-50 group-hover:text-white transition-all duration-300">
                     {item.title}
+                  </span>
+                )}
+                {/* Badge cho Blog */}
+                {item.title === 'Blog' && pendingBlogCount && pendingBlogCount > 0 && (
+                  <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-md">
+                    {pendingBlogCount}
                   </span>
                 )}
                 {/* Hover indicator */}
