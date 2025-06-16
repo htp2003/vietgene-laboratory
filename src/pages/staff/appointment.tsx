@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, User, Phone, Filter, Search, CheckCircle, XCircle, Eye, AlertCircle } from 'lucide-react';
+import { Calendar, Search, CheckCircle, AlertCircle } from 'lucide-react';
+import AppointmentCard from '../../components/appointment/AppointmentCard';
+import AppointmentModal from '../../components/appointment/AppointmentModal';
+import TestResultModal from './TestResultModal';
 
+interface TestResult {
+  id: string;
+  appointmentId: string;
+  resultType: 'Positive' | 'Negative' | 'Inconclusive';
+  resultPercentage?: number;
+  conclusion: string;
+  resultDetails: string;
+  resultFile?: File;
+  testedDate: string;
+  verifiedByStaffId: string;
+}
 interface Appointment {
   id: string;
   customerName: string;
@@ -15,8 +28,11 @@ interface Appointment {
   address?: string;
   notes?: string;
   doctor?: string;
+  testResult?: TestResult; // Add test result to appointment
 }
 
+
+// Sample data
 const appointmentsData: Appointment[] = [
   {
     id: 'appt-001',
@@ -29,8 +45,7 @@ const appointmentsData: Appointment[] = [
     locationType: 'Tại nhà',
     legalType: 'Pháp Lý',
     address: '123 Đường ABC, Quận 1, TP.HCM',
-    notes: 'Khách yêu cầu gọi trước 30 phút',
-    doctor: 'Bác sĩ Nguyễn Văn A'
+    notes: 'Khách yêu cầu gọi trước 30 phút'
   },
   {
     id: 'appt-002',
@@ -39,9 +54,10 @@ const appointmentsData: Appointment[] = [
     date: '2025-06-09',
     time: '14:30',
     serviceType: 'Sức khỏe tổng quát',
-    status: 'Confirmed',
+    status: 'Pending',
     locationType: 'Cơ sở y tế',
-    legalType: 'Dân Sự'
+    legalType: 'Dân Sự',
+    doctor: 'Bác sĩ Nguyễn Văn B'
   },
   {
     id: 'appt-003',
@@ -50,10 +66,10 @@ const appointmentsData: Appointment[] = [
     date: '2025-06-10',
     time: '09:00',
     serviceType: 'ADN Cha con',
-    status: 'DeliveringKit',
-    locationType: 'Tại nhà',
+    status: 'SampleReceived',
+    locationType: 'Cơ sở y tế',
     legalType: 'Dân Sự',
-    address: '456 Đường XYZ, Quận 3, TP.HCM'
+    doctor: 'Bác sĩ Trần Văn C'
   },
   {
     id: 'appt-004',
@@ -62,9 +78,10 @@ const appointmentsData: Appointment[] = [
     date: '2025-06-11',
     time: '11:00',
     serviceType: 'Pháp Y',
-    status: 'KitDelivered',
+    status: 'Testing',
     locationType: 'Cơ sở y tế',
-    legalType: 'Pháp Lý'
+    legalType: 'Pháp Lý',
+    doctor: 'Bác sĩ Lê Thị C'
   },
   {
     id: 'appt-005',
@@ -73,21 +90,37 @@ const appointmentsData: Appointment[] = [
     date: '2025-06-12',
     time: '15:30',
     serviceType: 'ADN Anh em',
+    status: 'DeliveringKit',
+    locationType: 'Tại nhà',
+    legalType: 'Dân Sự',
+    address: '789 Đường DEF, Quận 7, TP.HCM'
+  },
+  {
+    id: 'appt-006',
+    customerName: 'Đỗ Thị F',
+    phone: '0945678901',
+    date: '2025-06-13',
+    time: '08:00',
+    serviceType: 'ADN Cha con',
     status: 'Completed',
     locationType: 'Tại nhà',
     legalType: 'Dân Sự'
-  },
+  }
 ];
 
 const StaffAppointments: React.FC = () => {
-  const navigate = useNavigate();
+  // State management
+  const [appointments, setAppointments] = useState<Appointment[]>(appointmentsData);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [testResultAppointment, setTestResultAppointment] = useState<Appointment | null>(null);
+  
+  // Filters
   const [locationFilter, setLocationFilter] = useState<'Tất cả' | 'Tại nhà' | 'Cơ sở y tế'>('Tất cả');
   const [legalFilter, setLegalFilter] = useState<'Tất cả' | 'Pháp Lý' | 'Dân Sự'>('Tất cả');
   const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Pending' | 'Confirmed' | 'DeliveringKit' | 'KitDelivered' | 'Completed' | 'Cancelled'>('Tất cả');
   const [searchTerm, setSearchTerm] = useState('');
-  const [appointments, setAppointments] = useState<Appointment[]>(appointmentsData);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
+  // Filtered data
   const filteredAppointments = appointments.filter((a) => {
     const matchesLocation = locationFilter === 'Tất cả' || a.locationType === locationFilter;
     const matchesLegal = legalFilter === 'Tất cả' || a.legalType === legalFilter;
@@ -99,31 +132,20 @@ const StaffAppointments: React.FC = () => {
     return matchesLocation && matchesLegal && matchesStatus && matchesSearch;
   });
 
-  const getStatusConfig = (status: string) => {
-    const configs = {
-      'Pending': { color: 'bg-amber-100 text-amber-800 border-amber-200', icon: AlertCircle, text: 'Chờ xử lý' },
-      'Confirmed': { color: 'bg-blue-100 text-blue-800 border-blue-200', icon: CheckCircle, text: 'Đã xác nhận' },
-      'DeliveringKit': { color: 'bg-purple-100 text-purple-800 border-purple-200', icon: Clock, text: 'Đang giao kit' },
-      'KitDelivered': { color: 'bg-indigo-100 text-indigo-800 border-indigo-200', icon: CheckCircle, text: 'Đã giao kit' },
-      'SampleReceived': { color: 'bg-orange-100 text-orange-800 border-orange-200', icon: Clock, text: 'Đã nhận mẫu' },
-      'Testing': { color: 'bg-yellow-100 text-yellow-800 border-yellow-200', icon: Clock, text: 'Đang xét nghiệm' },
-      'Completed': { color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle, text: 'Hoàn thành' },
-      'Cancelled': { color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle, text: 'Đã hủy' },
-    };
-    return configs[status] || configs['Pending'];
+  // Statistics
+  const stats = {
+    total: appointments.length,
+    pending: appointments.filter(a => a.status === 'Pending').length,
+    confirmed: appointments.filter(a => a.status === 'Confirmed').length,
+    completed: appointments.filter(a => a.status === 'Completed').length,
   };
 
+  // Event handlers
   const handleConfirm = (appointment: Appointment) => {
-    if (appointment.locationType === 'Tại nhà') {
-      setAppointments(prev => prev.map(a =>
-        a.id === appointment.id ? { ...a, status: 'DeliveringKit' } : a
-      ));
-      // navigate(`/staff/test-requests/${appointment.id}`);
-    } else {
-      setAppointments(prev => prev.map(a =>
-        a.id === appointment.id ? { ...a, status: 'Confirmed' } : a
-      ));
-    }
+    const newStatus = appointment.locationType === 'Tại nhà' ? 'DeliveringKit' : 'Confirmed';
+    setAppointments(prev => prev.map(a =>
+      a.id === appointment.id ? { ...a, status: newStatus } : a
+    ));
   };
 
   const handleCancel = (appointmentId: string) => {
@@ -132,21 +154,44 @@ const StaffAppointments: React.FC = () => {
     ));
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('vi-VN', {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+  const updateAppointmentStatus = (appointmentId: string, newStatus: Appointment['status']) => {
+    setAppointments(prev => prev.map(a => {
+      if (a.id === appointmentId) {
+        console.log(`Cập nhật ${appointmentId}: ${a.status} → ${newStatus}`);
+        
+        // If completing the test, open test result modal
+        if (newStatus === 'Completed') {
+          const appointment = prev.find(ap => ap.id === appointmentId);
+          if (appointment && !appointment.testResult) {
+            setTestResultAppointment(appointment);
+            return a; // Don't update status yet, wait for test result
+          }
+        }
+        
+        return { ...a, status: newStatus };
+      }
+      return a;
+    }));
   };
 
-  const stats = {
-    total: appointments.length,
-    pending: appointments.filter(a => a.status === 'Pending').length,
-    confirmed: appointments.filter(a => a.status === 'Confirmed').length,
-    completed: appointments.filter(a => a.status === 'Completed').length,
+  const handleSaveTestResult = (result: TestResult) => {
+    setAppointments(prev => prev.map(a => {
+      if (a.id === result.appointmentId) {
+        return { ...a, status: 'Completed', testResult: result };
+      }
+      return a;
+    }));
+    
+    setTestResultAppointment(null);
+    console.log('Đã lưu kết quả xét nghiệm:', result);
+  };
+
+  const handleViewDetails = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+  };
+
+  const closeModal = () => {
+    setSelectedAppointment(null);
   };
 
   return (
@@ -226,7 +271,7 @@ const StaffAppointments: React.FC = () => {
               </div>
             </div>
 
-            {/* Filters */}
+            {/* Filter Dropdowns */}
             <div className="flex gap-3">
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -267,125 +312,21 @@ const StaffAppointments: React.FC = () => {
           </div>
         </div>
 
-        {/* Appointments Grid */}
+        {/* Appointments List */}
         <div className="grid gap-4">
-          {filteredAppointments.map((appointment) => {
-            const statusConfig = getStatusConfig(appointment.status);
-            const StatusIcon = statusConfig.icon;
-
-            return (
-              <div key={appointment.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                          {appointment.customerName.charAt(0)}
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-900 text-lg">{appointment.customerName}</h3>
-                          <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <Phone className="w-4 h-4" />
-                            {appointment.phone}
-                          </p>
-                        </div>
-                        <div className={`px-3 py-1 rounded-full border ${statusConfig.color} flex items-center gap-1`}>
-                          <StatusIcon className="w-4 h-4" />
-                          <span className="text-sm font-medium">{statusConfig.text}</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          <span className="text-sm">{formatDate(appointment.date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm">{appointment.time}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <MapPin className="w-4 h-4" />
-                          <span className="text-sm">{appointment.locationType}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <User className="w-4 h-4" />
-                          <span className="text-sm">{appointment.serviceType}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <User className="w-4 h-4" />
-                          <span className="text-sm">{appointment.doctor}</span>
-                        </div>
-                      </div>
-
-                      {appointment.address && (
-                        <div className="text-sm text-gray-600 mb-2">
-                          <strong>Địa chỉ:</strong> {appointment.address}
-                        </div>
-                      )}
-
-                      {appointment.notes && (
-                        <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 mb-4">
-                          <strong>Ghi chú:</strong> {appointment.notes}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${appointment.legalType === 'Pháp Lý'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-green-100 text-green-800'
-                          }`}>
-                          {appointment.legalType}
-                        </span>
-                        <span className="text-xs text-gray-500">ID: {appointment.id}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 ml-4">
-                      <button
-                        onClick={() => setSelectedAppointment(appointment)}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center gap-2 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                        Chi tiết
-                      </button>
-
-                      {appointment.status === 'Pending' && (
-                        <>
-                          <button
-                            onClick={() => handleConfirm(appointment)}
-                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Xác nhận
-                          </button>
-                          <button
-                            onClick={() => handleCancel(appointment.id)}
-                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors"
-                          >
-                            <XCircle className="w-4 h-4" />
-                            Hủy
-                          </button>
-                        </>
-                      )}
-
-                      {appointment.status === 'DeliveringKit' && appointment.locationType === 'Tại nhà' && (
-                        <button
-                          onClick={() => navigate(`/staff/test-requests/${appointment.id}`)}
-                          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg flex items-center gap-2 transition-colors"
-                        >
-                          <Clock className="w-4 h-4" />
-                          Quản lý kit
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {filteredAppointments.map((appointment) => (
+            <AppointmentCard
+              key={appointment.id}
+              appointment={appointment}
+              onViewDetails={handleViewDetails}
+              onConfirm={handleConfirm}
+              onCancel={handleCancel}
+              onUpdateStatus={updateAppointmentStatus}
+            />
+          ))}
         </div>
 
+        {/* Empty State */}
         {filteredAppointments.length === 0 && (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -396,140 +337,23 @@ const StaffAppointments: React.FC = () => {
           </div>
         )}
 
+        {/* Test Result Modal */}
+        <TestResultModal
+          appointment={testResultAppointment}
+          isOpen={!!testResultAppointment}
+          onClose={() => setTestResultAppointment(null)}
+          onSaveResult={handleSaveTestResult}
+        />
+
         {/* Detail Modal */}
-        {selectedAppointment && (
-          <div
-            className="fixed inset-0 flex items-center justify-center p-4 z-50 pt-8 overflow-y-auto"
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-            onClick={() => setSelectedAppointment(null)} // Click outside to close
-          >
-            <div
-              className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto my-8"
-              onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
-            >
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Chi tiết lịch hẹn</h2>
-                  <button
-                    onClick={() => setSelectedAppointment(null)}
-                    className="text-gray-400 hover:text-gray-600 p-1"
-                  >
-                    <XCircle className="w-6 h-6" />
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Mã lịch hẹn</label>
-                      <p className="text-gray-900">{selectedAppointment.id}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Trạng thái</label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`px-3 py-1 rounded-full text-sm ${getStatusConfig(selectedAppointment.status).color}`}>
-                          {getStatusConfig(selectedAppointment.status).text}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Khách hàng</label>
-                      <p className="text-gray-900">{selectedAppointment.customerName}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Số điện thoại</label>
-                      <p className="text-gray-900">{selectedAppointment.phone}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Ngày hẹn</label>
-                      <p className="text-gray-900">{formatDate(selectedAppointment.date)}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Giờ hẹn</label>
-                      <p className="text-gray-900">{selectedAppointment.time}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Loại xét nghiệm</label>
-                      <p className="text-gray-900">{selectedAppointment.serviceType}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Địa điểm</label>
-                      <p className="text-gray-900">{selectedAppointment.locationType}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">Loại dịch vụ</label>
-                    <p className="text-gray-900">{selectedAppointment.legalType}</p>
-                  </div>
-
-                  {selectedAppointment.address && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Địa chỉ</label>
-                      <p className="text-gray-900">{selectedAppointment.address}</p>
-                    </div>
-                  )}
-
-                  {selectedAppointment.notes && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Ghi chú</label>
-                      <p className="text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedAppointment.notes}</p>
-                    </div>
-                  )}
-
-                  {selectedAppointment.doctor && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Bác sĩ phụ trách</label>
-                      <p className="text-gray-900">{selectedAppointment.doctor}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-3 mt-6 pt-6 border-t">
-                  {selectedAppointment.status === 'Pending' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          handleConfirm(selectedAppointment);
-                          setSelectedAppointment(null);
-                        }}
-                        className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Xác nhận
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleCancel(selectedAppointment.id);
-                          setSelectedAppointment(null);
-                        }}
-                        className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Hủy lịch hẹn
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => setSelectedAppointment(null)}
-                    className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <AppointmentModal
+          appointment={selectedAppointment}
+          isOpen={!!selectedAppointment}
+          onClose={closeModal}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+          onUpdateStatus={updateAppointmentStatus}
+        />
       </div>
     </div>
   );
