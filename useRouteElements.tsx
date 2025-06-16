@@ -13,6 +13,8 @@ import OrderDetail from "./src/pages/order/OrderDetail";
 import About from "./src/pages/About";
 import Contact from "./src/pages/Contact";
 import ProtectedRoute from "./src/components/ProtectedRoute";
+import Profile from "./src/pages/profile/Profile";
+import News from "./src/pages/News/News";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -97,6 +99,24 @@ export default function useRouteElements() {
       element: (
         <MainLayout>
           <Contact />
+        </MainLayout>
+      ),
+    },
+    {
+      path: "/profile",
+      element: (
+        <ProtectedRoute>
+          <MainLayout>
+            <Profile />
+          </MainLayout>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/news",
+      element: (
+        <MainLayout>
+          <News />
         </MainLayout>
       ),
     },
