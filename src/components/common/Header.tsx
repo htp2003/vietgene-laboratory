@@ -25,14 +25,17 @@ const Header: React.FC = () => {
 
   useEffect(() => {
     // Check authentication state
+    const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
-    if (savedUser) {
+
+    if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser);
         setUser(userData);
       } catch (error) {
-        console.error("Error parsing user data:", error);
+        // Clear invalid data
         localStorage.removeItem("user");
+        localStorage.removeItem("token");
       }
     }
   }, []);

@@ -2,6 +2,7 @@
   "name": "dna-testing-app",
   "private": true,
   "version": "0.0.0",
+  "proxy" : "https://dna-service-se1857.onrender.com",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +13,8 @@
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
     "@tailwindcss/vite": "^4.1.7",
+    "axios": "^1.10.0",
+    "dotenv": "^16.5.0",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

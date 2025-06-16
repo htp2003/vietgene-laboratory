@@ -12,16 +12,18 @@ import CustomerDashboard from "./src/pages/dashboard/CustomerDashboard";
 import OrderDetail from "./src/pages/order/OrderDetail";
 import About from "./src/pages/About";
 import Contact from "./src/pages/Contact";
-
+import ProtectedRoute from "./src/components/ProtectedRoute";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
       path: "/",
       index: true,
       element: (
-        <MainLayout>
-          <Home />
-        </MainLayout>
+        <ProtectedRoute>
+          <MainLayout>
+            <Home />
+          </MainLayout>
+        </ProtectedRoute>
       ),
     },
     {
