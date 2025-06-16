@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
 import { FaPlus } from 'react-icons/fa'
 import ServiceModal from '../../components/admin/service/ServiceModal'
-import ServiceList from '../../components/admin/service/ServiceList'
-import ServiceSearchBar from '../../components/admin/service/ServiceSearchBar'
-import { useServices } from '../../hooks/useServices'
-import { Service } from '../../api/services.api'
+import ServiceList from '../../components/admin/service/ServiceList';
+import ServiceDetailTabs from '../../components/admin/service/ServiceDetailTabs';
+import ServiceSearchBar from '../../components/admin/service/ServiceSearchBar';
+import { useServices } from '../../hooks/useServices';
+import { Service } from '../../api/services.api';
 
 
 export default function ServicesManagement() {
@@ -68,11 +69,21 @@ export default function ServicesManagement() {
       {error && <div className="text-center py-4 text-red-600">{error.message}</div>}
 
       {/* Services Table */}
-      {!loading && !error && (
+      {/* Danh sách dịch vụ */}
+      {!loading && !error && !selectedService && (
         <ServiceList
           services={filteredServices}
           onEdit={handleEditService}
           onDelete={handleDeleteService}
+          onView={setSelectedService} // Khi click vào tên dịch vụ sẽ mở tab chi tiết
+        />
+      )}
+
+      {/* Hiển thị chi tiết service khi chọn */}
+      {selectedService && !isModalOpen && (
+        <ServiceDetailTabs
+          service={selectedService}
+          onBack={() => setSelectedService(undefined)}
         />
       )}
 
@@ -84,7 +95,10 @@ export default function ServicesManagement() {
             if (selectedService) {
               await updateService(selectedService.id, serviceData)
             } else {
-              await createService(serviceData)
+              await createService({
+                ...serviceData,
+                created_at: new Date().toISOString(),
+              })
             }
             setIsModalOpen(false)
             setSelectedService(undefined)

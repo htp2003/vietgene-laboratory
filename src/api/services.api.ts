@@ -2,30 +2,45 @@
 export const mockServices: Service[] = [
   {
     id: '1',
-    name: 'Paternity DNA Test',
+    service_name: 'Paternity DNA Test',
+    service_type: 'Civil',
+    test_category: 'Relationship',
     description: 'Determine biological relationship between alleged father and child',
     price: 299.99,
-    category: 'Relationship Testing',
-    status: 'active'
+    duration_days: 7,
+    collection_methods: ['In-Clinic', 'Home Kit'],
+    requires_legal_documents: true,
+    is_active: true,
+    created_at: '2025-06-01T10:00:00+07:00'
   },
   {
     id: '2',
-    name: 'Ancestry DNA Test',
+    service_name: 'Ancestry DNA Test',
+    service_type: 'Administrative',
+    test_category: 'Ancestry',
     description: 'Discover your ethnic origins and find relatives',
     price: 199.99,
-    category: 'Ancestry Testing',
-    status: 'active'
+    duration_days: 10,
+    collection_methods: ['Home Kit'],
+    requires_legal_documents: false,
+    is_active: true,
+    created_at: '2025-06-01T10:00:00+07:00'
   }
-]
+];
 
 // Types
 export interface Service {
-  id: string
-  name: string
-  description: string
-  price: number
-  category: string
-  status: 'active' | 'inactive'
+  id: string;
+  service_name: string;
+  service_type: string;
+  test_category: string;
+  description: string;
+  price: number;
+  duration_days: number;
+  collection_methods: string[];
+  requires_legal_documents: boolean;
+  is_active: boolean;
+  created_at: string;
 }
 
 // Mock API service
