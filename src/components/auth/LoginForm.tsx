@@ -3,9 +3,10 @@ import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, ArrowRight } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import { authService } from "../../services/authService";
 
 interface LoginFormData {
-  email: string;
+  username: string;
   password: string;
   remember: boolean;
 }
@@ -22,45 +23,87 @@ const LoginForm: React.FC = () => {
   } = useForm<LoginFormData>();
 
   const handleFormSubmit = async (data: LoginFormData) => {
+    const loadingToast = toast.loading("Đang đăng nhập...");
     setIsLoading(true);
 
-    // Show loading toast
-    const loadingToast = toast.loading("Đang đăng nhập...");
-
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      console.log("🚀 Login attempt with:", {
+        username: data.username,
+        password: "***",
+      });
 
-      // Mock validation - check for demo credentials
-      if (data.email === "phat@vietgene.vn" && data.password === "Phat123!") {
-        // Success case
-        const user = {
-          id: 1,
-          email: data.email,
-          fullName: "Hà Tấn Phát",
-          role: "customer",
-        };
+      const response = await authService.login(data.username, data.password);
 
-        localStorage.setItem("user", JSON.stringify(user));
+      console.log("📝 API Response:", response);
 
-        toast.success("Đăng nhập thành công!", {
-          id: loadingToast,
-          duration: 2000,
-        });
+      if (response.success && response.data) {
+        const { result } = response.data;
 
-        setTimeout(() => navigate("/"), 1000);
+        console.log("🔍 Login API response:", response.data);
+
+        // ✅ Store basic auth data first
+        localStorage.setItem("token", result.token);
+
+        // ✅ Get full profile data from /user/profile API
+        const profileResponse = await authService.getUserProfile();
+        console.log("👤 Profile API response:", profileResponse);
+
+        if (profileResponse.success && profileResponse.data) {
+          // Store complete user data từ profile API
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              userId: result.userId,
+              username: data.username,
+              authenticated: result.authenticated,
+              // ✅ Full data từ profile API
+              id: profileResponse.data.id,
+              email: profileResponse.data.email,
+              full_name: profileResponse.data.full_name,
+              fullName: profileResponse.data.full_name, // Alias cho compatibility
+              phone: profileResponse.data.phone,
+              address: profileResponse.data.address,
+              // ✅ Extract role từ roles array
+              role: profileResponse.data.roles?.[0]?.name || "customer",
+              roles: profileResponse.data.roles, // Keep full roles array
+              created_at: profileResponse.data.created_at,
+            })
+          );
+        } else {
+          // Fallback nếu profile API fail
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              userId: result.userId,
+              username: data.username,
+              authenticated: result.authenticated,
+              email: `${data.username}@example.com`,
+              fullName: data.username,
+              role: "customer",
+            })
+          );
+        }
+
+        // ✅ Remember me functionality
+        if (data.remember) {
+          localStorage.setItem("rememberLogin", "true");
+        }
+
+        toast.success("Đăng nhập thành công!", { id: loadingToast });
+
+        // ✅ Navigate to dashboard
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1000);
       } else {
-        // Error case
-        toast.error("Email hoặc mật khẩu không chính xác!", {
+        console.error("❌ Login failed:", response.message);
+        toast.error(response.message || "Đăng nhập thất bại", {
           id: loadingToast,
-          duration: 4000,
         });
       }
-    } catch (error) {
-      toast.error("Có lỗi xảy ra, vui lòng thử lại!", {
-        id: loadingToast,
-        duration: 4000,
-      });
+    } catch (error: any) {
+      console.error("💥 Login error:", error);
+      toast.error("Có lỗi xảy ra khi đăng nhập!", { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
@@ -86,33 +129,34 @@ const LoginForm: React.FC = () => {
         {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-            {/* Email Field */}
+            {/* Username Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email hoặc Tên đăng nhập
+                Tên đăng nhập hoặc Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  {...register("email", {
-                    required: "Vui lòng nhập email hoặc tên đăng nhập",
-                    pattern: {
-                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$|^[a-zA-Z0-9_]+$/,
-                      message: "Email hoặc tên đăng nhập không hợp lệ",
+                  {...register("username", {
+                    required: "Vui lòng nhập tên đăng nhập hoặc email",
+                    minLength: {
+                      value: 3,
+                      message: "Tên đăng nhập phải có ít nhất 3 ký tự",
                     },
                   })}
                   type="text"
                   className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
-                    errors.email ? "border-red-300" : "border-gray-300"
+                    errors.username ? "border-red-300" : "border-gray-300"
                   }`}
-                  placeholder="Nhập email hoặc username"
+                  placeholder="Nhập tên đăng nhập hoặc email"
+                  disabled={isLoading}
                 />
               </div>
-              {errors.email && (
+              {errors.username && (
                 <p className="text-red-500 text-sm mt-1">
-                  {errors.email.message}
+                  {errors.username.message}
                 </p>
               )}
             </div>
@@ -130,8 +174,8 @@ const LoginForm: React.FC = () => {
                   {...register("password", {
                     required: "Vui lòng nhập mật khẩu",
                     minLength: {
-                      value: 6,
-                      message: "Mật khẩu phải có ít nhất 6 ký tự",
+                      value: 5,
+                      message: "Mật khẩu phải có ít nhất 5 ký tự",
                     },
                   })}
                   type={showPassword ? "text" : "password"}
@@ -139,11 +183,13 @@ const LoginForm: React.FC = () => {
                     errors.password ? "border-red-300" : "border-gray-300"
                   }`}
                   placeholder="Nhập mật khẩu"
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -166,6 +212,7 @@ const LoginForm: React.FC = () => {
                   {...register("remember")}
                   type="checkbox"
                   className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  disabled={isLoading}
                 />
                 <span className="ml-2 text-sm text-gray-600">
                   Ghi nhớ đăng nhập
@@ -224,7 +271,10 @@ const LoginForm: React.FC = () => {
         {/* Demo Info */}
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800 text-center">
-            <strong>Demo:</strong> Email: phat@vietgene.vn, Mật khẩu: Phat123!
+            <strong>Demo:</strong> Username: admin, Password: 123456
+          </p>
+          <p className="text-xs text-blue-600 text-center mt-1">
+            Hoặc sử dụng tài khoản thật từ database
           </p>
         </div>
       </div>
@@ -234,8 +284,6 @@ const LoginForm: React.FC = () => {
         position="top-center"
         reverseOrder={false}
         gutter={8}
-        containerClassName=""
-        containerStyle={{}}
         toastOptions={{
           duration: 4000,
           style: {

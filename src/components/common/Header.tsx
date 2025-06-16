@@ -3,10 +3,22 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { User, Bell, LogOut, ChevronDown } from "lucide-react";
 
 interface User {
-  id: number;
-  email: string;
-  fullName: string;
-  role: string;
+  userId: number;
+  username: string;
+  authenticated: boolean;
+  // Optional fields từ API (nếu có)
+  id?: number;
+  email?: string;
+  full_name?: string;
+  fullName?: string;
+  role?: string;
+  roles?: Array<{
+    name: string;
+    description: string;
+  }>;
+  phone?: string;
+  address?: string;
+  created_at?: string;
 }
 
 const Header: React.FC = () => {
@@ -18,6 +30,7 @@ const Header: React.FC = () => {
 
   const navLinks = [
     { path: "/", label: "Trang chủ" },
+    { path: "/news", label: "Tin tức" },
     { path: "/services", label: "Dịch vụ" },
     { path: "/about", label: "Giới thiệu" },
     { path: "/contact", label: "Liên hệ" },
@@ -25,20 +38,26 @@ const Header: React.FC = () => {
 
   useEffect(() => {
     // Check authentication state
+    const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
-    if (savedUser) {
+
+    if (token && savedUser) {
       try {
         const userData = JSON.parse(savedUser);
+        console.log("👤 User data from localStorage:", userData);
         setUser(userData);
       } catch (error) {
-        console.error("Error parsing user data:", error);
+        console.error("❌ Invalid user data in localStorage:", error);
+        // Clear invalid data
         localStorage.removeItem("user");
+        localStorage.removeItem("token");
       }
     }
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     setUser(null);
     setIsUserMenuOpen(false);
     navigate("/");
@@ -52,7 +71,7 @@ const Header: React.FC = () => {
     },
     {
       label: "Đơn hàng của tôi",
-      path: "/orders",
+      path: "/orders/1",
       icon: User,
     },
     {
@@ -61,6 +80,41 @@ const Header: React.FC = () => {
       icon: User,
     },
   ];
+
+  // ✅ Helper function để hiển thị tên user
+  const getUserDisplayName = () => {
+    if (!user) return "";
+    return user.full_name || user.fullName || user.username || "User";
+  };
+
+  // ✅ Helper function để hiển thị email
+  const getUserEmail = () => {
+    if (!user) return "";
+    return user.email || `${user.username}@example.com`;
+  };
+
+  // ✅ Helper function để hiển thị role
+  const getUserRole = () => {
+    if (!user) return "";
+
+    // Map roles to Vietnamese
+    const roleMap: { [key: string]: string } = {
+      ROLE_ADMIN: "Quản trị viên",
+      administrator: "Quản trị viên",
+      admin: "Quản trị viên",
+      doctor: "Bác sĩ",
+      staff: "Nhân viên",
+      customer: "Khách hàng",
+    };
+
+    // Get role from roles array or fallback to role field
+    let roleName = user.role;
+    if (user.roles && user.roles.length > 0) {
+      roleName = user.roles[0].name;
+    }
+
+    return roleMap[roleName || ""] || roleName || "Người dùng";
+  };
 
   return (
     <header className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
@@ -107,11 +161,9 @@ const Header: React.FC = () => {
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-medium text-gray-900">
-                      {user.fullName}
+                      {getUserDisplayName()}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      {user.role === "customer" ? "Khách hàng" : user.role}
-                    </p>
+                    <p className="text-xs text-gray-500">{getUserRole()}</p>
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
@@ -122,9 +174,12 @@ const Header: React.FC = () => {
                     {/* User Info */}
                     <div className="px-4 py-3 border-b border-gray-200">
                       <p className="text-sm font-medium text-gray-900">
-                        {user.fullName}
+                        {getUserDisplayName()}
                       </p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                      <p className="text-sm text-gray-500">{getUserEmail()}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        ID: {user.userId}
+                      </p>
                     </div>
 
                     {/* Menu Items */}
@@ -235,9 +290,14 @@ const Header: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900">
-                          {user.fullName}
+                          {getUserDisplayName()}
                         </p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
+                        <p className="text-sm text-gray-500">
+                          {getUserEmail()}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {getUserRole()} • ID: {user.userId}
+                        </p>
                       </div>
                     </div>
                   </div>
