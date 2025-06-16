@@ -32,32 +32,71 @@ const LoginForm: React.FC = () => {
         password: "***",
       });
 
-      // ✅ Gọi API với đúng field names
       const response = await authService.login(data.username, data.password);
 
       console.log("📝 API Response:", response);
 
       if (response.success && response.data) {
-        // Store token và user info
         const { result } = response.data;
 
+        console.log("🔍 Login API response:", response.data);
+
+        // ✅ Store basic auth data first
         localStorage.setItem("token", result.token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            userId: result.userId,
-            username: data.username,
-            // Có thể thêm các field khác từ API response
-            authenticated: result.authenticated,
-          })
-        );
+
+        // ✅ Get full profile data from /user/profile API
+        const profileResponse = await authService.getUserProfile();
+        console.log("👤 Profile API response:", profileResponse);
+
+        if (profileResponse.success && profileResponse.data) {
+          // Store complete user data từ profile API
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              userId: result.userId,
+              username: data.username,
+              authenticated: result.authenticated,
+              // ✅ Full data từ profile API
+              id: profileResponse.data.id,
+              email: profileResponse.data.email,
+              full_name: profileResponse.data.full_name,
+              fullName: profileResponse.data.full_name, // Alias cho compatibility
+              phone: profileResponse.data.phone,
+              address: profileResponse.data.address,
+              // ✅ Extract role từ roles array
+              role: profileResponse.data.roles?.[0]?.name || "customer",
+              roles: profileResponse.data.roles, // Keep full roles array
+              created_at: profileResponse.data.created_at,
+            })
+          );
+        } else {
+          // Fallback nếu profile API fail
+          localStorage.setItem(
+            "user",
+            JSON.stringify({
+              userId: result.userId,
+              username: data.username,
+              authenticated: result.authenticated,
+              email: `${data.username}@example.com`,
+              fullName: data.username,
+              role: "customer",
+            })
+          );
+        }
+
+        // ✅ Remember me functionality
+        if (data.remember) {
+          localStorage.setItem("rememberLogin", "true");
+        }
 
         toast.success("Đăng nhập thành công!", { id: loadingToast });
 
-        // Navigate based on user role or default to dashboard
-        navigate("/");
+        // ✅ Navigate to dashboard
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 1000);
       } else {
-        console.error("Login failed:", response.message);
+        console.error("❌ Login failed:", response.message);
         toast.error(response.message || "Đăng nhập thất bại", {
           id: loadingToast,
         });
@@ -112,6 +151,7 @@ const LoginForm: React.FC = () => {
                     errors.username ? "border-red-300" : "border-gray-300"
                   }`}
                   placeholder="Nhập tên đăng nhập hoặc email"
+                  disabled={isLoading}
                 />
               </div>
               {errors.username && (
@@ -143,11 +183,13 @@ const LoginForm: React.FC = () => {
                     errors.password ? "border-red-300" : "border-gray-300"
                   }`}
                   placeholder="Nhập mật khẩu"
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -170,6 +212,7 @@ const LoginForm: React.FC = () => {
                   {...register("remember")}
                   type="checkbox"
                   className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  disabled={isLoading}
                 />
                 <span className="ml-2 text-sm text-gray-600">
                   Ghi nhớ đăng nhập
@@ -241,8 +284,6 @@ const LoginForm: React.FC = () => {
         position="top-center"
         reverseOrder={false}
         gutter={8}
-        containerClassName=""
-        containerStyle={{}}
         toastOptions={{
           duration: 4000,
           style: {

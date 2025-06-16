@@ -9,6 +9,8 @@ const apiClient = axios.create({
     "Content-Type": "application/json",
     Accept: "application/json",
   },
+  // ✅ Bật credentials để match với backend CORS
+  withCredentials: true,
 });
 
 // Request interceptor
@@ -109,6 +111,40 @@ export const authService = {
           message: "Có lỗi xảy ra: " + error.message,
         };
       }
+    }
+  },
+
+  // ✅ Thêm getUserProfile method
+  getUserProfile: async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No token found");
+      }
+
+      const response = await apiClient.get("/user/profile", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.data.code === 200) {
+        return {
+          success: true,
+          data: response.data.result,
+        };
+      } else {
+        return {
+          success: false,
+          message: response.data.message || "Không thể lấy thông tin profile",
+        };
+      }
+    } catch (error: any) {
+      console.error("❌ Get profile error:", error);
+      return {
+        success: false,
+        message: "Lỗi khi lấy thông tin profile",
+      };
     }
   },
 
