@@ -153,23 +153,6 @@ const NewsDetail: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Breadcrumb */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <nav className="flex items-center space-x-2 text-sm text-gray-600">
-            <Link to="/" className="hover:text-red-600 transition-colors">
-              Trang chủ
-            </Link>
-            <ChevronRight className="w-4 h-4" />
-            <Link to="/news" className="hover:text-red-600 transition-colors">
-              Tin tức
-            </Link>
-            <ChevronRight className="w-4 h-4" />
-            <span className="text-gray-900 truncate">{article.title}</span>
-          </nav>
-        </div>
-      </div>
-
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Back Button */}
         <button
