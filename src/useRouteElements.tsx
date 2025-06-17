@@ -23,6 +23,7 @@ import DoctorManagement from "./pages/Admin/DoctorManagement";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
+import NewsDetail from "./pages/news/NewsDetail";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -127,6 +128,14 @@ export default function useRouteElements() {
       element: (
         <MainLayout>
           <News />
+        </MainLayout>
+      ),
+    },
+    {
+      path: "/news/:id",
+      element: (
+        <MainLayout>
+          <NewsDetail />
         </MainLayout>
       ),
     },

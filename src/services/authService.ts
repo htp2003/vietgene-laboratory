@@ -9,7 +9,6 @@ const apiClient = axios.create({
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-  // ✅ Bật credentials để match với backend CORS
   withCredentials: true,
 });
 
