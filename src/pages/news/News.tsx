@@ -9,145 +9,51 @@ import {
   ArrowRight,
   TrendingUp,
   Star,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
-
-// Mock data based on blog_posts table
-const mockNews = [
-  {
-    id: 1,
-    title: "Công nghệ xét nghiệm DNA mới: Độ chính xác lên đến 99.99%",
-    content:
-      "VietGene Lab vừa áp dụng công nghệ STR Analysis thế hệ mới với độ chính xác vượt trội, giúp khách hàng có được kết quả tin cậy nhất...",
-    author_id: 1,
-    author: {
-      full_name: "TS. Nguyễn Văn Minh",
-      avatar: null,
-    },
-    status: "published",
-    view_count: 1250,
-    featured_image:
-      "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&h=400&fit=crop",
-    created_at: "2025-06-15T09:00:00Z",
-    excerpt:
-      "Khám phá công nghệ xét nghiệm DNA tiên tiến nhất hiện nay với độ chính xác vượt trội...",
-    reading_time: 5,
-    is_featured: true,
-  },
-  {
-    id: 2,
-    title: "Hướng dẫn chuẩn bị trước khi xét nghiệm DNA",
-    content:
-      "Để có kết quả xét nghiệm chính xác nhất, khách hàng cần lưu ý một số điều quan trọng trước khi tiến hành lấy mẫu...",
-    author_id: 2,
-    author: {
-      full_name: "ThS. Trần Thị Lan",
-      avatar: null,
-    },
-    status: "published",
-    view_count: 890,
-    featured_image:
-      "https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=800&h=400&fit=crop",
-    created_at: "2025-06-12T14:30:00Z",
-    excerpt:
-      "Những lưu ý quan trọng giúp đảm bảo chất lượng mẫu xét nghiệm tốt nhất...",
-    reading_time: 3,
-    is_featured: false,
-  },
-  {
-    id: 3,
-    title: "Xét nghiệm huyết thống: Khám phá nguồn gốc gia đình",
-    content:
-      "Dịch vụ xét nghiệm huyết thống giúp bạn tìm hiểu về nguồn gốc, lịch sử di cư và kết nối với họ hàng xa...",
-    author_id: 1,
-    author: {
-      full_name: "TS. Nguyễn Văn Minh",
-      avatar: null,
-    },
-    status: "published",
-    view_count: 672,
-    featured_image:
-      "https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=800&h=400&fit=crop",
-    created_at: "2025-06-10T11:15:00Z",
-    excerpt:
-      "Hành trình khám phá nguồn gốc gia đình qua công nghệ xét nghiệm DNA hiện đại...",
-    reading_time: 7,
-    is_featured: true,
-  },
-  {
-    id: 4,
-    title: "VietGene Lab đạt chứng nhận ISO 15189:2012",
-    content:
-      "Chúng tôi vinh dự thông báo VietGene Lab đã chính thức đạt được chứng nhận ISO 15189:2012 - tiêu chuẩn quốc tế về phòng thí nghiệm y tế...",
-    author_id: 3,
-    author: {
-      full_name: "BS. Lê Quang Hùng",
-      avatar: null,
-    },
-    status: "published",
-    view_count: 445,
-    featured_image:
-      "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&h=400&fit=crop",
-    created_at: "2025-06-08T16:45:00Z",
-    excerpt:
-      "Một cột mốc quan trọng khẳng định chất lượng dịch vụ đạt tiêu chuẩn quốc tế...",
-    reading_time: 4,
-    is_featured: false,
-  },
-  {
-    id: 5,
-    title: "Câu hỏi thường gặp về xét nghiệm quan hệ cha con",
-    content:
-      "Tổng hợp những câu hỏi phổ biến nhất mà khách hàng thường quan tâm khi thực hiện xét nghiệm quan hệ cha con...",
-    author_id: 2,
-    author: {
-      full_name: "ThS. Trần Thị Lan",
-      avatar: null,
-    },
-    status: "published",
-    view_count: 1180,
-    featured_image:
-      "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&h=400&fit=crop",
-    created_at: "2025-06-06T10:20:00Z",
-    excerpt:
-      "Giải đáp chi tiết các thắc mắc phổ biến về quy trình và kết quả xét nghiệm...",
-    reading_time: 6,
-    is_featured: false,
-  },
-  {
-    id: 6,
-    title: "Bảo mật thông tin khách hàng - Cam kết của VietGene Lab",
-    content:
-      "Chúng tôi hiểu rằng thông tin xét nghiệm DNA là vô cùng nhạy cảm. Vì vậy, VietGene Lab cam kết bảo mật tuyệt đối...",
-    author_id: 1,
-    author: {
-      full_name: "TS. Nguyễn Văn Minh",
-      avatar: null,
-    },
-    status: "published",
-    view_count: 567,
-    featured_image:
-      "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=400&fit=crop",
-    created_at: "2025-06-04T13:10:00Z",
-    excerpt:
-      "Tìm hiểu về các biện pháp bảo mật tiên tiến để bảo vệ thông tin cá nhân...",
-    reading_time: 4,
-    is_featured: false,
-  },
-];
+import toast, { Toaster } from "react-hot-toast";
+import { newsService, NewsArticle } from "../../services/newsService";
 
 const News: React.FC = () => {
-  const [news, setNews] = useState(mockNews);
+  const [news, setNews] = useState<NewsArticle[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"latest" | "popular">("latest");
 
   useEffect(() => {
-    // Simulate API call
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    fetchNews();
   }, []);
+
+  const fetchNews = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log("📰 Fetching news from API...");
+      const response = await newsService.getAllNews();
+
+      if (response.success && response.data) {
+        console.log("✅ News data received:", response.data);
+        setNews(response.data);
+      } else {
+        console.error("❌ Failed to fetch news:", response.message);
+        setError(response.message || "Không thể tải tin tức");
+        toast.error(response.message || "Không thể tải tin tức");
+      }
+    } catch (error: any) {
+      console.error("💥 News fetch error:", error);
+      setError("Có lỗi xảy ra khi tải tin tức");
+      toast.error("Có lỗi xảy ra khi tải tin tức");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    fetchNews();
+  };
 
   const filteredNews = news.filter(
     (article) =>
@@ -184,12 +90,37 @@ const News: React.FC = () => {
     return count.toString();
   };
 
+  // Loading State
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Đang tải tin tức...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Không thể tải tin tức
+          </h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={handleRetry}
+            className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            <RefreshCw className="w-5 h-5" />
+            Thử lại
+          </button>
         </div>
       </div>
     );
@@ -267,11 +198,20 @@ const News: React.FC = () => {
                   className="group bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
                 >
                   <div className="relative">
-                    <img
-                      src={article.featured_image}
-                      alt={article.title}
-                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
+                    {article.featured_image ? (
+                      <img
+                        src={article.featured_image}
+                        alt={article.title}
+                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+                        <div className="text-red-400 text-center">
+                          <TrendingUp className="w-12 h-12 mx-auto mb-2" />
+                          <p className="text-sm">VietGene Lab</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="absolute top-4 left-4">
                       <span className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-medium">
                         Nổi bật
@@ -283,13 +223,16 @@ const News: React.FC = () => {
                       {article.title}
                     </h3>
                     <p className="text-gray-600 mb-4 line-clamp-2">
-                      {article.excerpt}
+                      {article.excerpt ||
+                        article.content.substring(0, 150) + "..."}
                     </p>
                     <div className="flex items-center justify-between text-sm text-gray-500">
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1">
                           <User className="w-4 h-4" />
-                          <span>{article.author.full_name}</span>
+                          <span>
+                            {article.author?.full_name || "VietGene Lab"}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
@@ -301,10 +244,12 @@ const News: React.FC = () => {
                           <Eye className="w-4 h-4" />
                           <span>{formatViewCount(article.view_count)}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{article.reading_time} phút</span>
-                        </div>
+                        {article.reading_time && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{article.reading_time} phút</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -331,33 +276,45 @@ const News: React.FC = () => {
                 className="group bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
               >
                 <div className="relative">
-                  <img
-                    src={article.featured_image}
-                    alt={article.title}
-                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                  {article.featured_image ? (
+                    <img
+                      src={article.featured_image}
+                      alt={article.title}
+                      className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <div className="text-gray-400 text-center">
+                        <TrendingUp className="w-8 h-8 mx-auto mb-1" />
+                        <p className="text-xs">VietGene Lab</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-3 group-hover:text-red-600 transition-colors line-clamp-2">
                     {article.title}
                   </h3>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {article.excerpt}
+                    {article.excerpt ||
+                      article.content.substring(0, 100) + "..."}
                   </p>
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <div className="flex items-center gap-1">
                       <User className="w-3 h-3" />
-                      <span>{article.author.full_name}</span>
+                      <span>{article.author?.full_name || "VietGene Lab"}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">
                         <Eye className="w-3 h-3" />
                         <span>{formatViewCount(article.view_count)}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>{article.reading_time}p</span>
-                      </div>
+                      {article.reading_time && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{article.reading_time}p</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-gray-100">
@@ -378,7 +335,7 @@ const News: React.FC = () => {
         </div>
 
         {/* No Results */}
-        {sortedNews.length === 0 && (
+        {sortedNews.length === 0 && !loading && (
           <div className="text-center py-16">
             <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -391,41 +348,74 @@ const News: React.FC = () => {
         )}
 
         {/* Stats Section */}
-        <div className="mt-20 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-8 md:p-12 text-white">
-          <div className="text-center mb-8">
-            <h3 className="text-2xl font-bold mb-4">Thống kê nội dung</h3>
+        {news.length > 0 && (
+          <div className="mt-20 bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-8 md:p-12 text-white">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold mb-4">Thống kê nội dung</h3>
+            </div>
+            <div className="grid md:grid-cols-4 gap-8 text-center">
+              <div>
+                <div className="text-3xl font-bold mb-2">{news.length}</div>
+                <div className="text-red-100">Bài viết</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold mb-2">
+                  {news
+                    .reduce((sum, article) => sum + article.view_count, 0)
+                    .toLocaleString()}
+                </div>
+                <div className="text-red-100">Lượt xem</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold mb-2">
+                  {featuredNews.length}
+                </div>
+                <div className="text-red-100">Bài nổi bật</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold mb-2">
+                  {news.filter((a) => a.reading_time).length > 0
+                    ? Math.round(
+                        news
+                          .filter((a) => a.reading_time)
+                          .reduce(
+                            (sum, article) => sum + (article.reading_time || 0),
+                            0
+                          ) / news.filter((a) => a.reading_time).length
+                      )
+                    : 0}
+                </div>
+                <div className="text-red-100">Phút đọc TB</div>
+              </div>
+            </div>
           </div>
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold mb-2">{news.length}</div>
-              <div className="text-red-100">Bài viết</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold mb-2">
-                {news
-                  .reduce((sum, article) => sum + article.view_count, 0)
-                  .toLocaleString()}
-              </div>
-              <div className="text-red-100">Lượt xem</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold mb-2">
-                {featuredNews.length}
-              </div>
-              <div className="text-red-100">Bài nổi bật</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold mb-2">
-                {Math.round(
-                  news.reduce((sum, article) => sum + article.reading_time, 0) /
-                    news.length
-                )}
-              </div>
-              <div className="text-red-100">Phút đọc TB</div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
+
+      {/* Toast Container */}
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: "#363636",
+            color: "#fff",
+            padding: "16px",
+            borderRadius: "8px",
+          },
+          success: {
+            style: {
+              background: "#10b981",
+            },
+          },
+          error: {
+            style: {
+              background: "#ef4444",
+            },
+          },
+        }}
+      />
     </div>
   );
 };
