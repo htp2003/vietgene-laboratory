@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Microscope,
@@ -7,128 +7,87 @@ import {
   TreePine,
   Scale,
   FileCheck,
+  Loader,
+  AlertCircle,
 } from "lucide-react";
-
-// Mock data based on your database schema
-const services = [
-  {
-    id: 1,
-    service_name: "Xét nghiệm quan hệ cha con",
-    test_category: "paternity",
-    service_type: "civil",
-    description:
-      "Xác định mối quan hệ huyết thống giữa cha và con với độ chính xác cao nhất",
-    price: 2500000,
-    duration_days: 5,
-    collection_methods: "self_collect,facility_collect",
-    requires_legal_documents: false,
-    icon: "microscope",
-    features: [
-      "Độ chính xác 99.99%",
-      "Kết quả trong 5-7 ngày",
-      "Hỗ trợ lấy mẫu tại nhà",
-      "Bảo mật thông tin tuyệt đối",
-    ],
-  },
-  {
-    id: 2,
-    service_name: "Xét nghiệm quan hệ mẹ con",
-    test_category: "maternity",
-    service_type: "civil",
-    description:
-      "Xác định mối quan hệ huyết thống giữa mẹ và con một cách chính xác",
-    price: 2300000,
-    duration_days: 5,
-    collection_methods: "self_collect,facility_collect",
-    requires_legal_documents: false,
-    icon: "flaskConical",
-    features: [
-      "Công nghệ hiện đại",
-      "Quy trình nhanh chóng",
-      "Tư vấn miễn phí",
-      "Hỗ trợ 24/7",
-    ],
-  },
-  {
-    id: 3,
-    service_name: "Xét nghiệm anh chị em ruột",
-    test_category: "sibling",
-    service_type: "civil",
-    description:
-      "Xác định mối quan hệ huyết thống giữa các anh chị em cùng cha mẹ",
-    price: 2800000,
-    duration_days: 7,
-    collection_methods: "self_collect,facility_collect",
-    requires_legal_documents: false,
-    icon: "dna",
-    features: [
-      "Phân tích DNA toàn diện",
-      "Báo cáo chi tiết",
-      "Tư vấn chuyên nghiệp",
-      "Bảo đảm chất lượng",
-    ],
-  },
-  {
-    id: 4,
-    service_name: "Xét nghiệm huyết thống tổ tiên",
-    test_category: "ancestry",
-    service_type: "civil",
-    description: "Khám phá nguồn gốc và lịch sử gia đình qua phân tích DNA",
-    price: 3500000,
-    duration_days: 10,
-    collection_methods: "self_collect,facility_collect",
-    requires_legal_documents: false,
-    icon: "treePine",
-    features: [
-      "Bản đồ nguồn gốc chi tiết",
-      "Lịch sử di cư gia đình",
-      "Kết nối với họ hàng xa",
-      "Báo cáo đa dạng sinh học",
-    ],
-  },
-  {
-    id: 5,
-    service_name: "Xét nghiệm pháp lý cha con",
-    test_category: "paternity",
-    service_type: "administrative",
-    description:
-      "Xét nghiệm được công nhận về mặt pháp lý cho các thủ tục hành chính",
-    price: 3200000,
-    duration_days: 7,
-    collection_methods: "facility_collect",
-    requires_legal_documents: true,
-    icon: "scale",
-    features: [
-      "Được pháp luật công nhận",
-      "Quy trình nghiêm ngặt",
-      "Giấy tờ pháp lý đầy đủ",
-      "Hỗ trợ thủ tục hành chính",
-    ],
-  },
-  {
-    id: 6,
-    service_name: "Xét nghiệm pháp lý anh chị em",
-    test_category: "sibling",
-    service_type: "administrative",
-    description:
-      "Xét nghiệm anh chị em có giá trị pháp lý cho các thủ tục thừa kế",
-    price: 3500000,
-    duration_days: 8,
-    collection_methods: "facility_collect",
-    requires_legal_documents: true,
-    icon: "fileCheck",
-    features: [
-      "Có giá trị tại tòa án",
-      "Phục vụ thủ tục thừa kế",
-      "Quy trình chuẩn quốc tế",
-      "Bảo mật cao độ",
-    ],
-  },
-];
+import {
+  ServiceService,
+  mapApiServiceToFrontend,
+  formatPrice,
+  getCategoryName,
+  getServiceTypeName,
+} from "../../services/serviceService";
 
 const Services: React.FC = () => {
+  const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [selectedType, setSelectedType] = useState<string>("all");
+
+  // Fetch services from API
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        setLoading(true);
+        console.log("Starting to fetch services...");
+
+        const apiServices = await ServiceService.getAllServices();
+        console.log("Raw API services:", apiServices);
+
+        if (!apiServices || apiServices.length === 0) {
+          console.warn("No services returned from API");
+          setServices([]);
+          setError("Chưa có dịch vụ nào được thiết lập.");
+          return;
+        }
+
+        const mappedServices = apiServices
+          .map((service, index) => {
+            console.log(`=== MAPPING SERVICE ${index} ===`);
+            console.log("Raw API service:", service);
+            console.log(
+              "testPrice:",
+              service.testPrice,
+              typeof service.testPrice
+            );
+            console.log(
+              "durationDays:",
+              service.durationDays,
+              typeof service.durationDays
+            );
+
+            try {
+              const mapped = mapApiServiceToFrontend(service);
+              console.log("=== MAPPED RESULT ===");
+              console.log("Final price:", mapped.price, typeof mapped.price);
+              console.log(
+                "Final duration:",
+                mapped.duration_days,
+                typeof mapped.duration_days
+              );
+              console.log("=====================");
+              return mapped;
+            } catch (mappingError) {
+              console.error(`Error mapping service ${index}:`, mappingError);
+              return null;
+            }
+          })
+          .filter(Boolean);
+
+        console.log("Final mapped services:", mappedServices);
+        setServices(mappedServices);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to fetch services:", err);
+        setError("Không thể tải danh sách dịch vụ. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServices();
+  }, []);
 
   const filteredServices = services.filter((service) => {
     const categoryMatch =
@@ -137,27 +96,6 @@ const Services: React.FC = () => {
       selectedType === "all" || service.service_type === selectedType;
     return categoryMatch && typeMatch;
   });
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
-  };
-
-  const getCategoryName = (category: string) => {
-    const names: { [key: string]: string } = {
-      paternity: "Cha con",
-      maternity: "Mẹ con",
-      sibling: "Anh chị em",
-      ancestry: "Huyết thống",
-    };
-    return names[category] || category;
-  };
-
-  const getServiceTypeName = (type: string) => {
-    return type === "civil" ? "Dân sự" : "Pháp lý";
-  };
 
   const getIcon = (iconName: string) => {
     const iconMap = {
@@ -173,6 +111,39 @@ const Services: React.FC = () => {
       iconMap[iconName as keyof typeof iconMap] || Microscope;
     return <IconComponent className="w-8 h-8 text-red-600" />;
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-red-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải dịch vụ...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Có lỗi xảy ra
+          </h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -200,6 +171,7 @@ const Services: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {[
                     { value: "all", label: "Tất cả" },
+                    { value: "Cơ bản", label: "Cơ bản" },
                     { value: "paternity", label: "Cha con" },
                     { value: "maternity", label: "Mẹ con" },
                     { value: "sibling", label: "Anh chị em" },
@@ -228,6 +200,7 @@ const Services: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {[
                     { value: "all", label: "Tất cả" },
+                    { value: "Nhanh", label: "Nhanh" },
                     { value: "civil", label: "Dân sự" },
                     { value: "administrative", label: "Pháp lý" },
                   ].map((type) => (
@@ -251,103 +224,114 @@ const Services: React.FC = () => {
 
         {/* Services Grid */}
         <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-8">
-          {filteredServices.map((service) => (
-            <div
-              key={service.id}
-              className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group"
-            >
-              {/* Card Header */}
-              <div className="p-8 pb-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>{getIcon(service.icon)}</div>
-                  <div className="flex gap-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        service.service_type === "civil"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-purple-100 text-purple-800"
-                      }`}
-                    >
-                      {getServiceTypeName(service.service_type)}
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      {getCategoryName(service.test_category)}
-                    </span>
-                  </div>
-                </div>
-
-                <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-red-600 transition-colors">
-                  {service.service_name}
-                </h3>
-
-                <p className="text-gray-600 leading-relaxed mb-6">
-                  {service.description}
-                </p>
-
-                {/* Features */}
-                <div className="space-y-2 mb-6">
-                  {service.features.map((feature, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center text-sm text-gray-600"
-                    >
-                      <svg
-                        className="w-4 h-4 text-green-500 mr-2 flex-shrink-0"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
+          {filteredServices.map((service) => {
+            console.log(
+              "Rendering service:",
+              service.service_name,
+              "Price:",
+              service.price,
+              "Duration:",
+              service.duration_days
+            );
+            return (
+              <div
+                key={service.id}
+                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group"
+              >
+                {/* Card Header */}
+                <div className="p-8 pb-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>{getIcon(service.icon)}</div>
+                    <div className="flex gap-2">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          service.service_type === "civil" ||
+                          service.service_type === "Nhanh"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
                       >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      {feature}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Card Footer */}
-              <div className="px-8 pb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <div className="text-2xl font-bold text-gray-900">
-                      {formatPrice(service.price)}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Kết quả trong {service.duration_days} ngày
+                        {getServiceTypeName(service.service_type)}
+                      </span>
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        {getCategoryName(service.test_category)}
+                      </span>
                     </div>
                   </div>
 
-                  {service.requires_legal_documents && (
-                    <div className="text-orange-600 text-xs font-medium bg-orange-50 px-2 py-1 rounded">
-                      Cần giấy tờ pháp lý
-                    </div>
-                  )}
+                  <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-red-600 transition-colors">
+                    {service.service_name}
+                  </h3>
+
+                  <p className="text-gray-600 leading-relaxed mb-6">
+                    {service.description}
+                  </p>
+
+                  {/* Features */}
+                  <div className="space-y-2 mb-6">
+                    {service.features?.map((feature: string, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center text-sm text-gray-600"
+                      >
+                        <svg
+                          className="w-4 h-4 text-green-500 mr-2 flex-shrink-0"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        {feature}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <Link
-                    to={`/services/${service.id}`}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-center"
-                  >
-                    Xem chi tiết
-                  </Link>
-                  <Link
-                    to={`/order/${service.id}`}
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition-colors text-center"
-                  >
-                    Đặt ngay
-                  </Link>
+                {/* Card Footer */}
+                <div className="px-8 pb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {formatPrice(service.price)}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Kết quả trong {service.duration_days || "N/A"} ngày
+                      </div>
+                    </div>
+
+                    {service.requires_legal_documents && (
+                      <div className="text-orange-600 text-xs font-medium bg-orange-50 px-2 py-1 rounded">
+                        Cần giấy tờ pháp lý
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Link
+                      to={`/services/${service.id}`}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-3 rounded-lg text-sm font-medium transition-colors text-center"
+                    >
+                      Xem chi tiết
+                    </Link>
+                    <Link
+                      to={`/order/${service.id}`}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg text-sm font-medium transition-colors text-center"
+                    >
+                      Đặt ngay
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* No Results */}
-        {filteredServices.length === 0 && (
+        {filteredServices.length === 0 && !loading && (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
