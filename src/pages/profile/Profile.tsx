@@ -14,9 +14,12 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
+  FileText,
+  Heart,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { authService } from "../../services/authService";
+import MedicalRecords from "../../components/medical/MedicalRecords";
 
 interface UserProfile {
   id: number;
@@ -50,7 +53,9 @@ const Profile: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"profile" | "password">("profile");
+  const [activeTab, setActiveTab] = useState<
+    "profile" | "password" | "medical"
+  >("profile");
   const [updateLoading, setUpdateLoading] = useState(false);
 
   const {
@@ -295,10 +300,10 @@ const Profile: React.FC = () => {
         {/* Tabs */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
           <div className="border-b border-gray-200">
-            <div className="flex">
+            <div className="flex overflow-x-auto">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "profile"
                     ? "border-red-500 text-red-600 bg-red-50"
                     : "border-transparent text-gray-500 hover:text-gray-700"
@@ -308,8 +313,19 @@ const Profile: React.FC = () => {
                 Chỉnh sửa thông tin
               </button>
               <button
+                onClick={() => setActiveTab("medical")}
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === "medical"
+                    ? "border-red-500 text-red-600 bg-red-50"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Hồ sơ y tế
+              </button>
+              <button
                 onClick={() => setActiveTab("password")}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "password"
                     ? "border-red-500 text-red-600 bg-red-50"
                     : "border-transparent text-gray-500 hover:text-gray-700"
@@ -479,6 +495,13 @@ const Profile: React.FC = () => {
                     </div>
                   )}
                 </form>
+              </div>
+            )}
+
+            {activeTab === "medical" && (
+              <div>
+                {/* Remove the outer container since MedicalRecords already has its own styling */}
+                <MedicalRecords />
               </div>
             )}
 

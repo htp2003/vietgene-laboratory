@@ -24,6 +24,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
+import APITestPage from "./pages/APITestPage";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -139,6 +140,17 @@ export default function useRouteElements() {
         </MainLayout>
       ),
     },
+
+    // Add this route to useRouteElements.tsx:
+
+    // {
+    //   path: "/api-test",
+    //   element: (
+    //     <MainLayout>
+    //       <APITestPage />
+    //     </MainLayout>
+    //   ),
+    // },
 
     // Admin
     {

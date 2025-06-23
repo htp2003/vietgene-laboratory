@@ -18,165 +18,116 @@ import {
   Home,
   RefreshCw,
   MessageCircle,
+  Loader,
+  Eye,
+  Users,
 } from "lucide-react";
-
-// Mock order data - normally would fetch from API
-const mockOrderDetails = {
-  1: {
-    id: 1,
-    orderCode: "DNA-ABC123XY",
-    serviceName: "Xét nghiệm quan hệ cha con",
-    serviceType: "civil",
-    status: "testing",
-    createdDate: "2025-06-01",
-    updatedDate: "2025-06-04",
-    estimatedResult: "2025-06-08",
-    price: 2500000,
-    progress: 80,
-    customer: {
-      fullName: "Nguyễn Văn Demo",
-      email: "demo@vietgene.vn",
-      phone: "0987654321",
-      address: "123 Nguyễn Văn Linh, Quận 7, TP.HCM",
-      identityCard: "079123456789",
-    },
-    participants: [
-      { name: "Nguyễn Văn Demo", relationship: "Cha", age: "35" },
-      { name: "Nguyễn Văn Junior", relationship: "Con", age: "8" },
-    ],
-    collectionMethod: "self_collect",
-    appointmentDate: null,
-    paymentMethod: "transfer",
-    paymentStatus: "paid",
-    paymentDate: "2025-06-01",
-    transactionId: "TXN123456789",
-    notes: "Gửi kit đến địa chỉ nhà riêng, liên hệ trước khi giao.",
-    trackingSteps: [
-      {
-        step: 1,
-        title: "Đơn hàng được xác nhận",
-        status: "completed",
-        date: "2025-06-01 09:30",
-        description: "Đơn hàng đã được xác nhận và thanh toán thành công",
-      },
-      {
-        step: 2,
-        title: "Chuẩn bị kit xét nghiệm",
-        status: "completed",
-        date: "2025-06-01 14:20",
-        description: "Kit xét nghiệm đã được chuẩn bị và đóng gói",
-      },
-      {
-        step: 3,
-        title: "Gửi kit đến khách hàng",
-        status: "completed",
-        date: "2025-06-02 08:15",
-        description:
-          "Kit đã được gửi qua đường vận chuyển. Mã vận đơn: VN123456789",
-      },
-      {
-        step: 4,
-        title: "Khách hàng nhận kit",
-        status: "completed",
-        date: "2025-06-03 16:45",
-        description:
-          "Kit đã được giao thành công và khách hàng đã xác nhận nhận hàng",
-      },
-      {
-        step: 5,
-        title: "Thu thập mẫu",
-        status: "completed",
-        date: "2025-06-04 10:30",
-        description: "Mẫu xét nghiệm đã được thu thập và gửi về phòng lab",
-      },
-      {
-        step: 6,
-        title: "Phân tích tại phòng lab",
-        status: "current",
-        date: "",
-        description:
-          "Mẫu đang được phân tích tại phòng lab với công nghệ tiên tiến",
-      },
-      {
-        step: 7,
-        title: "Kiểm tra và xác nhận kết quả",
-        status: "pending",
-        date: "",
-        description: "Kết quả sẽ được kiểm tra và xác nhận bởi chuyên gia",
-      },
-      {
-        step: 8,
-        title: "Kết quả hoàn thành",
-        status: "pending",
-        date: "",
-        description: "Kết quả sẽ được gửi qua email và SMS",
-      },
-    ],
-    timeline: [
-      { date: "2025-06-01", event: "Đơn hàng được tạo", type: "order" },
-      { date: "2025-06-01", event: "Thanh toán thành công", type: "payment" },
-      { date: "2025-06-02", event: "Kit được gửi đi", type: "shipping" },
-      { date: "2025-06-03", event: "Khách hàng nhận kit", type: "delivery" },
-      { date: "2025-06-04", event: "Mẫu được thu thập", type: "sample" },
-    ],
-  },
-};
+import { orderService } from "../../services/orderService";
+import { formatPrice } from "../../services/serviceService";
 
 const OrderDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [order, setOrder] = useState(mockOrderDetails[1]);
+
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("progress");
 
   useEffect(() => {
-    // Check if user is logged in
-    const savedUser = localStorage.getItem("user");
-    if (!savedUser) {
-      navigate("/login");
-      return;
-    }
+    const fetchOrderDetail = async () => {
+      if (!id) {
+        navigate("/dashboard");
+        return;
+      }
 
-    // Mock: fetch order data by ID
-    const orderId = parseInt(id || "1");
-    const orderData =
-      mockOrderDetails[orderId as keyof typeof mockOrderDetails];
-    if (!orderData) {
-      navigate("/dashboard");
-      return;
-    }
-    setOrder(orderData);
+      try {
+        setLoading(true);
+        setError(null);
+
+        console.log("🔍 Fetching order detail for ID:", id);
+
+        // Get complete order data from API/mock
+        const completeOrderData = await orderService.getCompleteOrderData(id);
+        console.log("📦 Complete order data received:", completeOrderData);
+
+        setOrder(completeOrderData);
+      } catch (err) {
+        console.error("❌ Error fetching order detail:", err);
+        setError("Không thể tải thông tin đơn hàng. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderDetail();
   }, [id, navigate]);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-red-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải thông tin đơn hàng...</p>
+        </div>
+      </div>
+    );
+  }
 
+  // Error state
+  if (error || !order) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            {error || "Không tìm thấy đơn hàng"}
+          </h2>
+          <Link
+            to="/dashboard"
+            className="text-red-600 hover:text-red-700 font-medium"
+          >
+            Quay lại Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Helper functions
   const formatDateTime = (dateTimeString: string) => {
-    if (!dateTimeString) return "";
-    const date = new Date(dateTimeString);
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    if (!dateTimeString) return "Chưa có";
+    try {
+      const date = new Date(dateTimeString);
+      return date.toLocaleString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "Không hợp lệ";
+    }
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    if (!dateString) return "Chưa có";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return "Không hợp lệ";
+    }
   };
 
   const getStatusInfo = (status: string) => {
-    const statusMap = {
+    const statusMap: Record<string, any> = {
       pending: {
         label: "Chờ xử lý",
         color: "bg-yellow-100 text-yellow-800",
@@ -187,19 +138,9 @@ const OrderDetail: React.FC = () => {
         color: "bg-blue-100 text-blue-800",
         icon: CheckCircle,
       },
-      kit_sent: {
-        label: "Đã gửi kit",
+      processing: {
+        label: "Đang xử lý",
         color: "bg-purple-100 text-purple-800",
-        icon: Package,
-      },
-      sample_collected: {
-        label: "Đã thu mẫu",
-        color: "bg-indigo-100 text-indigo-800",
-        icon: FileText,
-      },
-      testing: {
-        label: "Đang xét nghiệm",
-        color: "bg-orange-100 text-orange-800",
         icon: RefreshCw,
       },
       completed: {
@@ -213,20 +154,94 @@ const OrderDetail: React.FC = () => {
         icon: AlertCircle,
       },
     };
-    return statusMap[status as keyof typeof statusMap] || statusMap.pending;
+    return statusMap[status] || statusMap.pending;
   };
 
   const getPaymentMethodName = (method: string) => {
-    const methods = {
+    const methods: Record<string, string> = {
       transfer: "Chuyển khoản ngân hàng",
       cash: "Tiền mặt",
       card: "Thẻ tín dụng",
     };
-    return methods[method as keyof typeof methods] || method;
+    return methods[method] || method;
+  };
+
+  const getPaymentStatusName = (status: string) => {
+    const statuses: Record<string, string> = {
+      pending: "Chờ thanh toán",
+      paid: "Đã thanh toán",
+      failed: "Thanh toán thất bại",
+      refunded: "Đã hoàn tiền",
+    };
+    return statuses[status] || status;
   };
 
   const statusInfo = getStatusInfo(order.status);
   const StatusIcon = statusInfo.icon;
+
+  // Generate tracking steps based on order status
+  const getTrackingSteps = (orderStatus: string) => {
+    const baseSteps = [
+      {
+        step: 1,
+        title: "Đơn hàng được xác nhận",
+        status: "completed",
+        date: order.createdAt,
+        description: "Đơn hàng đã được tạo và xác nhận thành công",
+      },
+      {
+        step: 2,
+        title: "Chuẩn bị kit xét nghiệm",
+        status: orderStatus === "pending" ? "current" : "completed",
+        date:
+          orderStatus === "pending" ? "" : order.updatedAt || order.update_at,
+        description: "Kit xét nghiệm đang được chuẩn bị và đóng gói",
+      },
+      {
+        step: 3,
+        title: "Gửi kit đến khách hàng",
+        status:
+          orderStatus === "processing"
+            ? "current"
+            : orderStatus === "completed"
+            ? "completed"
+            : "pending",
+        date:
+          orderStatus === "completed" ? order.updatedAt || order.update_at : "",
+        description: "Kit được gửi qua đường vận chuyển",
+      },
+      {
+        step: 4,
+        title: "Phân tích tại phòng lab",
+        status: orderStatus === "completed" ? "completed" : "pending",
+        date:
+          orderStatus === "completed" ? order.updatedAt || order.update_at : "",
+        description: "Mẫu đang được phân tích tại phòng lab",
+      },
+      {
+        step: 5,
+        title: "Kết quả hoàn thành",
+        status: orderStatus === "completed" ? "completed" : "pending",
+        date:
+          orderStatus === "completed" ? order.updatedAt || order.update_at : "",
+        description: "Kết quả đã hoàn thành và sẵn sàng tải về",
+      },
+    ];
+    return baseSteps;
+  };
+
+  const trackingSteps = getTrackingSteps(order.status);
+
+  // Safe access to nested properties
+  const orderCode = order.orderCode || order.order_code || order.id;
+  const totalAmount = order.totalAmount || order.total_amount || 0;
+  const paymentMethod = order.paymentMethod || order.payment_method || "";
+  const paymentStatus = order.paymentStatus || order.payment_status || "";
+  const paymentDate = order.paymentDate || order.payment_date;
+  const transactionId = order.transactionId || order.transaction_id;
+  const notes = order.notes || "";
+  const createdAt = order.createdAt || order.created_at;
+  const updatedAt = order.updatedAt || order.updated_at || order.update_at;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -266,71 +281,81 @@ const OrderDetail: React.FC = () => {
           <div className="grid md:grid-cols-2 gap-8">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                {order.serviceName}
+                Đơn hàng #{orderCode}
               </h2>
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Mã đơn hàng:</span>
-                  <span className="font-semibold text-red-600">
-                    {order.orderCode}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Loại dịch vụ:</span>
-                  <span className="font-medium">
-                    {order.serviceType === "civil" ? "Dân sự" : "Pháp lý"}
+                  <span className="font-semibold text-red-600 font-mono">
+                    {orderCode}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Ngày đặt:</span>
-                  <span className="font-medium">
-                    {formatDate(order.createdDate)}
-                  </span>
+                  <span className="font-medium">{formatDate(createdAt)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Cập nhật cuối:</span>
-                  <span className="font-medium">
-                    {formatDate(order.updatedDate)}
+                  <span className="font-medium">{formatDate(updatedAt)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Trạng thái:</span>
+                  <span
+                    className={`font-medium px-2 py-1 rounded text-xs ${statusInfo.color}`}
+                  >
+                    {statusInfo.label}
                   </span>
                 </div>
-                {order.estimatedResult && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Dự kiến hoàn thành:</span>
-                    <span className="font-medium text-orange-600">
-                      {formatDate(order.estimatedResult)}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
             <div>
               <div className="bg-gray-50 rounded-lg p-6">
-                <h3 className="font-semibold text-gray-900 mb-4">
-                  Tiến độ xử lý
+                <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Thông tin thanh toán
                 </h3>
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                    <span>Hoàn thành</span>
-                    <span>{order.progress}%</span>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Tổng tiền:</span>
+                    <span className="font-bold text-lg text-red-600">
+                      {formatPrice(totalAmount)}
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div
-                      className="bg-gradient-to-r from-red-500 to-red-600 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${order.progress}%` }}
-                    ></div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Phương thức:</span>
+                    <span className="font-medium">
+                      {getPaymentMethodName(paymentMethod)}
+                    </span>
                   </div>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900 mb-1">
-                    {formatPrice(order.price)}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Thanh toán:{" "}
-                    {order.paymentStatus === "paid"
-                      ? "Đã thanh toán"
-                      : "Chưa thanh toán"}
-                  </p>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Trạng thái:</span>
+                    <span
+                      className={`font-medium px-2 py-1 rounded text-xs ${
+                        paymentStatus === "paid"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      {getPaymentStatusName(paymentStatus)}
+                    </span>
+                  </div>
+                  {paymentDate && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Ngày thanh toán:</span>
+                      <span className="font-medium">
+                        {formatDate(paymentDate)}
+                      </span>
+                    </div>
+                  )}
+                  {transactionId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mã GD:</span>
+                      <span className="font-medium font-mono text-xs">
+                        {transactionId}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -344,7 +369,7 @@ const OrderDetail: React.FC = () => {
               {[
                 { id: "progress", label: "Tiến trình", icon: Clock },
                 { id: "details", label: "Thông tin chi tiết", icon: FileText },
-                { id: "payment", label: "Thanh toán", icon: CreditCard },
+                { id: "participants", label: "Người tham gia", icon: Users },
               ].map((tab) => {
                 const TabIcon = tab.icon;
                 return (
@@ -373,7 +398,7 @@ const OrderDetail: React.FC = () => {
                   Tiến trình xử lý đơn hàng
                 </h3>
                 <div className="space-y-6">
-                  {order.trackingSteps.map((step, index) => (
+                  {trackingSteps.map((step, index) => (
                     <div key={index} className="flex gap-4">
                       <div
                         className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${
@@ -441,242 +466,180 @@ const OrderDetail: React.FC = () => {
             {/* Details Tab */}
             {activeTab === "details" && (
               <div className="space-y-8">
-                {/* Customer Info */}
+                {/* Order Info */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Thông tin khách hàng
+                    Thông tin đơn hàng
                   </h3>
                   <div className="bg-gray-50 rounded-lg p-6">
                     <div className="grid md:grid-cols-2 gap-6">
                       <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <User className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm text-gray-600">Họ và tên</p>
-                            <p className="font-medium text-gray-900">
-                              {order.customer.fullName}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Mã đơn hàng</p>
+                          <p className="font-medium text-gray-900 font-mono">
+                            {orderCode}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Mail className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm text-gray-600">Email</p>
-                            <p className="font-medium text-gray-900">
-                              {order.customer.email}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Trạng thái</p>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
+                          >
+                            <StatusIcon className="w-3 h-3" />
+                            {statusInfo.label}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Phone className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm text-gray-600">
-                              Số điện thoại
-                            </p>
-                            <p className="font-medium text-gray-900">
-                              {order.customer.phone}
-                            </p>
-                          </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Ngày tạo</p>
+                          <p className="font-medium text-gray-900">
+                            {formatDateTime(createdAt)}
+                          </p>
                         </div>
                       </div>
                       <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <MapPin className="w-5 h-5 text-gray-400 mt-1" />
-                          <div>
-                            <p className="text-sm text-gray-600">Địa chỉ</p>
-                            <p className="font-medium text-gray-900">
-                              {order.customer.address}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm text-gray-600">CMND/CCCD</p>
-                            <p className="font-medium text-gray-900">
-                              {order.customer.identityCard}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Participants */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Người tham gia xét nghiệm
-                  </h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    {order.participants.map((participant, index) => (
-                      <div key={index} className="bg-gray-50 rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-2">
-                          {participant.name}
-                        </h4>
-                        <div className="space-y-1 text-sm text-gray-600">
-                          <p>
-                            Mối quan hệ:{" "}
-                            <span className="font-medium">
-                              {participant.relationship}
-                            </span>
-                          </p>
-                          <p>
-                            Tuổi:{" "}
-                            <span className="font-medium">
-                              {participant.age}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Collection Method */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Phương thức lấy mẫu
-                  </h3>
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      {order.collectionMethod === "self_collect" ? (
-                        <Home className="w-5 h-5 text-red-600" />
-                      ) : (
-                        <Truck className="w-5 h-5 text-red-600" />
-                      )}
-                      <span className="font-medium text-gray-900">
-                        {order.collectionMethod === "self_collect"
-                          ? "Lấy mẫu tại nhà"
-                          : "Lấy mẫu tại cơ sở"}
-                      </span>
-                    </div>
-                    {order.appointmentDate && (
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-5 h-5 text-gray-400" />
                         <div>
-                          <p className="text-sm text-gray-600">Ngày hẹn</p>
-                          <p className="font-medium text-gray-900">
-                            {formatDate(order.appointmentDate)}
+                          <p className="text-sm text-gray-600">Tổng tiền</p>
+                          <p className="font-bold text-lg text-red-600">
+                            {formatPrice(totalAmount)}
                           </p>
                         </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Thanh toán</p>
+                          <p className="font-medium text-gray-900">
+                            {getPaymentMethodName(paymentMethod)}
+                          </p>
+                        </div>
+                        {notes && (
+                          <div>
+                            <p className="text-sm text-gray-600">Ghi chú</p>
+                            <p className="font-medium text-gray-900">{notes}</p>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Notes */}
-                {order.notes && (
+                {/* Order Details (Services) */}
+                {order.orderDetails && order.orderDetails.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Ghi chú
+                      Dịch vụ đã đặt
                     </h3>
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <p className="text-gray-700">{order.notes}</p>
+                    <div className="space-y-4">
+                      {order.orderDetails.map((detail: any, index: number) => (
+                        <div key={index} className="bg-gray-50 rounded-lg p-6">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                              <Package className="w-4 h-4" />
+                              Dịch vụ #{index + 1}
+                            </h4>
+                            <span className="font-bold text-red-600">
+                              {formatPrice(
+                                detail.subtotal ||
+                                  detail.unitPrice ||
+                                  detail.unit_price ||
+                                  0
+                              )}
+                            </span>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-600">
+                                Số lượng:{" "}
+                                <span className="font-medium">
+                                  {detail.quantity || 1}
+                                </span>
+                              </p>
+                              <p className="text-gray-600">
+                                Đơn giá:{" "}
+                                <span className="font-medium">
+                                  {formatPrice(
+                                    detail.unitPrice || detail.unit_price || 0
+                                  )}
+                                </span>
+                              </p>
+                            </div>
+                            {(detail.notes || detail.note) && (
+                              <div>
+                                <p className="text-gray-600">Ghi chú:</p>
+                                <p className="font-medium">
+                                  {detail.notes || detail.note}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Payment Tab */}
-            {activeTab === "payment" && (
+            {/* Participants Tab */}
+            {activeTab === "participants" && (
               <div className="space-y-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-6">
-                  Thông tin thanh toán
+                  Người tham gia xét nghiệm
                 </h3>
 
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-4">
-                        Chi tiết thanh toán
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Dịch vụ:</span>
-                          <span className="font-medium">
-                            {order.serviceName}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Đơn giá:</span>
-                          <span className="font-medium">
-                            {formatPrice(order.price)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-t border-gray-300 pt-3">
-                          <span className="font-semibold text-gray-900">
-                            Tổng cộng:
-                          </span>
-                          <span className="font-bold text-red-600 text-lg">
-                            {formatPrice(order.price)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-4">
-                        Phương thức thanh toán
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <CreditCard className="w-5 h-5 text-gray-400" />
-                          <div>
-                            <p className="text-sm text-gray-600">Phương thức</p>
-                            <p className="font-medium text-gray-900">
-                              {getPaymentMethodName(order.paymentMethod)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                          <div>
-                            <p className="text-sm text-gray-600">Trạng thái</p>
-                            <p
-                              className={`font-medium ${
-                                order.paymentStatus === "paid"
-                                  ? "text-green-600"
-                                  : "text-orange-600"
-                              }`}
-                            >
-                              {order.paymentStatus === "paid"
-                                ? "Đã thanh toán"
-                                : "Chưa thanh toán"}
-                            </p>
-                          </div>
-                        </div>
-                        {order.paymentDate && (
-                          <div className="flex items-center gap-3">
-                            <Calendar className="w-5 h-5 text-gray-400" />
+                {order.participants && order.participants.length > 0 ? (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {order.participants.map(
+                      (participant: any, index: number) => (
+                        <div key={index} className="bg-gray-50 rounded-lg p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-red-600" />
+                            </div>
                             <div>
-                              <p className="text-sm text-gray-600">
-                                Ngày thanh toán
-                              </p>
-                              <p className="font-medium text-gray-900">
-                                {formatDate(order.paymentDate)}
+                              <h4 className="font-medium text-gray-900">
+                                {participant.participantName ||
+                                  participant.participant_name ||
+                                  `Người tham gia ${index + 1}`}
+                              </h4>
+                              <p className="text-sm text-gray-500">
+                                Người tham gia #{index + 1}
                               </p>
                             </div>
                           </div>
-                        )}
-                        {order.transactionId && (
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-gray-400" />
-                            <div>
-                              <p className="text-sm text-gray-600">
-                                Mã giao dịch
-                              </p>
-                              <p className="font-medium text-gray-900 font-mono">
-                                {order.transactionId}
-                              </p>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                Mối quan hệ:
+                              </span>
+                              <span className="font-medium">
+                                {participant.relationship || "Chưa xác định"}
+                              </span>
                             </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Tuổi:</span>
+                              <span className="font-medium">
+                                {participant.age || "Chưa xác định"} tuổi
+                              </span>
+                            </div>
+                            {(participant.notes || participant.note) && (
+                              <div>
+                                <p className="text-gray-600 mb-1">Ghi chú:</p>
+                                <p className="font-medium text-xs bg-white p-2 rounded">
+                                  {participant.notes || participant.note}
+                                </p>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      )
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">
+                      Chưa có thông tin người tham gia
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
