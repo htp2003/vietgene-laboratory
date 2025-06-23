@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -13,123 +13,60 @@ import {
   TreePine,
   Scale,
   FileCheck,
+  Loader,
 } from "lucide-react";
-
-// Mock data - same as Services page
-const services = [
-  {
-    id: 1,
-    service_name: "Xét nghiệm quan hệ cha con",
-    test_category: "paternity",
-    service_type: "civil",
-    description:
-      "Xác định mối quan hệ huyết thống giữa cha và con với độ chính xác cao nhất",
-    price: 2500000,
-    duration_days: 5,
-    collection_methods: "self_collect,facility_collect",
-    requires_legal_documents: false,
-    icon: "microscope",
-    detailed_description:
-      "Xét nghiệm quan hệ cha con là phương pháp khoa học hiện đại nhất để xác định mối quan hệ huyết thống giữa người cha và con. Chúng tôi sử dụng công nghệ phân tích DNA tiên tiến với độ chính xác lên đến 99.99% cho kết quả loại trừ và 99.9999% cho kết quả xác nhận.",
-    process_steps: [
-      "Tư vấn và đăng ký dịch vụ",
-      "Lấy mẫu DNA (nước bọt hoặc máu)",
-      "Vận chuyển mẫu về phòng lab",
-      "Phân tích DNA tại phòng lab",
-      "Kiểm tra và xác nhận kết quả",
-      "Gửi báo cáo kết quả cho khách hàng",
-    ],
-    sample_types: ["Nước bọt", "Máu"],
-    legal_value: false,
-    documents_required: [],
-    faq: [
-      {
-        question: "Độ chính xác của xét nghiệm như thế nào?",
-        answer:
-          "Độ chính xác lên đến 99.99% cho kết quả loại trừ và 99.9999% cho kết quả xác nhận quan hệ cha con.",
-      },
-      {
-        question: "Thời gian có kết quả là bao lâu?",
-        answer:
-          "Thường trong vòng 5-7 ngày làm việc kể từ khi mẫu được nhận tại phòng lab.",
-      },
-      {
-        question: "Có thể lấy mẫu tại nhà không?",
-        answer:
-          "Có, chúng tôi hỗ trợ dịch vụ lấy mẫu tại nhà hoặc bạn có thể đến trực tiếp cơ sở của chúng tôi.",
-      },
-    ],
-  },
-  {
-    id: 2,
-    service_name: "Xét nghiệm quan hệ mẹ con",
-    test_category: "maternity",
-    service_type: "civil",
-    description:
-      "Xác định mối quan hệ huyết thống giữa mẹ và con một cách chính xác",
-    price: 2300000,
-    duration_days: 5,
-    collection_methods: "self_collect,facility_collect",
-    requires_legal_documents: false,
-    icon: "flaskConical",
-    detailed_description:
-      "Xét nghiệm quan hệ mẹ con sử dụng công nghệ phân tích DNA mitochondrial và autosomal để xác định mối quan hệ huyết thống giữa người mẹ và con với độ chính xác cao.",
-    process_steps: [
-      "Đăng ký và tư vấn dịch vụ",
-      "Thu thập mẫu DNA từ mẹ và con",
-      "Bảo quản và vận chuyển mẫu",
-      "Phân tích DNA mitochondrial",
-      "So sánh và đối chiếu kết quả",
-      "Xuất báo cáo chi tiết",
-    ],
-    sample_types: ["Nước bọt", "Tế bào má"],
-    legal_value: false,
-    documents_required: [],
-    faq: [
-      {
-        question: "Xét nghiệm mẹ con khác gì với xét nghiệm cha con?",
-        answer:
-          "Xét nghiệm mẹ con phân tích DNA mitochondrial được truyền từ mẹ, trong khi xét nghiệm cha con phân tích DNA autosomal.",
-      },
-      {
-        question: "Có cần mẫu từ cả mẹ và con không?",
-        answer:
-          "Có, cần mẫu từ cả người mẹ và con để so sánh và đưa ra kết quả chính xác.",
-      },
-    ],
-  },
-];
+import {
+  ServiceService,
+  mapApiServiceToFrontend,
+  formatPrice,
+} from "../../services/serviceService";
 
 const ServiceDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const service = services.find((s) => s.id === parseInt(id || "0"));
+  const [service, setService] = useState<any>(null);
+  const [relatedServices, setRelatedServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!service) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Không tìm thấy dịch vụ
-          </h2>
-          <Link
-            to="/services"
-            className="text-red-600 hover:text-red-700 font-medium"
-          >
-            Quay lại danh sách dịch vụ
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Fetch service detail and related services
+  useEffect(() => {
+    const fetchServiceDetail = async () => {
+      if (!id) return;
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
-  };
+      try {
+        setLoading(true);
+        // Fetch service detail
+        const apiService = await ServiceService.getServiceById(id);
+        const mappedService = mapApiServiceToFrontend(apiService);
+        setService(mappedService);
+
+        // Fetch all services for related services
+        const allServices = await ServiceService.getAllServices();
+        const mappedAllServices = allServices.map(mapApiServiceToFrontend);
+
+        // Filter related services (same category, exclude current)
+        const related = mappedAllServices
+          .filter(
+            (s) =>
+              s.id !== mappedService.id &&
+              s.test_category === mappedService.test_category
+          )
+          .slice(0, 3);
+
+        setRelatedServices(related);
+        setError(null);
+      } catch (err) {
+        console.error("Failed to fetch service detail:", err);
+        setError("Không thể tải chi tiết dịch vụ. Vui lòng thử lại sau.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchServiceDetail();
+  }, [id]);
 
   const getIcon = (iconName: string) => {
     const iconMap = {
@@ -145,6 +82,38 @@ const ServiceDetail: React.FC = () => {
       iconMap[iconName as keyof typeof iconMap] || Microscope;
     return <IconComponent className="w-12 h-12 text-red-600" />;
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-red-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải chi tiết dịch vụ...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !service) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            {error || "Không tìm thấy dịch vụ"}
+          </h2>
+          <Link
+            to="/services"
+            className="text-red-600 hover:text-red-700 font-medium"
+          >
+            Quay lại danh sách dịch vụ
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -179,12 +148,17 @@ const ServiceDetail: React.FC = () => {
                   <div className="flex gap-2 mb-3">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        service.service_type === "civil"
+                        service.service_type === "civil" ||
+                        service.service_type === "Nhanh"
                           ? "bg-blue-100 text-blue-800"
                           : "bg-purple-100 text-purple-800"
                       }`}
                     >
-                      {service.service_type === "civil" ? "Dân sự" : "Pháp lý"}
+                      {service.service_type === "civil"
+                        ? "Dân sự"
+                        : service.service_type === "Nhanh"
+                        ? "Nhanh"
+                        : "Pháp lý"}
                     </span>
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                       {service.test_category}
@@ -206,7 +180,7 @@ const ServiceDetail: React.FC = () => {
                 Quy trình thực hiện
               </h2>
               <div className="space-y-4">
-                {service.process_steps?.map((step, index) => (
+                {service.process_steps?.map((step: string, index: number) => (
                   <div key={index} className="flex items-start gap-4">
                     <div className="flex-shrink-0 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center text-sm font-semibold">
                       {index + 1}
@@ -228,12 +202,14 @@ const ServiceDetail: React.FC = () => {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-3">Loại mẫu</h3>
                   <div className="space-y-2">
-                    {service.sample_types?.map((type, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-green-500" />
-                        <span className="text-gray-700">{type}</span>
-                      </div>
-                    ))}
+                    {service.sample_types?.map(
+                      (type: string, index: number) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                          <span className="text-gray-700">{type}</span>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
                 <div>
@@ -241,7 +217,7 @@ const ServiceDetail: React.FC = () => {
                     Phương thức lấy mẫu
                   </h3>
                   <div className="space-y-2">
-                    {service.collection_methods.includes("self_collect") && (
+                    {service.collection_methods?.includes("self_collect") && (
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-500" />
                         <span className="text-gray-700">
@@ -249,7 +225,7 @@ const ServiceDetail: React.FC = () => {
                         </span>
                       </div>
                     )}
-                    {service.collection_methods.includes(
+                    {service.collection_methods?.includes(
                       "facility_collect"
                     ) && (
                       <div className="flex items-center gap-2">
@@ -268,7 +244,7 @@ const ServiceDetail: React.FC = () => {
                 Câu hỏi thường gặp
               </h2>
               <div className="space-y-6">
-                {service.faq?.map((item, index) => (
+                {service.faq?.map((item: any, index: number) => (
                   <div
                     key={index}
                     className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0"
@@ -352,19 +328,13 @@ const ServiceDetail: React.FC = () => {
         </div>
 
         {/* Related Services */}
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">
-            Dịch vụ liên quan
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {services
-              .filter(
-                (s) =>
-                  s.id !== service.id &&
-                  s.test_category === service.test_category
-              )
-              .slice(0, 3)
-              .map((relatedService) => (
+        {relatedServices.length > 0 && (
+          <div className="mt-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-8">
+              Dịch vụ liên quan
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {relatedServices.map((relatedService) => (
                 <Link
                   key={relatedService.id}
                   to={`/services/${relatedService.id}`}
@@ -374,13 +344,16 @@ const ServiceDetail: React.FC = () => {
                     {getIcon(relatedService.icon)}
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${
-                        relatedService.service_type === "civil"
+                        relatedService.service_type === "civil" ||
+                        relatedService.service_type === "Nhanh"
                           ? "bg-blue-100 text-blue-800"
                           : "bg-purple-100 text-purple-800"
                       }`}
                     >
                       {relatedService.service_type === "civil"
                         ? "Dân sự"
+                        : relatedService.service_type === "Nhanh"
+                        ? "Nhanh"
                         : "Pháp lý"}
                     </span>
                   </div>
@@ -395,8 +368,9 @@ const ServiceDetail: React.FC = () => {
                   </div>
                 </Link>
               ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
