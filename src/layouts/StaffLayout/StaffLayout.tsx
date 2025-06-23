@@ -25,13 +25,6 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       href: "/staff",
       icon: <FaCalendarAlt size={20} />,
     },
-    {
-      name: "Yêu cầu xét nghiệm",
-      href: "/staff/test-requests",
-      icon: <FaFlask size={20} />,
-    },
-    { name: "Hỗ trợ", href: "/staff/support", icon: <FaHeadset size={20} /> },
-    { name: "Blog", href: "/staff/blog", icon: <FaBlog size={20}/> },
     { name: "Hồ sơ", href: "/staff/profile", icon: <FaUser size={20} /> },
   ];
 
