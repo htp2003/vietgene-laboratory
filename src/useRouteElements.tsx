@@ -24,6 +24,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
+import StaffProfileComponent from "./pages/staff/StaffProfile";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -188,6 +189,14 @@ export default function useRouteElements() {
       element: (
         <StaffLayout>
           <StaffAppointments />
+        </StaffLayout>
+      ),
+    },
+    {
+      path: "/staff/profile",
+      element: (
+        <StaffLayout>
+          <StaffProfileComponent/>
         </StaffLayout>
       ),
     },
