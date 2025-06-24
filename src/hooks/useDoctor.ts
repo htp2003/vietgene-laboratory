@@ -3,9 +3,6 @@ import doctorService, { Doctor, DoctorRequest } from '../services/doctorService'
 
 // Enhanced Doctor interface for frontend with additional fields
 export interface EnhancedDoctor extends Doctor {
-  fullName?: string;
-  email?: string;
-  phone?: string;
   specialization?: string;
   experience?: number;
   avatar?: string;
@@ -23,20 +20,13 @@ export const useDoctor = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Helper function to enhance doctor data with mock fields for better UI
+  // Helper function to enhance doctor data with additional mock fields for better UI
   const enhanceDoctor = (doctor: Doctor): EnhancedDoctor => {
-    // Safe string handling to avoid null/undefined errors
-    const safeCode = doctor.doctorCode || '';
-    const cleanCode = safeCode.toLowerCase().replace(/\s+/g, '');
-    
     return {
       ...doctor,
-      fullName: `Dr. ${safeCode}`,
-      email: `${cleanCode}@hospital.com`,
-      phone: `090${Math.floor(Math.random() * 10000000).toString().padStart(7, '0')}`,
       specialization: ['Tim mạch', 'Thần kinh', 'Nhi khoa', 'Chỉnh hình', 'Da liễu'][Math.floor(Math.random() * 5)],
       experience: Math.floor(Math.random() * 20) + 1,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(safeCode)}&background=random&color=fff`
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.doctorName)}&background=random&color=fff`
     };
   };
 
@@ -184,6 +174,9 @@ export const useDoctor = () => {
       
       const response = await updateDoctor(doctorId, {
         doctorCode: doctor.doctorCode,
+        doctorName: doctor.doctorName,
+        doctorEmail: doctor.doctorEmail,
+        doctorPhone: doctor.doctorPhone,
         isActive: !doctor.isActive
       });
       
@@ -196,38 +189,6 @@ export const useDoctor = () => {
     }
   }, [doctors, updateDoctor]);
 
-  // Search doctors (client-side filtering)
-  const searchDoctors = useCallback((searchTerm: string) => {
-    if (!searchTerm.trim()) {
-      return doctors;
-    }
-    
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    return doctors.filter(doctor => {
-      // Safe string handling to avoid null errors
-      const code = (doctor.doctorCode || '').toLowerCase();
-      const fullName = (doctor.fullName || '').toLowerCase();
-      const email = (doctor.email || '').toLowerCase();
-      const phone = (doctor.phone || '').toLowerCase();
-      const specialization = (doctor.specialization || '').toLowerCase();
-      
-      return code.includes(lowerSearchTerm) ||
-             fullName.includes(lowerSearchTerm) ||
-             email.includes(lowerSearchTerm) ||
-             phone.includes(lowerSearchTerm) ||
-             specialization.includes(lowerSearchTerm);
-    });
-  }, [doctors]);
-
-  // Filter doctors by status
-  const filterDoctorsByStatus = useCallback((isActive?: boolean) => {
-    if (isActive === undefined) {
-      return doctors;
-    }
-    
-    return doctors.filter(doctor => doctor.isActive === isActive);
-  }, [doctors]);
-
   // Get combined search and filter results
   const getFilteredDoctors = useCallback((searchTerm: string, statusFilter?: boolean) => {
     let filtered = doctors;
@@ -238,13 +199,13 @@ export const useDoctor = () => {
       filtered = filtered.filter(doctor => {
         // Safe string handling to avoid null errors
         const code = (doctor.doctorCode || '').toLowerCase();
-        const fullName = (doctor.fullName || '').toLowerCase();
-        const email = (doctor.email || '').toLowerCase();
-        const phone = (doctor.phone || '').toLowerCase();
+        const name = (doctor.doctorName || '').toLowerCase();
+        const email = (doctor.doctorEmail || '').toLowerCase();
+        const phone = (doctor.doctorPhone || '').toLowerCase();
         const specialization = (doctor.specialization || '').toLowerCase();
         
         return code.includes(lowerSearchTerm) ||
-               fullName.includes(lowerSearchTerm) ||
+               name.includes(lowerSearchTerm) ||
                email.includes(lowerSearchTerm) ||
                phone.includes(lowerSearchTerm) ||
                specialization.includes(lowerSearchTerm);
@@ -308,8 +269,6 @@ export const useDoctor = () => {
     refetch: fetchDoctors,
     
     // Filtering & Search
-    searchDoctors,
-    filterDoctorsByStatus,
     getFilteredDoctors,
     
     // Statistics & Analytics

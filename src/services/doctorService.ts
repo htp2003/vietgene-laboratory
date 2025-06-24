@@ -61,6 +61,9 @@ export interface Doctor {
   userId: string;
   doctorId: string;
   doctorCode: string;
+  doctorName: string;
+  doctorEmail: string;
+  doctorPhone: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -69,6 +72,9 @@ export interface Doctor {
 // Doctor request interface for create/update
 export interface DoctorRequest {
   doctorCode: string;
+  doctorName: string;
+  doctorEmail: string;
+  doctorPhone: string;
   isActive: boolean;
 }
 
@@ -136,6 +142,32 @@ export const doctorService = {
     try {
       console.log("➕ Creating new doctor...");
       console.log("📤 Data being sent:", doctorData);
+
+      // Validate required fields
+      if (!doctorData.doctorCode?.trim()) {
+        return { success: false, message: "Mã bác sĩ không được để trống" };
+      }
+      if (!doctorData.doctorName?.trim()) {
+        return { success: false, message: "Tên bác sĩ không được để trống" };
+      }
+      if (!doctorData.doctorEmail?.trim()) {
+        return { success: false, message: "Email không được để trống" };
+      }
+      if (!doctorData.doctorPhone?.trim()) {
+        return { success: false, message: "Số điện thoại không được để trống" };
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(doctorData.doctorEmail)) {
+        return { success: false, message: "Email không đúng định dạng" };
+      }
+
+      // Validate phone format (Vietnamese phone number)
+      const phoneRegex = /^(0|\+84)[0-9]{8,10}$/;
+      if (!phoneRegex.test(doctorData.doctorPhone.replace(/\s/g, ''))) {
+        return { success: false, message: "Số điện thoại không đúng định dạng" };
+      }
       
       const response = await apiClient.post<ApiResponse<Doctor>>("/doctors", doctorData);
       
@@ -176,6 +208,39 @@ export const doctorService = {
           success: false,
           message: "Mã bác sĩ không được để trống"
         };
+      }
+
+      if (!doctorData.doctorName?.trim()) {
+        return {
+          success: false,
+          message: "Tên bác sĩ không được để trống"
+        };
+      }
+
+      if (!doctorData.doctorEmail?.trim()) {
+        return {
+          success: false,
+          message: "Email không được để trống"
+        };
+      }
+
+      if (!doctorData.doctorPhone?.trim()) {
+        return {
+          success: false,
+          message: "Số điện thoại không được để trống"
+        };
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(doctorData.doctorEmail)) {
+        return { success: false, message: "Email không đúng định dạng" };
+      }
+
+      // Validate phone format
+      const phoneRegex = /^(0|\+84)[0-9]{8,10}$/;
+      if (!phoneRegex.test(doctorData.doctorPhone.replace(/\s/g, ''))) {
+        return { success: false, message: "Số điện thoại không đúng định dạng" };
       }
       
       const response = await apiClient.put<ApiResponse<Doctor>>(`/doctors/${doctorId}`, doctorData);
@@ -248,7 +313,7 @@ function handleApiError(error: any): { success: false; message: string } {
       case 404:
         return { success: false, message: "Không tìm thấy bác sĩ" };
       case 409:
-        return { success: false, message: "Mã bác sĩ đã tồn tại" };
+        return { success: false, message: "Mã bác sĩ hoặc email đã tồn tại" };
       case 500:
         return { success: false, message: "Lỗi server, vui lòng thử lại sau" };
       default:

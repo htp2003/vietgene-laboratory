@@ -1,6 +1,7 @@
 import React from 'react'
 import { FaEdit, FaTrash } from 'react-icons/fa'
-import { Service } from '../../../api/services.api';
+import { Service } from '../../../services/serviceService';
+
 
 
 interface ServiceListProps {
@@ -47,9 +48,7 @@ export default function ServiceList({ services, onEdit, onDelete, onView }: Serv
                 <div className="text-sm text-gray-900">{service.duration_days}</div>
               </td>
               <td className="px-4 py-3 whitespace-nowrap">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${service.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {service.is_active ? 'Đang hoạt động' : 'Ngừng hoạt động'}
-                </span>
+               
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                 <div className="flex items-center gap-3">

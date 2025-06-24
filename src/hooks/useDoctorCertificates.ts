@@ -3,10 +3,11 @@ import doctorCertificateService, { DoctorCertificate, CertificateRequest } from 
 
 export interface CertificateStats {
   total: number;
-  active: number;
+  valid: number;
   expired: number;
   expiringSoon: number; 
 }
+
 export const useDoctorCertificate = (doctorId: string) => {
   const [certificates, setCertificates] = useState<DoctorCertificate[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -108,32 +109,6 @@ export const useDoctorCertificate = (doctorId: string) => {
     }
   }, []);
 
-  // Toggle certificate status (removed since API doesn't support this)
-  // Can be added back if API supports this feature
-  const toggleCertificateStatus = useCallback(async (certificateId: string) => {
-    try {
-      setError(null);
-      
-      // Get current certificate
-      const currentCert = certificates.find(cert => cert.id === certificateId);
-      if (!currentCert) {
-        return { success: false, message: "Không tìm thấy chứng chỉ" };
-      }
-      
-      // Update with opposite status
-      const response = await updateCertificate(certificateId, {
-        isActive: !currentCert.isActive
-      });
-      
-      return response;
-    } catch (err: any) {
-      const errorMessage = 'Có lỗi xảy ra khi thay đổi trạng thái chứng chỉ';
-      setError(new Error(errorMessage));
-      console.error('Toggle certificate status error:', err);
-      return { success: false, message: errorMessage };
-    }
-  }, [certificates, updateCertificate]);
-
   // Check if certificate is expired
   const isCertificateExpired = useCallback((expiryDate: string) => {
     return new Date(expiryDate) < new Date();
@@ -147,19 +122,24 @@ export const useDoctorCertificate = (doctorId: string) => {
     return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
   }, []);
 
+  // Check if certificate is valid (not expired)
+  const isCertificateValid = useCallback((expiryDate: string) => {
+    return new Date(expiryDate) >= new Date();
+  }, []);
+
   // Get certificate statistics
   const getCertificateStats = useCallback((): CertificateStats => {
     const stats = {
       total: certificates.length,
-      active: certificates.filter(cert => cert.isActive && !isCertificateExpired(cert.expiryDate)).length,
+      valid: certificates.filter(cert => isCertificateValid(cert.expiryDate)).length,
       expired: certificates.filter(cert => isCertificateExpired(cert.expiryDate)).length,
       expiringSoon: certificates.filter(cert => 
-        cert.isActive && isCertificateExpiringSoon(cert.expiryDate)
+        isCertificateExpiringSoon(cert.expiryDate)
       ).length,
     };
     
     return stats;
-  }, [certificates, isCertificateExpired, isCertificateExpiringSoon]);
+  }, [certificates, isCertificateExpired, isCertificateExpiringSoon, isCertificateValid]);
 
   // Search certificates
   const searchCertificates = useCallback((searchTerm: string) => {
@@ -170,39 +150,76 @@ export const useDoctorCertificate = (doctorId: string) => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return certificates.filter(cert => 
       (cert.certificateName || '').toLowerCase().includes(lowerSearchTerm) ||
+      (cert.licenseNumber || '').toLowerCase().includes(lowerSearchTerm) ||
       (cert.issuedBy || '').toLowerCase().includes(lowerSearchTerm)
     );
   }, [certificates]);
 
   // Filter certificates by status
-  const filterCertificatesByStatus = useCallback((status: 'active' | 'expired' | 'expiring' | 'all') => {
+  const filterCertificatesByStatus = useCallback((status: 'valid' | 'expired' | 'expiring' | 'all') => {
     switch (status) {
-      case 'active':
-        return certificates.filter(cert => cert.isActive && !isCertificateExpired(cert.expiryDate));
+      case 'valid':
+        return certificates.filter(cert => isCertificateValid(cert.expiryDate) && !isCertificateExpiringSoon(cert.expiryDate));
       case 'expired':
         return certificates.filter(cert => isCertificateExpired(cert.expiryDate));
       case 'expiring':
-        return certificates.filter(cert => cert.isActive && isCertificateExpiringSoon(cert.expiryDate));
+        return certificates.filter(cert => isCertificateExpiringSoon(cert.expiryDate));
       case 'all':
       default:
         return certificates;
     }
-  }, [certificates, isCertificateExpired, isCertificateExpiringSoon]);
+  }, [certificates, isCertificateExpired, isCertificateExpiringSoon, isCertificateValid]);
 
   // Get filtered certificates with search and status
-  const getFilteredCertificates = useCallback((searchTerm: string, statusFilter: 'active' | 'expired' | 'expiring' | 'all') => {
+  const getFilteredCertificates = useCallback((searchTerm: string, statusFilter: 'valid' | 'expired' | 'expiring' | 'all') => {
     let filtered = filterCertificatesByStatus(statusFilter);
     
     if (searchTerm.trim()) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(cert => 
         (cert.certificateName || '').toLowerCase().includes(lowerSearchTerm) ||
+        (cert.licenseNumber || '').toLowerCase().includes(lowerSearchTerm) ||
         (cert.issuedBy || '').toLowerCase().includes(lowerSearchTerm)
       );
     }
     
     return filtered;
   }, [filterCertificatesByStatus]);
+
+  // Get certificate status info
+  const getCertificateStatus = useCallback((certificate: DoctorCertificate) => {
+    if (isCertificateExpired(certificate.expiryDate)) {
+      return {
+        status: 'expired' as const,
+        text: 'Đã hết hạn',
+        color: 'text-red-500',
+        bgColor: 'bg-red-100'
+      };
+    } else if (isCertificateExpiringSoon(certificate.expiryDate)) {
+      return {
+        status: 'expiring' as const,
+        text: 'Sắp hết hạn',
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-100'
+      };
+    } else {
+      return {
+        status: 'valid' as const,
+        text: 'Còn hiệu lực',
+        color: 'text-green-500',
+        bgColor: 'bg-green-100'
+      };
+    }
+  }, [isCertificateExpired, isCertificateExpiringSoon]);
+
+  // Get days until expiry
+  const getDaysUntilExpiry = useCallback((expiryDate: string) => {
+    const today = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }, []);
 
   // Load certificates on component mount or when doctorId changes
   useEffect(() => {
@@ -221,12 +238,14 @@ export const useDoctorCertificate = (doctorId: string) => {
     createCertificate,
     updateCertificate,
     deleteCertificate,
-    toggleCertificateStatus,
     refetch: fetchCertificates,
     
     // Utilities
     isCertificateExpired,
     isCertificateExpiringSoon,
+    isCertificateValid,
+    getCertificateStatus,
+    getDaysUntilExpiry,
     
     // Filtering & Search
     searchCertificates,
