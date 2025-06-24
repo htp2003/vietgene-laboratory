@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   User,
   Mail,
@@ -47,11 +47,24 @@ interface PasswordFormData {
 
 const Profile: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<"profile" | "password">("profile");
   const [updateLoading, setUpdateLoading] = useState(false);
+
+  // 🔍 Auto-detect admin mode từ URL
+  const isAdminMode = location.pathname.startsWith('/admin');
+  
+  // 🎯 Dynamic navigation based on mode
+  const getBackPath = () => {
+    return isAdminMode ? "/admin" : "/dashboard";
+  };
+  
+  const getBackLabel = () => {
+    return isAdminMode ? "Admin Panel" : "Dashboard";
+  };
 
   const {
     register: registerProfile,
@@ -177,6 +190,7 @@ const Profile: React.FC = () => {
       ROLE_ADMIN: "Quản trị viên",
       ROLE_DOCTOR: "Bác sĩ",
       ROLE_STAFF: "Nhân viên",
+      ROLE_USER: "Khách hàng",
       ROLE_CUSTOMER: "Khách hàng",
     };
 
@@ -201,10 +215,10 @@ const Profile: React.FC = () => {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Không thể tải thông tin profile</p>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(getBackPath())}
             className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
           >
-            Quay về Dashboard
+            Quay về {getBackLabel()}
           </button>
         </div>
       </div>
@@ -214,35 +228,45 @@ const Profile: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header with dynamic back navigation */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(getBackPath())}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            Dashboard
+            {getBackLabel()}
           </button>
           <span className="text-gray-400">|</span>
           <h1 className="text-2xl font-bold text-gray-900">
-            Thông tin cá nhân
+            {isAdminMode ? "Cài đặt tài khoản Admin" : "Thông tin cá nhân"}
           </h1>
         </div>
 
         {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-8">
-          {/* Profile Header */}
-          <div className="bg-gradient-to-r from-red-600 to-red-700 px-8 py-6">
+          {/* Profile Header với color khác nhau cho admin */}
+          <div className={`${isAdminMode 
+            ? 'bg-gradient-to-r from-blue-600 to-blue-700' 
+            : 'bg-gradient-to-r from-red-600 to-red-700'
+          } px-8 py-6`}>
             <div className="flex items-center gap-6">
               <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-                <User className="w-10 h-10 text-red-600" />
+                <User className={`w-10 h-10 ${isAdminMode ? 'text-blue-600' : 'text-red-600'}`} />
               </div>
               <div className="text-white">
                 <h2 className="text-2xl font-bold">{profile.full_name}</h2>
-                <p className="text-red-100">@{profile.username}</p>
-                <p className="text-red-200 text-sm">
+                <p className={`${isAdminMode ? 'text-blue-100' : 'text-red-100'}`}>
+                  @{profile.username}
+                </p>
+                <p className={`${isAdminMode ? 'text-blue-200' : 'text-red-200'} text-sm`}>
                   {getRoleName(profile.roles)}
                 </p>
+                {isAdminMode && (
+                  <p className="text-blue-100 text-xs mt-1">
+                    🛡️ Administrator Access
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -300,7 +324,10 @@ const Profile: React.FC = () => {
                 onClick={() => setActiveTab("profile")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "profile"
-                    ? "border-red-500 text-red-600 bg-red-50"
+                    ? `${isAdminMode 
+                        ? 'border-blue-500 text-blue-600 bg-blue-50' 
+                        : 'border-red-500 text-red-600 bg-red-50'
+                      }`
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -311,7 +338,10 @@ const Profile: React.FC = () => {
                 onClick={() => setActiveTab("password")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === "password"
-                    ? "border-red-500 text-red-600 bg-red-50"
+                    ? `${isAdminMode 
+                        ? 'border-blue-500 text-blue-600 bg-blue-50' 
+                        : 'border-red-500 text-red-600 bg-red-50'
+                      }`
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
               >
@@ -331,7 +361,10 @@ const Profile: React.FC = () => {
                   {!isEditing && (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                      className={`flex items-center gap-2 ${isAdminMode 
+                        ? 'bg-blue-600 hover:bg-blue-700' 
+                        : 'bg-red-600 hover:bg-red-700'
+                      } text-white px-4 py-2 rounded-lg transition-colors`}
                     >
                       <Edit3 className="w-4 h-4" />
                       Chỉnh sửa
@@ -358,7 +391,10 @@ const Profile: React.FC = () => {
                         })}
                         type="text"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                          ? 'focus:ring-blue-500 focus:border-blue-500' 
+                          : 'focus:ring-red-500 focus:border-red-500'
+                        } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } ${
                           profileErrors.full_name
@@ -387,7 +423,10 @@ const Profile: React.FC = () => {
                         })}
                         type="email"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                          ? 'focus:ring-blue-500 focus:border-blue-500' 
+                          : 'focus:ring-red-500 focus:border-red-500'
+                        } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } ${
                           profileErrors.email
@@ -415,7 +454,10 @@ const Profile: React.FC = () => {
                         })}
                         type="tel"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                          ? 'focus:ring-blue-500 focus:border-blue-500' 
+                          : 'focus:ring-red-500 focus:border-red-500'
+                        } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } ${
                           profileErrors.phone
@@ -439,7 +481,10 @@ const Profile: React.FC = () => {
                         {...registerProfile("address")}
                         type="text"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                          ? 'focus:ring-blue-500 focus:border-blue-500' 
+                          : 'focus:ring-red-500 focus:border-red-500'
+                        } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } border-gray-300`}
                         placeholder="Nhập địa chỉ"
@@ -452,7 +497,10 @@ const Profile: React.FC = () => {
                       <button
                         type="submit"
                         disabled={updateLoading}
-                        className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                        className={`flex items-center gap-2 ${isAdminMode 
+                          ? 'bg-blue-600 hover:bg-blue-700' 
+                          : 'bg-red-600 hover:bg-red-700'
+                        } text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50`}
                       >
                         {updateLoading ? (
                           <>
@@ -501,7 +549,10 @@ const Profile: React.FC = () => {
                         required: "Vui lòng nhập mật khẩu hiện tại",
                       })}
                       type="password"
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                        ? 'focus:ring-blue-500 focus:border-blue-500' 
+                        : 'focus:ring-red-500 focus:border-red-500'
+                      } transition-colors ${
                         passwordErrors.currentPassword
                           ? "border-red-300"
                           : "border-gray-300"
@@ -533,7 +584,10 @@ const Profile: React.FC = () => {
                         },
                       })}
                       type="password"
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                        ? 'focus:ring-blue-500 focus:border-blue-500' 
+                        : 'focus:ring-red-500 focus:border-red-500'
+                      } transition-colors ${
                         passwordErrors.newPassword
                           ? "border-red-300"
                           : "border-gray-300"
@@ -559,7 +613,10 @@ const Profile: React.FC = () => {
                           "Mật khẩu xác nhận không khớp",
                       })}
                       type="password"
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
+                        ? 'focus:ring-blue-500 focus:border-blue-500' 
+                        : 'focus:ring-red-500 focus:border-red-500'
+                      } transition-colors ${
                         passwordErrors.confirmPassword
                           ? "border-red-300"
                           : "border-gray-300"
@@ -573,9 +630,9 @@ const Profile: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className={`${isAdminMode ? 'bg-blue-50 border-blue-200' : 'bg-blue-50 border-blue-200'} border rounded-lg p-4`}>
                     <div className="flex items-start gap-3">
-                      <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <Shield className={`w-5 h-5 ${isAdminMode ? 'text-blue-600' : 'text-blue-600'} mt-0.5`} />
                       <div>
                         <h4 className="text-blue-900 font-medium text-sm mb-1">
                           Yêu cầu mật khẩu:
@@ -593,7 +650,10 @@ const Profile: React.FC = () => {
                   <button
                     type="submit"
                     disabled={updateLoading}
-                    className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    className={`flex items-center gap-2 ${isAdminMode 
+                      ? 'bg-blue-600 hover:bg-blue-700' 
+                      : 'bg-red-600 hover:bg-red-700'
+                    } text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50`}
                   >
                     {updateLoading ? (
                       <>

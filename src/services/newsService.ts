@@ -62,7 +62,7 @@ export interface NewsArticle {
     full_name: string;
     avatar?: string;
   };
-  status?: "draft" | "published";
+  status?: "draft" | "published"; // ✅ Simplified status (removed pending)
   view_count?: number;
   featured_image?: string; // Alias for imageUrl
   created_at?: string; // Alias for createdAt
@@ -95,7 +95,7 @@ export const newsService = {
           featured_image: item.imageUrl,
           created_at: item.createdAt,
           updated_at: item.updatedAt,
-          status: "published", // ✅ Default since API doesn't return status
+          status: "published", // ✅ Default status since API doesn't provide status
           view_count: Math.floor(Math.random() * 1000), // ✅ Mock view count
           author: {
             full_name: "VietGene Lab",
@@ -241,6 +241,7 @@ export const newsService = {
   createNews: async (newsData: Partial<NewsArticle>) => {
     try {
       console.log("📝 Creating new news article...");
+      console.log("📤 Data being sent:", newsData);
 
       const response = await apiClient.post<ApiResponse<NewsArticle>>(
         "/status",
@@ -248,9 +249,26 @@ export const newsService = {
       );
 
       if (response.data.code === 200 || response.data.code === 201) {
+        // Transform the response data
+        const item = response.data.result;
+        const transformedData = {
+          ...item,
+          featured_image: item.imageUrl,
+          created_at: item.createdAt,
+          updated_at: item.updatedAt,
+          status: "draft" as const, // ✅ New posts start as draft
+          view_count: 0,
+          author: {
+            full_name: "VietGene Lab",
+          },
+          excerpt: item.content?.substring(0, 150) + "...",
+          reading_time: Math.ceil(item.content?.length / 1000) || 5,
+          is_featured: false,
+        };
+
         return {
           success: true,
-          data: response.data.result,
+          data: transformedData,
           message: "Tạo bài viết thành công",
         };
       } else {
@@ -275,16 +293,50 @@ export const newsService = {
   ) => {
     try {
       console.log(`📝 Updating news article with ID: ${postId}...`);
+      console.log("📤 Original data received:", newsData);
+
+      // ✅ Only send fields that API accepts
+      const apiData = {
+        title: newsData.title,
+        content: newsData.content,
+        imageUrl: newsData.imageUrl
+      };
+
+      // Remove undefined values
+      Object.keys(apiData).forEach(key => {
+        if (apiData[key as keyof typeof apiData] === undefined) {
+          delete apiData[key as keyof typeof apiData];
+        }
+      });
+
+      console.log("📤 Clean API data being sent:", apiData);
 
       const response = await apiClient.put<ApiResponse<NewsArticle>>(
         `/status/${postId}`,
-        newsData
+        apiData
       );
 
       if (response.data.code === 200) {
+        // Transform the response data
+        const item = response.data.result;
+        const transformedData = {
+          ...item,
+          featured_image: item.imageUrl,
+          created_at: item.createdAt,
+          updated_at: item.updatedAt,
+          status: "published" as const, // ✅ Updated posts are published
+          view_count: Math.floor(Math.random() * 1000),
+          author: {
+            full_name: "VietGene Lab",
+          },
+          excerpt: item.content?.substring(0, 150) + "...",
+          reading_time: Math.ceil(item.content?.length / 1000) || 5,
+          is_featured: Math.random() > 0.7,
+        };
+
         return {
           success: true,
-          data: response.data.result,
+          data: transformedData,
           message: "Cập nhật bài viết thành công",
         };
       } else {

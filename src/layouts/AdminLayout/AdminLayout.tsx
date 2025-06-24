@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Header from "../../components/admin/Header";
 import Sidebar from "../../components/admin/Sidebar";
 import { FaBars } from 'react-icons/fa';
-import { useBlogPosts } from '../../hooks/useBlogPosts';
+// import { useBlogPosts } from '../../hooks/useBlogPosts';
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -17,8 +17,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     // Toggle sidebar (mobile)
     const handleToggleMobileSidebar = () => setIsMobileSidebarOpen((prev) => !prev);
 
-    const { posts } = useBlogPosts();
-    const pendingBlogCount = posts.filter(post => post.status === 'pending').length;
+    // const { posts } = useBlogPosts();
+    // const pendingBlogCount = posts.filter(post => post.status === 'pending').length;
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -32,7 +32,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     onToggleSidebar={handleToggleSidebar}
                     isMobileOpen={isMobileSidebarOpen}
                     onToggleMobileSidebar={handleToggleMobileSidebar}
-                    pendingBlogCount={pendingBlogCount}
+
                 />
             </aside>
 

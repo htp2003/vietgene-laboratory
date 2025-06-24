@@ -24,6 +24,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
+
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -179,6 +180,16 @@ export default function useRouteElements() {
         <AdminLayout>
           <BlogManagement />
         </AdminLayout>
+      ),
+    },
+    {
+      path: "/admin/profile",
+      element: (
+        <ProtectedRoute>
+          <AdminLayout>
+            <Profile />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
 
