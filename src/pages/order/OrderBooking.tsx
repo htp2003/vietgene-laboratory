@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle,
@@ -50,13 +50,14 @@ interface OrderForm {
     }>;
   };
   paymentInfo: {
-    method: "cash" | "card" | "transfer";
+    method: "cash" | "transfer";
   };
 }
 
 const OrderBooking: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // States
   const [service, setService] = useState<any>(null);
@@ -143,7 +144,6 @@ const OrderBooking: React.FC = () => {
       }));
     }
   }, []);
-
   // Helper functions
   const calculateTotal = () => {
     return service?.price * formData.serviceInfo.quantity || 0;
@@ -189,9 +189,21 @@ const OrderBooking: React.FC = () => {
     }
   };
 
+  // Thay thế function handleDoctorSelect trong Part 3:
+
   const handleDoctorSelect = async (doctorId: string) => {
     try {
       console.log("🔍 Fetching time slots for doctor:", doctorId);
+      console.log(
+        "🔍 Doctor object:",
+        doctors.find(
+          (d) =>
+            d.doctorId === doctorId ||
+            d.id === doctorId ||
+            d.userId === doctorId
+        )
+      );
+
       const timeSlots = await orderService.getDoctorTimeSlots(doctorId);
       setAvailableTimeSlots(timeSlots);
 
@@ -204,7 +216,14 @@ const OrderBooking: React.FC = () => {
       console.log("✅ Time slots loaded:", timeSlots.length);
     } catch (error) {
       console.error("❌ Error fetching time slots:", error);
-      setError("Không thể tải lịch khám của bác sĩ");
+      // Don't show error immediately, might be expected if no time slots
+      setAvailableTimeSlots([]);
+
+      updateFormData("serviceInfo", {
+        doctorId,
+        timeSlotId: "",
+        appointmentTime: "",
+      });
     }
   };
 
@@ -262,7 +281,6 @@ const OrderBooking: React.FC = () => {
         return false;
     }
   };
-
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
@@ -287,27 +305,43 @@ const OrderBooking: React.FC = () => {
 
       console.log("✅ Order created successfully with ID:", orderId);
 
-      // Navigate to success page
+      // Navigate to success page with order data
       navigate("/order/success", {
         state: {
           orderId,
-          orderData: {
-            ...orderData,
-            service,
-            orderId,
-            orderCode: "DNA-" + orderId.slice(-8).toUpperCase(),
-            totalAmount: calculateTotal(),
+          orderCode: "DNA-" + orderId.slice(-8).toUpperCase(),
+          service: {
+            name: service?.service_name || "Dịch vụ xét nghiệm DNA",
+            price: service?.price || 0,
+            duration: service?.duration_days || 7,
           },
+          customer: {
+            name: formData.customerInfo.fullName,
+            email: formData.customerInfo.email,
+            phone: formData.customerInfo.phone,
+          },
+          collectionMethod: formData.serviceInfo.collectionMethod,
+          appointmentDate: formData.serviceInfo.appointmentDate,
+          participants: formData.participantInfo.participants,
+          payment: {
+            method: formData.paymentInfo.method,
+            status: "pending",
+            amount: calculateTotal(),
+          },
+          totalAmount: calculateTotal(),
         },
       });
     } catch (err) {
       console.error("❌ Error submitting order:", err);
-      setError("Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại sau.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại sau."
+      );
     } finally {
       setSubmitting(false);
     }
   };
-
   // Loading state
   if (loading) {
     return (
@@ -347,7 +381,6 @@ const OrderBooking: React.FC = () => {
     { number: 3, title: "Phương thức lấy mẫu", icon: Calendar },
     { number: 4, title: "Thanh toán", icon: CreditCard },
   ];
-
   const renderStepIndicator = () => (
     <div className="mb-8">
       <div className="flex items-center justify-between">
@@ -480,7 +513,6 @@ const OrderBooking: React.FC = () => {
       </div>
     </div>
   );
-
   const renderStep2 = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -584,7 +616,6 @@ const OrderBooking: React.FC = () => {
       </div>
     </div>
   );
-
   const renderStep3 = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Phương thức lấy mẫu</h2>
@@ -648,7 +679,6 @@ const OrderBooking: React.FC = () => {
           </ul>
         </div>
       </div>
-
       {formData.serviceInfo.collectionMethod === "facility" && (
         <>
           {/* Doctor Selection */}
@@ -656,43 +686,77 @@ const OrderBooking: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Chọn bác sĩ tư vấn *
             </label>
+
+            {/* Debug: Show doctors data */}
+            <div className="mb-4 p-2 bg-yellow-100 rounded text-xs">
+              <p>Debug - Doctors count: {doctors.length}</p>
+              {doctors.length > 0 && (
+                <pre className="mt-2 overflow-auto max-h-32">
+                  {JSON.stringify(doctors[0], null, 2)}
+                </pre>
+              )}
+            </div>
+
             <div className="grid md:grid-cols-2 gap-4">
-              {doctors.map((doctor) => (
-                <div
-                  key={doctor.id}
-                  className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                    formData.serviceInfo.doctorId === doctor.id
-                      ? "border-red-500 bg-red-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
-                  onClick={() => handleDoctorSelect(doctor.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-red-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        {doctor.user?.fullName || `Bác sĩ ${doctor.doctorCode}`}
-                      </h3>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Chuyên gia xét nghiệm DNA
-                      </p>
-                      <div className="space-y-1 text-xs text-gray-500">
-                        <p>Mã BS: {doctor.doctorCode}</p>
-                        {doctor.user?.email && <p>{doctor.user.email}</p>}
-                        {doctor.user?.phone && <p>{doctor.user.phone}</p>}
+              {doctors.map((doctor, index) => {
+                // Try different possible ID fields
+                const doctorId =
+                  doctor.doctorId ||
+                  doctor.id ||
+                  doctor.userId ||
+                  index.toString();
+
+                return (
+                  <div
+                    key={doctorId}
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      formData.serviceInfo.doctorId === doctorId
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => handleDoctorSelect(doctorId)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                        <User className="w-6 h-6 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {doctor.doctorName ||
+                            doctor.name ||
+                            `Bác sĩ ${
+                              doctor.doctorCode || doctor.code || index + 1
+                            }`}
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Chuyên gia xét nghiệm DNA
+                        </p>
+                        <div className="space-y-1 text-xs text-gray-500">
+                          <p>
+                            Mã BS: {doctor.doctorCode || doctor.code || "N/A"}
+                          </p>
+                          {doctor.doctorEmail && <p>{doctor.doctorEmail}</p>}
+                          {doctor.doctorPhone && <p>{doctor.doctorPhone}</p>}
+                          <p className="text-red-500">ID: {doctorId}</p>
+                          <p className="text-blue-500">
+                            Active: {doctor.isActive ? "Yes" : "No"}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+
             {doctors.length === 0 && (
               <div className="text-center py-8">
                 <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-500">
                   Hiện không có bác sĩ nào khả dụng
+                </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Check console for API response details
                 </p>
               </div>
             )}
@@ -783,14 +847,13 @@ const OrderBooking: React.FC = () => {
       </div>
     </div>
   );
-
   const renderStep4 = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">
         Phương thức thanh toán
       </h2>
 
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-2 gap-4">
         {[
           {
             value: "transfer",
@@ -803,12 +866,6 @@ const OrderBooking: React.FC = () => {
             label: "Tiền mặt",
             desc: "Thanh toán khi nhận dịch vụ",
             icon: Phone,
-          },
-          {
-            value: "card",
-            label: "Thẻ tín dụng",
-            desc: "Thanh toán online",
-            icon: CreditCard,
           },
         ].map((method) => {
           const Icon = method.icon;
@@ -867,10 +924,12 @@ const OrderBooking: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Bác sĩ tư vấn:</span>
                 <span className="font-medium">
-                  {doctors.find((d) => d.id === formData.serviceInfo.doctorId)
-                    ?.user?.fullName ||
-                    doctors.find((d) => d.id === formData.serviceInfo.doctorId)
-                      ?.doctorCode}
+                  {doctors.find(
+                    (d) => d.doctorId === formData.serviceInfo.doctorId
+                  )?.doctorName ||
+                    doctors.find(
+                      (d) => d.doctorId === formData.serviceInfo.doctorId
+                    )?.doctorCode}
                 </span>
               </div>
             )}

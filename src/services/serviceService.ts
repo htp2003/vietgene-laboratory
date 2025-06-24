@@ -202,7 +202,6 @@ export const formatPrice = (price: number | undefined | null): string => {
     currency: "VND",
   }).format(Number(price));
 
-  console.log("Formatted price:", formattedPrice);
   return formattedPrice;
 };
 

@@ -30,28 +30,26 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Types
 export interface Doctor {
-  id: string;
+  userId: string;
+  doctorId: string;
   doctorCode: string;
+  doctorName: string;
+  doctorEmail: string;
+  doctorPhone: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  user?: {
-    id: string;
-    fullName: string;
-    email: string;
-    phone: string;
-  };
 }
 
 export interface TimeSlot {
-  id: number;
-  doctorId: string;
+  id: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
   isAvailable: boolean;
+  createdAt: string;
+  doctorId: string;
 }
 
 export interface CreateOrderRequest {
@@ -83,170 +81,90 @@ export interface CreateOrderRequest {
     method: "cash" | "card" | "transfer";
   };
 }
-
-// Environment config
-const API_CONFIG = {
-  USE_MOCK_DOCTORS: true,
-  USE_MOCK_TIMESLOTS: true,
-  USE_MOCK_PAYMENT: true,
-  SKIP_USER_REGISTRATION: true, // Skip registration if user exists
-  USE_MOCK_APPOINTMENT: true, // Use mock for appointments
-};
-
 class OrderService {
   // ===== DOCTORS =====
+
   async getAllDoctors(): Promise<Doctor[]> {
-    if (API_CONFIG.USE_MOCK_DOCTORS) {
-      return this.getMockDoctors();
-    }
-
     try {
+      console.log("🔍 Fetching doctors from API...");
       const response = await apiClient.get("/doctors");
+
       if (response.data.code === 200) {
-        return response.data.result || [];
+        const doctors = response.data.result || [];
+        console.log("✅ Doctors loaded:", doctors.length);
+        console.log("✅ Raw doctors data:", doctors);
+
+        // Temporarily return all doctors without filtering
+        // Later you can add filter if needed: .filter((doctor: Doctor) => doctor.isActive !== false)
+        return doctors;
       }
+
       throw new Error("Failed to fetch doctors");
-    } catch (error) {
-      console.warn("⚠️ Doctors API failed, using mock data");
-      return this.getMockDoctors();
+    } catch (error: any) {
+      console.error(
+        "❌ Doctors API failed:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tải danh sách bác sĩ. Vui lòng thử lại sau.");
     }
   }
-
-  private getMockDoctors(): Doctor[] {
-    return [
-      {
-        id: "1",
-        doctorCode: "DR001",
-        isActive: true,
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-01-01T00:00:00Z",
-        user: {
-          id: "user1",
-          fullName: "Dr. Nguyễn Văn An",
-          email: "nguyenvanan@vietgene.vn",
-          phone: "0912345678",
-        },
-      },
-      {
-        id: "2",
-        doctorCode: "DR002",
-        isActive: true,
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-01-01T00:00:00Z",
-        user: {
-          id: "user2",
-          fullName: "Dr. Trần Thị Bình",
-          email: "tranthibinh@vietgene.vn",
-          phone: "0987654321",
-        },
-      },
-      {
-        id: "3",
-        doctorCode: "DR003",
-        isActive: true,
-        createdAt: "2024-01-01T00:00:00Z",
-        updatedAt: "2024-01-01T00:00:00Z",
-        user: {
-          id: "user3",
-          fullName: "Dr. Lê Minh Châu",
-          email: "leminhchau@vietgene.vn",
-          phone: "0901234567",
-        },
-      },
-    ];
-  }
-
   // ===== TIME SLOTS =====
   async getDoctorTimeSlots(doctorId: string): Promise<TimeSlot[]> {
-    if (API_CONFIG.USE_MOCK_TIMESLOTS) {
-      return this.getMockTimeSlots(doctorId);
-    }
-
     try {
-      const response = await apiClient.get(`/doctor-time-slots/${doctorId}`);
-      return response.data.result || [];
-    } catch (error) {
-      console.warn("⚠️ Time slots API failed, using mock data");
-      return this.getMockTimeSlots(doctorId);
+      console.log("🔍 Fetching time slots for doctor:", doctorId);
+      const response = await apiClient.get(
+        `/doctor-time-slots/doctor/${doctorId}`
+      );
+
+      if (response.data.code === 200) {
+        const timeSlots = response.data.result || [];
+        console.log("✅ Time slots loaded:", timeSlots.length);
+        return timeSlots.filter((slot: TimeSlot) => slot.isAvailable);
+      }
+
+      throw new Error("Failed to fetch time slots");
+    } catch (error: any) {
+      console.error(
+        "❌ Time slots API failed:",
+        error.response?.data || error.message
+      );
+      throw new Error(
+        "Không thể tải lịch khám của bác sĩ. Vui lòng thử lại sau."
+      );
     }
   }
 
-  private getMockTimeSlots(doctorId: string): TimeSlot[] {
-    const baseSlots = [
-      { startTime: "08:00", endTime: "10:00", dayOfWeek: 1 },
-      { startTime: "10:30", endTime: "12:30", dayOfWeek: 1 },
-      { startTime: "13:30", endTime: "15:30", dayOfWeek: 1 },
-      { startTime: "16:00", endTime: "18:00", dayOfWeek: 1 },
-      { startTime: "08:00", endTime: "10:00", dayOfWeek: 2 },
-      { startTime: "10:30", endTime: "12:30", dayOfWeek: 2 },
-      { startTime: "13:30", endTime: "15:30", dayOfWeek: 2 },
-      { startTime: "08:00", endTime: "10:00", dayOfWeek: 3 },
-      { startTime: "10:30", endTime: "12:30", dayOfWeek: 3 },
-      { startTime: "16:00", endTime: "18:00", dayOfWeek: 3 },
-      { startTime: "08:00", endTime: "10:00", dayOfWeek: 4 },
-      { startTime: "13:30", endTime: "15:30", dayOfWeek: 4 },
-      { startTime: "16:00", endTime: "18:00", dayOfWeek: 4 },
-      { startTime: "08:00", endTime: "10:00", dayOfWeek: 5 },
-      { startTime: "10:30", endTime: "12:30", dayOfWeek: 5 },
-    ];
-
-    return baseSlots.map((slot, index) => ({
-      id: parseInt(`${doctorId}${slot.dayOfWeek}${index}`),
-      doctorId,
-      ...slot,
-      isAvailable: Math.random() > 0.3,
-    }));
-  }
-
-  // ===== USER REGISTRATION (FIXED) =====
+  // ===== USER REGISTRATION =====
   private async handleUserRegistration(userData: {
     fullName: string;
     phone: string;
     email: string;
   }): Promise<string> {
-    if (API_CONFIG.SKIP_USER_REGISTRATION) {
-      // Use current user if logged in, otherwise create mock user
+    try {
+      // Check if user is already logged in
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-      if (currentUser.id) {
+      const token = localStorage.getItem("token");
+
+      console.log("🔍 Current user:", currentUser);
+      console.log("🔍 Token exists:", !!token);
+
+      if (currentUser.id && token) {
         console.log("✅ Using current logged in user:", currentUser.id);
         return currentUser.id;
-      } else {
-        console.log("✅ Using mock user for guest checkout");
-        return "mock_user_" + Date.now();
-      }
-    }
-
-    try {
-      const registrationData = {
-        username: userData.phone,
-        password: "temp123456", // Temporary password
-        email: userData.email,
-        full_name: userData.fullName,
-        dob: "1990-01-01",
-      };
-
-      const response = await apiClient.post("/user/register", registrationData);
-
-      if (response.data.code === 200) {
-        console.log("✅ New user registered:", response.data.result.id);
-        return response.data.result.id;
       }
 
-      throw new Error("User registration failed");
+      // If no user logged in, try to register or use guest mode
+      console.log("⚠️ No user logged in, creating guest order");
+
+      // For now, return a guest user ID - you may want to implement proper registration
+      return "guest_user_" + Date.now();
     } catch (error: any) {
-      if (error.response?.status === 409) {
-        // User already exists - that's okay for our use case
-        console.log("✅ User already exists, proceeding with current user");
-        const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-        return currentUser.id || "existing_user_" + Date.now();
-      }
-
-      console.warn("⚠️ User registration failed, using fallback");
-      return "fallback_user_" + Date.now();
+      console.error("❌ User handling failed:", error);
+      return "guest_user_" + Date.now();
     }
   }
+  // ===== ORDER CREATION =====
 
-  // ===== ORDER CREATION (FIXED) =====
   async createOrder(orderData: {
     customerId: string;
     serviceId: string;
@@ -255,39 +173,47 @@ class OrderService {
     notes?: string;
   }): Promise<{ orderId: string }> {
     try {
+      const now = new Date().toISOString();
+
+      // Use exact field names from database schema
       const orderPayload = {
-        order_code: Math.floor(Math.random() * 1000000),
+        order_code: Math.floor(Math.random() * 900000) + 100000, // Try number first
         status: "pending",
-        total_amount: 2500000 * orderData.quantity, // Calculate total
+        total_amount: 2500000 * orderData.quantity,
         payment_method: "transfer",
         payment_status: "pending",
+        payment_date: null,
+        transaction_id: null,
         notes: orderData.notes || "",
+        created_at: now, // Use snake_case
+        update_at: now, // Use snake_case
       };
 
-      console.log("📤 Creating order with payload:", orderPayload);
-
+      console.log("📤 Creating order with correct field names:", orderPayload);
       const response = await apiClient.post("/orders", orderPayload);
 
       if (response.data.code === 200) {
         const orderId = response.data.result.orderId || response.data.result.id;
-        console.log("✅ Order created successfully:", orderId);
+        console.log(
+          "✅ Order created with correct fields:",
+          response.data.result
+        );
         return { orderId };
       }
 
-      throw new Error("Order creation failed");
-    } catch (error: any) {
-      console.error(
-        "❌ Order creation error:",
-        error.response?.data || error.message
+      throw new Error(
+        `Order creation failed: ${response.data.message || "Unknown error"}`
       );
+    } catch (error: any) {
+      console.error("❌ Order creation error:", error.response?.data);
       throw new Error(
         "Không thể tạo đơn hàng: " +
           (error.response?.data?.message || error.message)
       );
     }
   }
-
   // ===== ORDER DETAILS =====
+
   async createOrderDetail(
     orderId: string,
     serviceId: string,
@@ -298,34 +224,44 @@ class OrderService {
     }
   ): Promise<{ orderDetailId: string }> {
     try {
+      // Fix payload structure
       const payload = {
         quantity: orderDetailData.quantity,
         unit_price: orderDetailData.unitPrice,
         subtotal: orderDetailData.quantity * orderDetailData.unitPrice,
-        note: orderDetailData.notes || "",
+        note: orderDetailData.notes || "", // Empty string instead of null
+        // Don't send createdAt - let backend handle
       };
 
-      console.log("📤 Creating order detail with payload:", payload);
+      console.log("📤 Creating order detail with fixed payload:", payload);
+      console.log("📤 Order ID:", orderId, "Service ID:", serviceId);
 
       const response = await apiClient.post(
         `/order-details/${orderId}/${serviceId}`,
         payload
       );
 
+      console.log("📤 Order detail response:", response.data);
+
       if (response.data.code === 200) {
-        console.log("✅ Order detail created");
+        console.log("✅ Order detail created:", response.data.result.id);
         return { orderDetailId: response.data.result.id };
       }
 
-      throw new Error("Order detail creation failed");
-    } catch (error: any) {
-      console.error(
-        "❌ Order detail error:",
-        error.response?.data || error.message
+      throw new Error(
+        `Order detail creation failed: ${
+          response.data.message || "Unknown error"
+        }`
       );
-      // Don't throw - this is not critical for the demo
-      console.log("⚠️ Continuing without order detail...");
-      return { orderDetailId: "mock_detail_" + Date.now() };
+    } catch (error: any) {
+      console.error("❌ Order detail error:");
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
+
+      throw new Error(
+        "Không thể tạo chi tiết đơn hàng: " +
+          (error.response?.data?.message || error.message)
+      );
     }
   }
 
@@ -340,77 +276,105 @@ class OrderService {
     }
   ): Promise<{ participantId: string }> {
     try {
+      // Fix payload structure
       const payload = {
         participant_name: participantData.participantName,
         relationship: participantData.relationship,
         age: participantData.age,
-        note: participantData.notes || "",
+        note: participantData.notes || "", // Empty string instead of null
+        // Don't send createdAt - let backend handle
       };
 
-      console.log("📤 Adding participant:", payload);
+      console.log("📤 Adding participant with fixed payload:", payload);
+      console.log("📤 Order ID:", orderId);
 
       const response = await apiClient.post(
         `/OrderParticipants/${orderId}`,
         payload
       );
 
+      console.log("📤 Participant response:", response.data);
+
       if (response.data.code === 200) {
-        console.log("✅ Participant added");
+        console.log("✅ Participant added:", response.data.result.id);
         return { participantId: response.data.result.id };
       }
 
-      throw new Error("Participant creation failed");
-    } catch (error: any) {
-      console.error(
-        "❌ Participant error:",
-        error.response?.data || error.message
+      throw new Error(
+        `Participant creation failed: ${
+          response.data.message || "Unknown error"
+        }`
       );
-      // Don't throw - continue with flow
-      console.log("⚠️ Continuing without participant...");
-      return { participantId: "mock_participant_" + Date.now() };
+    } catch (error: any) {
+      console.error("❌ Participant error:");
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
+
+      throw new Error(
+        "Không thể thêm người tham gia: " +
+          (error.response?.data?.message || error.message)
+      );
     }
   }
+  // ===== APPOINTMENTS =====
 
-  // ===== APPOINTMENTS (MOCK FOR NOW) =====
   async createAppointment(
-    serviceId: string,
+    orderId: string,
     appointmentData: {
       appointmentDate: string;
       appointmentTime: string;
-      doctorId?: string;
+      doctorId: string;
+      timeSlotId: string;
       notes?: string;
     }
   ): Promise<{ appointmentId: string }> {
-    if (API_CONFIG.USE_MOCK_APPOINTMENT) {
-      console.log("✅ Mock appointment created");
-      return { appointmentId: "mock_appointment_" + Date.now() };
-    }
-
     try {
+      // Match exactly with Swagger payload that worked
       const payload = {
-        appointment_date: appointmentData.appointmentDate + "T09:00:00.000Z",
-        appointment_type: "consultation",
+        appointment_date: appointmentData.appointmentDate + "T03:24:55.300Z", // Use same format as Swagger
+        appointment_type: "Gặp để tư vấn", // Use Vietnamese like in Swagger
         status: true,
-        notes: appointmentData.notes || "",
+        notes: appointmentData.notes || "không có",
+        doctor_time_slot: appointmentData.timeSlotId,
       };
 
-      const response = await apiClient.post(
-        `/appointment/${serviceId}`,
+      console.log(
+        "📤 Creating appointment with Swagger-matched payload:",
         payload
       );
+      console.log("📤 Order ID:", orderId);
+      console.log(
+        "📤 Full URL:",
+        `${apiClient.defaults.baseURL}/appointment/${orderId}`
+      );
+
+      const response = await apiClient.post(`/appointment/${orderId}`, payload);
+
+      console.log("📤 Appointment response:", response.data);
 
       if (response.data.code === 200) {
+        console.log(
+          "✅ Appointment created successfully:",
+          response.data.result.id
+        );
         return { appointmentId: response.data.result.id };
       }
 
-      throw new Error("Appointment creation failed");
+      throw new Error(`Appointment creation failed: ${response.data.message}`);
     } catch (error: any) {
-      console.warn("⚠️ Appointment API failed, using mock");
-      return { appointmentId: "mock_appointment_" + Date.now() };
+      console.error("❌ Appointment creation failed:");
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
+      console.error("❌ Error message:", error.message);
+
+      // Still throw error so we can see what's happening
+      throw new Error(
+        "Không thể tạo lịch hẹn: " +
+          (error.response?.data?.message || error.message)
+      );
     }
   }
-
-  // ===== PAYMENT (MOCK) =====
+  // ===== PAYMENT (Mock for now - no API available) =====
   async processPayment(
     orderId: string,
     paymentData: {
@@ -422,7 +386,6 @@ class OrderService {
     transactionId?: string;
     message: string;
   }> {
-    // Always use mock for now since payment API is complex
     console.log("💳 Processing mock payment...");
 
     const messages = {
@@ -438,23 +401,38 @@ class OrderService {
     // Simulate payment processing delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
+    try {
+      // Try to update order payment status via API
+      const updatePayload = {
+        payment_method: paymentData.method,
+        payment_status: paymentData.method === "cash" ? "pending" : "paid",
+        total_amount: paymentData.amount,
+      };
+
+      console.log("📤 Updating order payment info:", updatePayload);
+      await apiClient.put(`/orders/${orderId}`, updatePayload);
+      console.log("✅ Order payment info updated");
+    } catch (error) {
+      console.warn("⚠️ Could not update order payment info, continuing...");
+    }
+
     return {
       success: true,
       transactionId: "TXN_" + Date.now(),
       message: messages[paymentData.method],
     };
   }
+  // ===== COMPLETE ORDER FLOW =====
 
-  // ===== COMPLETE ORDER FLOW (IMPROVED ERROR HANDLING) =====
   async createCompleteOrder(orderData: CreateOrderRequest): Promise<string> {
-    console.log("🚀 Starting improved order creation flow...");
+    console.log("🚀 Starting simplified order creation flow...");
 
     try {
-      // Step 1: Handle user
+      // Step 1: Handle user registration
       console.log("👤 Step 1: Handling user...");
       const userId = await this.handleUserRegistration(orderData.customerInfo);
 
-      // Step 2: Create order
+      // Step 2: Create main order (simplified)
       console.log("📦 Step 2: Creating order...");
       const orderResult = await this.createOrder({
         customerId: userId,
@@ -464,20 +442,22 @@ class OrderService {
         notes: orderData.serviceInfo.notes,
       });
       const orderId = orderResult.orderId;
+      console.log("✅ Order created with ID:", orderId);
 
-      // Step 3: Add order detail (non-blocking)
+      // Step 3: Add order details (simplified)
       console.log("📋 Step 3: Adding order details...");
       try {
         await this.createOrderDetail(orderId, orderData.serviceInfo.serviceId, {
           quantity: orderData.serviceInfo.quantity,
-          unitPrice: 2500000, // Mock price
+          unitPrice: 2500000, // Fixed price for now
           notes: orderData.serviceInfo.notes,
         });
+        console.log("✅ Order details added");
       } catch (error) {
-        console.warn("⚠️ Order detail failed, continuing...");
+        console.warn("⚠️ Could not add order details, continuing...");
       }
 
-      // Step 4: Add participants (non-blocking)
+      // Step 4: Add participants (simplified)
       console.log("👨‍👩‍👧‍👦 Step 4: Adding participants...");
       for (const participant of orderData.participantInfo.participants) {
         try {
@@ -487,30 +467,39 @@ class OrderService {
             age: parseInt(participant.age),
             notes: "",
           });
+          console.log(`✅ Participant ${participant.name} added`);
         } catch (error) {
-          console.warn("⚠️ Participant add failed, continuing...");
+          console.warn(
+            `⚠️ Could not add participant ${participant.name}, continuing...`
+          );
         }
       }
 
-      // Step 5: Create appointment if needed (non-blocking)
+      // Step 5: Create appointment ONLY if facility collection AND user selected doctor
       if (
         orderData.serviceInfo.collectionMethod === "facility" &&
-        orderData.serviceInfo.appointmentDate
+        orderData.serviceInfo.appointmentDate &&
+        orderData.serviceInfo.doctorId &&
+        orderData.serviceInfo.timeSlotId
       ) {
         console.log("📅 Step 5: Creating appointment...");
         try {
-          await this.createAppointment(orderData.serviceInfo.serviceId, {
+          await this.createAppointment(orderId, {
             appointmentDate: orderData.serviceInfo.appointmentDate,
             appointmentTime: orderData.serviceInfo.appointmentTime || "09:00",
             doctorId: orderData.serviceInfo.doctorId,
+            timeSlotId: orderData.serviceInfo.timeSlotId,
             notes: orderData.serviceInfo.notes,
           });
+          console.log("✅ Appointment created");
         } catch (error) {
-          console.warn("⚠️ Appointment creation failed, continuing...");
+          console.warn(
+            "⚠️ Could not create appointment, but order is still valid"
+          );
         }
       }
 
-      // Step 6: Process payment
+      // Step 6: Process payment (mock)
       console.log("💳 Step 6: Processing payment...");
       const totalAmount = 2500000 * orderData.serviceInfo.quantity;
       await this.processPayment(orderId, {
@@ -521,89 +510,93 @@ class OrderService {
       console.log("🎉 Order creation completed successfully!");
       return orderId;
     } catch (error: any) {
-      console.error("❌ Complete order creation failed:", error);
-      throw new Error("Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại sau.");
+      console.error("❌ Order creation failed:", error);
+      throw new Error(
+        "Có lỗi xảy ra khi tạo đơn hàng: " +
+          (error.message || "Vui lòng thử lại sau")
+      );
     }
   }
 
   // ===== GET ORDER DATA =====
   async getCompleteOrderData(orderId: string): Promise<any> {
     try {
-      const response = await apiClient.get(`/orders/${orderId}`);
+      console.log("🔍 Fetching complete order data for:", orderId);
 
-      if (response.data.code === 200) {
-        const order = response.data.result;
+      // Get main order
+      const orderResponse = await apiClient.get(`/orders/${orderId}`);
+      if (orderResponse.data.code !== 200) {
+        throw new Error("Order not found");
+      }
+      const order = orderResponse.data.result;
 
-        // Try to get additional data
-        let participants = [];
-        let orderDetails = [];
-
-        try {
-          const participantsResponse = await apiClient.get(
-            `/OrderParticipants/order/${orderId}`
-          );
-          participants = participantsResponse.data.result || [];
-        } catch (error) {
-          console.warn("⚠️ Could not fetch participants");
-        }
-
-        try {
-          const detailsResponse = await apiClient.get(
-            `/order-details/${orderId}/all`
-          );
-          orderDetails = detailsResponse.data.result || [];
-        } catch (error) {
-          console.warn("⚠️ Could not fetch order details");
-        }
-
-        return {
-          ...order,
-          participants,
-          orderDetails,
-        };
+      // Get participants
+      let participants = [];
+      try {
+        const participantsResponse = await apiClient.get(
+          `/OrderParticipants/order/${orderId}`
+        );
+        participants = participantsResponse.data.result || [];
+      } catch (error) {
+        console.warn("⚠️ Could not fetch participants");
       }
 
-      throw new Error("Order not found");
-    } catch (error) {
-      console.error("❌ Error fetching order data:", error);
+      // Get order details
+      let orderDetails = [];
+      try {
+        const detailsResponse = await apiClient.get(
+          `/order-details/${orderId}/all`
+        );
+        orderDetails = detailsResponse.data.result || [];
+      } catch (error) {
+        console.warn("⚠️ Could not fetch order details");
+      }
 
-      // Return mock data as fallback
+      // Get appointment if exists
+      let appointment = null;
+      try {
+        const appointmentResponse = await apiClient.get(`/appointment`);
+        const appointments = appointmentResponse.data.result || [];
+        appointment = appointments.find((app: any) => app.orderId === orderId);
+      } catch (error) {
+        console.warn("⚠️ Could not fetch appointment");
+      }
+
+      console.log("✅ Complete order data retrieved");
       return {
-        id: orderId,
-        orderCode: "DNA-" + orderId.slice(-8).toUpperCase(),
-        status: "pending",
-        totalAmount: 2500000,
-        paymentMethod: "transfer",
-        paymentStatus: "pending",
-        notes: "Đơn hàng được tạo thành công",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        participants: [
-          {
-            id: "1",
-            participantName: "Mock Participant 1",
-            relationship: "Cha",
-            age: 35,
-          },
-          {
-            id: "2",
-            participantName: "Mock Participant 2",
-            relationship: "Con",
-            age: 8,
-          },
-        ],
-        orderDetails: [
-          {
-            id: "1",
-            quantity: 1,
-            unitPrice: 2500000,
-            subtotal: 2500000,
-          },
-        ],
+        ...order,
+        participants,
+        orderDetails,
+        appointment,
       };
+    } catch (error: any) {
+      console.error("❌ Error fetching order data:", error);
+      throw new Error("Không thể tải thông tin đơn hàng");
+    }
+  }
+
+  // ===== GET USER ORDERS =====
+  async getUserOrders(userId: string): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching orders for user:", userId);
+      const response = await apiClient.get(`/orders/user/${userId}`);
+
+      if (response.data.code === 200) {
+        const orders = response.data.result || [];
+        console.log("✅ User orders loaded:", orders.length);
+        return orders.sort(
+          (a: any, b: any) =>
+            new Date(b.createdAt || b.created_at).getTime() -
+            new Date(a.createdAt || a.created_at).getTime()
+        );
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error("❌ Error fetching user orders:", error);
+      return [];
     }
   }
 }
 
 export const orderService = new OrderService();
-export default orderService;
