@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaTimes, FaUserMd, FaStethoscope, FaToggleOn, FaToggleOff } from 'react-icons/fa';
+import { FaTimes, FaUserMd, FaStethoscope, FaToggleOn, FaToggleOff, FaEnvelope, FaPhone, FaUser } from 'react-icons/fa';
 import { DoctorRequest } from '../../../services/doctorService';
 
 interface DoctorModalProps {
@@ -34,9 +34,29 @@ const DoctorModal: React.FC<DoctorModalProps> = ({
     onSubmit(e);
   };
 
+  // Validation helpers
+  const isEmailValid = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const isPhoneValid = (phone: string) => {
+    const phoneRegex = /^(0|\+84)[0-9]{8,10}$/;
+    return phoneRegex.test(phone.replace(/\s/g, ''));
+  };
+
+  const isFormValid = () => {
+    return form.doctorCode.trim() &&
+           form.doctorName.trim() &&
+           form.doctorEmail.trim() &&
+           form.doctorPhone.trim() &&
+           isEmailValid(form.doctorEmail) &&
+           isPhoneValid(form.doctorPhone);
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -55,20 +75,22 @@ const DoctorModal: React.FC<DoctorModalProps> = ({
           <button
             onClick={handleClose}
             disabled={submitting}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100"
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100 disabled:opacity-50"
           >
             <FaTimes size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           <form onSubmit={handleFormSubmit} className="space-y-6">
             {/* Doctor Code */}
             <div>
-              <label className=" text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                <FaStethoscope size={14} />
-                Mã bác sĩ <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaStethoscope size={14} />
+                  Mã bác sĩ <span className="text-red-500">*</span>
+                </div>
               </label>
               <input
                 type="text"
@@ -83,6 +105,93 @@ const DoctorModal: React.FC<DoctorModalProps> = ({
               />
               <p className="text-xs text-gray-500 mt-1">
                 Mã bác sĩ duy nhất để xác định trong hệ thống
+              </p>
+            </div>
+
+            {/* Doctor Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaUser size={14} />
+                  Họ và tên <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="text"
+                name="doctorName"
+                value={form.doctorName}
+                onChange={onFormChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder="Nhập họ và tên bác sĩ"
+                required
+                disabled={submitting}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Họ và tên đầy đủ của bác sĩ
+              </p>
+            </div>
+
+            {/* Doctor Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaEnvelope size={14} />
+                  Email <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="email"
+                name="doctorEmail"
+                value={form.doctorEmail}
+                onChange={onFormChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  form.doctorEmail && !isEmailValid(form.doctorEmail) 
+                    ? 'border-red-300 bg-red-50' 
+                    : 'border-gray-300'
+                }`}
+                placeholder="Nhập email bác sĩ"
+                required
+                disabled={submitting}
+              />
+              {form.doctorEmail && !isEmailValid(form.doctorEmail) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Email không đúng định dạng
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Email liên hệ của bác sĩ
+              </p>
+            </div>
+
+            {/* Doctor Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaPhone size={14} />
+                  Số điện thoại <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="tel"
+                name="doctorPhone"
+                value={form.doctorPhone}
+                onChange={onFormChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  form.doctorPhone && !isPhoneValid(form.doctorPhone) 
+                    ? 'border-red-300 bg-red-50' 
+                    : 'border-gray-300'
+                }`}
+                placeholder="Nhập số điện thoại (VD: 0901234567)"
+                required
+                disabled={submitting}
+              />
+              {form.doctorPhone && !isPhoneValid(form.doctorPhone) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Số điện thoại không đúng định dạng (VD: 0901234567 hoặc +84901234567)
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Số điện thoại liên hệ của bác sĩ
               </p>
             </div>
 
@@ -161,7 +270,7 @@ const DoctorModal: React.FC<DoctorModalProps> = ({
           <button
             type="submit"
             onClick={handleFormSubmit}
-            disabled={submitting || !form.doctorCode.trim()}
+            disabled={submitting || !isFormValid()}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors font-medium flex items-center gap-2 disabled:cursor-not-allowed"
           >
             {submitting ? (

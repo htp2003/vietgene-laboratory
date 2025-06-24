@@ -4,8 +4,8 @@ import ServiceModal from '../../components/admin/service/ServiceModal'
 import ServiceList from '../../components/admin/service/ServiceList';
 import ServiceDetailTabs from '../../components/admin/service/ServiceDetailTabs';
 import ServiceSearchBar from '../../components/admin/service/ServiceSearchBar';
-import { useServices } from '../../hooks/useServices';
-import { Service } from '../../api/services.api';
+import { Service } from '../../services/serviceService';
+
 
 
 export default function ServicesManagement() {
@@ -106,8 +106,11 @@ export default function ServicesManagement() {
             alert('Failed to save service')
           }
         }}
-        service={selectedService}
       />
     </div>
   )
 }
+function useServices(): { loading: any; error: any; createService: any; updateService: any; deleteService: any; searchServices: any; } {
+  throw new Error('Function not implemented.');
+}
+

@@ -58,23 +58,23 @@ apiClient.interceptors.response.use(
 
 export interface DoctorCertificate {
   id: string;
-  doctorId: string;
   certificateName: string;
+  licenseNumber: string;
+  issuedBy: string;
   issueDate: string;
   expiryDate: string;
-  issuedBy: string;
-  isActive: boolean;
+  doctorId: string;
   createdAt: string;
   updatedAt?: string;
 }
 
 export interface CertificateRequest {
-  doctorId: string;
   certificateName: string;
+  licenseNumber: string;
+  issuedBy: string;
   issueDate: string;
   expiryDate: string;
-  issuedBy: string;
-  isActive: boolean;
+  doctorId: string;
 }
 
 // API Response interface
@@ -165,6 +165,34 @@ export const doctorCertificateService = {
     try {
       console.log("➕ Creating new certificate...");
       console.log("📤 Data being sent:", certificateData);
+
+      // Validate required fields
+      if (!certificateData.certificateName?.trim()) {
+        return { success: false, message: "Tên chứng chỉ không được để trống" };
+      }
+      if (!certificateData.licenseNumber?.trim()) {
+        return { success: false, message: "Số giấy phép không được để trống" };
+      }
+      if (!certificateData.issuedBy?.trim()) {
+        return { success: false, message: "Nơi cấp không được để trống" };
+      }
+      if (!certificateData.issueDate) {
+        return { success: false, message: "Ngày cấp không được để trống" };
+      }
+      if (!certificateData.expiryDate) {
+        return { success: false, message: "Ngày hết hạn không được để trống" };
+      }
+      if (!certificateData.doctorId?.trim()) {
+        return { success: false, message: "ID bác sĩ không được để trống" };
+      }
+
+      // Validate dates
+      const issueDate = new Date(certificateData.issueDate);
+      const expiryDate = new Date(certificateData.expiryDate);
+      
+      if (expiryDate <= issueDate) {
+        return { success: false, message: "Ngày hết hạn phải sau ngày cấp" };
+      }
       
       const response = await apiClient.post<ApiResponse<DoctorCertificate>>("/certificates", certificateData);
       
@@ -198,6 +226,16 @@ export const doctorCertificateService = {
           success: false,
           message: "ID chứng chỉ không hợp lệ"
         };
+      }
+
+      // Validate dates if both are provided
+      if (certificateData.issueDate && certificateData.expiryDate) {
+        const issueDate = new Date(certificateData.issueDate);
+        const expiryDate = new Date(certificateData.expiryDate);
+        
+        if (expiryDate <= issueDate) {
+          return { success: false, message: "Ngày hết hạn phải sau ngày cấp" };
+        }
       }
       
       const response = await apiClient.put<ApiResponse<DoctorCertificate>>(`/certificates/${certificateId}`, certificateData);
@@ -270,7 +308,7 @@ function handleApiError(error: any): { success: false; message: string } {
       case 404:
         return { success: false, message: "Không tìm thấy chứng chỉ" };
       case 409:
-        return { success: false, message: "Chứng chỉ đã tồn tại" };
+        return { success: false, message: "Số giấy phép đã tồn tại" };
       case 500:
         return { success: false, message: "Lỗi server, vui lòng thử lại sau" };
       default:

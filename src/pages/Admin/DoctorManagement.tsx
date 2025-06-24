@@ -6,6 +6,7 @@ import DoctorList from '../../components/admin/doctor/DoctorList';
 import DoctorModal from '../../components/admin/doctor/DoctorModal';
 import DoctorSearchBar from '../../components/admin/doctor/DoctorSearchBar';
 import DoctorCertificateManagement from '../../components/admin/doctor/DoctorCertificateManagement';
+import DoctorTimeSlotManagement from '../../components/admin/doctor/DoctorTimeSlotManagement';
 
 export default function DoctorManagement() {
   // Use the doctor hook
@@ -30,6 +31,9 @@ export default function DoctorManagement() {
   // Form state
   const [form, setForm] = useState<DoctorRequest>({
     doctorCode: '',
+    doctorName: '',
+    doctorEmail: '',
+    doctorPhone: '',
     isActive: true,
   });
 
@@ -42,12 +46,18 @@ export default function DoctorManagement() {
     if (doctor) {
       setForm({
         doctorCode: doctor.doctorCode || '',
+        doctorName: doctor.doctorName || '',
+        doctorEmail: doctor.doctorEmail || '',
+        doctorPhone: doctor.doctorPhone || '',
         isActive: doctor.isActive ?? true,
       });
       setEditingDoctor(doctor);
     } else {
       setForm({
         doctorCode: '',
+        doctorName: '',
+        doctorEmail: '',
+        doctorPhone: '',
         isActive: true,
       });
       setEditingDoctor(null);
@@ -61,6 +71,9 @@ export default function DoctorManagement() {
     setEditingDoctor(null);
     setForm({
       doctorCode: '',
+      doctorName: '',
+      doctorEmail: '',
+      doctorPhone: '',
       isActive: true,
     });
   };
@@ -79,8 +92,38 @@ export default function DoctorManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate required fields
     if (!form.doctorCode.trim()) {
       alert('Vui lòng nhập mã bác sĩ');
+      return;
+    }
+
+    if (!form.doctorName.trim()) {
+      alert('Vui lòng nhập tên bác sĩ');
+      return;
+    }
+
+    if (!form.doctorEmail.trim()) {
+      alert('Vui lòng nhập email');
+      return;
+    }
+
+    if (!form.doctorPhone.trim()) {
+      alert('Vui lòng nhập số điện thoại');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.doctorEmail)) {
+      alert('Email không đúng định dạng');
+      return;
+    }
+
+    // Validate phone format
+    const phoneRegex = /^(0|\+84)[0-9]{8,10}$/;
+    if (!phoneRegex.test(form.doctorPhone.replace(/\s/g, ''))) {
+      alert('Số điện thoại không đúng định dạng');
       return;
     }
 
@@ -113,7 +156,7 @@ export default function DoctorManagement() {
 
   // Delete doctor
   const handleDelete = async (doctor: EnhancedDoctor) => {
-    if (window.confirm(`Bạn có chắc muốn xóa bác sĩ ${doctor.fullName || doctor.doctorCode}?`)) {
+    if (window.confirm(`Bạn có chắc muốn xóa bác sĩ ${doctor.doctorName || doctor.doctorCode}?`)) {
       try {
         const response = await deleteDoctor(doctor.doctorId);
         
@@ -149,6 +192,7 @@ export default function DoctorManagement() {
   const handleSelectDoctor = (doctor: EnhancedDoctor) => {
     setSelectedDoctor(doctor);
   };
+
   // Get filtered doctors and statistics
   const filteredDoctors = getFilteredDoctors(searchTerm, statusFilter);
   const stats = getDoctorStats();
@@ -327,6 +371,11 @@ export default function DoctorManagement() {
       {/* Certificate Management - Show when a doctor is selected */}
       {selectedDoctor && (
         <DoctorCertificateManagement doctor={selectedDoctor} />
+      )}
+
+      {/* Time Slot Management - Show when a doctor is selected */}
+      {selectedDoctor && (
+        <DoctorTimeSlotManagement doctor={selectedDoctor} />
       )}
 
       {/* Doctor Modal */}

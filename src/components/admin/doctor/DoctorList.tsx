@@ -82,11 +82,11 @@ const DoctorList: React.FC<DoctorListProps> = ({
                 <div className="flex-shrink-0">
                   <img
                     src={doctor.avatar}
-                    alt={doctor.fullName}
+                    alt={doctor.doctorName}
                     className="w-16 h-16 rounded-full object-cover border-2 border-blue-100"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.doctorCode)}&background=3b82f6&color=fff`;
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctor.doctorName)}&background=3b82f6&color=fff`;
                     }}
                   />
                 </div>
@@ -94,7 +94,7 @@ const DoctorList: React.FC<DoctorListProps> = ({
                 {/* Name and Code */}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-gray-900 truncate">
-                    {doctor.fullName}
+                    {doctor.doctorName}
                   </div>
                   <div className="text-sm text-blue-600 font-medium">
                     {doctor.doctorCode}
@@ -111,11 +111,11 @@ const DoctorList: React.FC<DoctorListProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center text-sm text-gray-600">
                     <FaEnvelope className="mr-2 text-gray-400" size={12} />
-                    <span className="truncate">{doctor.email}</span>
+                    <span className="truncate">{doctor.doctorEmail}</span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <FaPhone className="mr-2 text-gray-400" size={12} />
-                    <span>{doctor.phone}</span>
+                    <span>{doctor.doctorPhone}</span>
                   </div>
                 </div>
               </div>
@@ -137,7 +137,10 @@ const DoctorList: React.FC<DoctorListProps> = ({
                     {getStatusText(doctor.isActive)}
                   </span>
                   <button
-                    onClick={() => onToggleStatus(doctor)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleStatus(doctor);
+                    }}
                     className="text-gray-400 hover:text-gray-600 transition-colors"
                     title={doctor.isActive ? 'Ngưng hoạt động' : 'Kích hoạt'}
                   >
@@ -166,7 +169,10 @@ const DoctorList: React.FC<DoctorListProps> = ({
               <div className="col-span-1 text-center">
                 <div className="flex items-center justify-center gap-1">
                   <button
-                    onClick={() => onEdit(doctor)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(doctor);
+                    }}
                     className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-full hover:bg-blue-50"
                     title="Chỉnh sửa"
                   >
@@ -174,7 +180,10 @@ const DoctorList: React.FC<DoctorListProps> = ({
                   </button>
 
                   <button
-                    onClick={() => onDelete(doctor)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(doctor);
+                    }}
                     className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-full hover:bg-red-50"
                     title="Xóa"
                   >

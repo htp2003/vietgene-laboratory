@@ -1,5 +1,6 @@
 import React from 'react';
-import { Service } from '../../../api/services.api';
+import { Service } from '../../../services/serviceService';
+
 
 
 // Placeholder for workflow/tasks config UI

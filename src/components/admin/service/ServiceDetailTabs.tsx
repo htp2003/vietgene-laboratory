@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 
 import ServiceWorkflowTab from './ServiceWorkflowTab';
-import ServiceOrdersTab from './ServiceOrdersTab';
+// import ServiceOrdersTab from './ServiceOrdersTab';
 
-import { Service } from '../../../api/services.api';
+// import { Service } from '../../../api/services.api';
 import ServiceInfoTab from './ServiceInfoTab';
-import ServiceSamplesTab from './ServiceSamplesTab';
+
 import ServiceDocumentsTab from './ServiceDocumentsTab';
+import { Service } from '../../../services/serviceService';
 
 interface ServiceDetailTabsProps {
   service: Service;
@@ -48,8 +49,8 @@ export default function ServiceDetailTabs({ service, onBack }: ServiceDetailTabs
       <div>
         {activeTab === 'info' && <ServiceInfoTab service={service} />}
         {activeTab === 'workflow' && <ServiceWorkflowTab service={service} />}
-        {activeTab === 'orders' && <ServiceOrdersTab service={service} />}
-        {activeTab === 'samples' && <ServiceSamplesTab service={service} />}
+        {/* {activeTab === 'orders' && <ServiceOrdersTab service={service} />} */}
+        {/* {activeTab === 'samples' && <ServiceSamplesTab service={service} />} */}
         {activeTab === 'documents' && <ServiceDocumentsTab service={service} />}
       </div>
     </div>
