@@ -6,6 +6,7 @@ import DoctorList from '../../components/admin/doctor/DoctorList';
 import DoctorModal from '../../components/admin/doctor/DoctorModal';
 import DoctorSearchBar from '../../components/admin/doctor/DoctorSearchBar';
 import DoctorCertificateManagement from '../../components/admin/doctor/DoctorCertificateManagement';
+import DoctorTimeSlotManagement from '../../components/admin/doctor/DoctorTimeSlotManagement';
 
 export default function DoctorManagement() {
   // Use the doctor hook
@@ -370,6 +371,11 @@ export default function DoctorManagement() {
       {/* Certificate Management - Show when a doctor is selected */}
       {selectedDoctor && (
         <DoctorCertificateManagement doctor={selectedDoctor} />
+      )}
+
+      {/* Time Slot Management - Show when a doctor is selected */}
+      {selectedDoctor && (
+        <DoctorTimeSlotManagement doctor={selectedDoctor} />
       )}
 
       {/* Doctor Modal */}
