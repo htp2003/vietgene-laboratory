@@ -25,6 +25,8 @@ import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
 import APITestPage from "./pages/APITestPage";
+import StaffProfileComponent from "./pages/staff/StaffProfile";
+import StaffAppointmentsWithTestMode from "./pages/staff/AppointmentWithTestMode";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -200,6 +202,22 @@ export default function useRouteElements() {
       element: (
         <StaffLayout>
           <StaffAppointments />
+        </StaffLayout>
+      ),
+    },
+    {
+      path: "/staff/appointment",
+      element: (
+        <StaffLayout>
+          <StaffAppointmentsWithTestMode/>
+        </StaffLayout>
+      ),
+    },
+    {
+      path: "/staff/profile",
+      element: (
+        <StaffLayout>
+          <StaffProfileComponent/>
         </StaffLayout>
       ),
     },
