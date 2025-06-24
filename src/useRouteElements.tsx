@@ -195,6 +195,16 @@ export default function useRouteElements() {
         </AdminLayout>
       ),
     },
+    {
+      path: "/admin/profile",
+      element: (
+        <ProtectedRoute>
+          <AdminLayout>
+            <Profile />
+          </AdminLayout>
+        </ProtectedRoute>
+      ),
+    },
 
     // Staff
     {
