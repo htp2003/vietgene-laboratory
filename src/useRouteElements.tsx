@@ -13,7 +13,7 @@ import OrderDetail from "./pages/order/OrderDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import AdminLayout from "./layouts/AdminLayout/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
+
 import ServicesManagement from "./pages/Admin/ServicesManagement";
 import BlogManagement from "./pages/admin/BlogManagement";
 import StaffAppointments from "./pages/staff/appointment";
@@ -27,6 +27,7 @@ import NewsDetail from "./pages/news/NewsDetail";
 import APITestPage from "./pages/APITestPage";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
 import StaffAppointmentsWithTestMode from "./pages/staff/AppointmentWithTestMode";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -189,6 +190,14 @@ export default function useRouteElements() {
     },
     {
       path: "/admin/blog",
+      element: (
+        <AdminLayout>
+          <BlogManagement />
+        </AdminLayout>
+      ),
+    },
+    {
+      path: "/admin/notification",
       element: (
         <AdminLayout>
           <BlogManagement />
