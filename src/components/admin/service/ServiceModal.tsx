@@ -1,195 +1,372 @@
-import React from 'react'
-import { FaTimes } from 'react-icons/fa'
-
-interface Service {
-  id: string;
-  service_name: string;
-  service_type: string;
-  test_category: string;
-  description: string;
-  price: number;
-  duration_days: number;
-  collection_methods: string[];
-  requires_legal_documents: boolean;
-  is_active: boolean;
-  created_at: string;
-}
+import React, { useState, useEffect } from 'react';
+import { FaTimes, FaFlask } from 'react-icons/fa';
+import { Service } from '../../../services/serviceService';
 
 interface ServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (service: Omit<Service, 'id' | 'created_at'>) => void;
+  onSave: (service: Partial<Service>) => void;
   service?: Service;
+  submitting?: boolean;
 }
 
-export default function ServiceModal({ isOpen, onClose, onSave, service }: ServiceModalProps) {
-  const defaultForm: Omit<Service, 'id' | 'created_at'> = {
-    service_name: service?.service_name || '',
-    service_type: service?.service_type || '',
-    test_category: service?.test_category || '',
-    description: service?.description || '',
-    price: service?.price || 0,
-    duration_days: service?.duration_days || 0,
-    collection_methods: service?.collection_methods || [],
-    requires_legal_documents: service?.requires_legal_documents || false,
-    is_active: service?.is_active ?? true,
-  };
+const ServiceModal: React.FC<ServiceModalProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  service,
+  submitting = false
+}) => {
+  const [form, setForm] = useState<Partial<Service>>({
+    service_name: '',
+    service_type: '',
+    test_category: '',
+    description: '',
+    price: 0,
+    duration_days: 7,
+    collection_methods: 'facility_collect',
+    requires_legal_documents: false,
+  });
 
-  const [formData, setFormData] = React.useState<Omit<Service, 'id' | 'created_at'>>(defaultForm);
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (service) {
-      setFormData({
-        service_name: service.service_name,
-        service_type: service.service_type,
-        test_category: service.test_category,
-        description: service.description,
-        price: service.price,
-        duration_days: service.duration_days,
-        collection_methods: service.collection_methods,
-        requires_legal_documents: service.requires_legal_documents,
-        is_active: service.is_active,
+      setForm({
+        service_name: service.service_name || '',
+        service_type: service.service_type || '',
+        test_category: service.test_category || '',
+        description: service.description || '',
+        price: service.price || 0,
+        duration_days: service.duration_days || 7,
+        collection_methods: service.collection_methods || 'facility_collect',
+        requires_legal_documents: service.requires_legal_documents || false,
       });
     } else {
-      setFormData(defaultForm);
+      setForm({
+        service_name: '',
+        service_type: '',
+        test_category: '',
+        description: '',
+        price: 0,
+        duration_days: 7,
+        collection_methods: 'facility_collect',
+        requires_legal_documents: false,
+      });
     }
-  }, [service]);
+  }, [service, isOpen]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm(prev => ({ ...prev, [name]: checked }));
+    } else if (name === 'price' || name === 'duration_days') {
+      setForm(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+    } else {
+      setForm(prev => ({ ...prev, [name]: value }));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave(formData)
-    onClose()
-  }
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!form.service_name?.trim()) {
+      alert('Vui lòng nhập tên dịch vụ');
+      return;
+    }
+    if (!form.service_type?.trim()) {
+      alert('Vui lòng nhập loại dịch vụ');
+      return;
+    }
+    if (!form.test_category?.trim()) {
+      alert('Vui lòng nhập danh mục');
+      return;
+    }
+    if (!form.description?.trim()) {
+      alert('Vui lòng nhập mô tả');
+      return;
+    }
+    if (!form.price || form.price <= 0) {
+      alert('Vui lòng nhập giá hợp lệ');
+      return;
+    }
+    if (!form.duration_days || form.duration_days <= 0) {
+      alert('Vui lòng nhập thời gian xử lý hợp lệ');
+      return;
+    }
 
-  if (!isOpen) return null
+    onSave(form);
+  };
+
+  const handleClose = () => {
+    if (!submitting) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const isFormValid = () => {
+    return form.service_name?.trim() &&
+           form.service_type?.trim() &&
+           form.test_category?.trim() &&
+           form.description?.trim() &&
+           form.price && form.price > 0 &&
+           form.duration_days && form.duration_days > 0;
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {service ? 'Edit Service' : 'Add New Service'}
-          </h2>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FaFlask className="text-blue-600" size={20} />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900">
+                {service ? 'Chỉnh sửa dịch vụ' : 'Thêm dịch vụ mới'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {service ? 'Cập nhật thông tin dịch vụ' : 'Tạo dịch vụ xét nghiệm mới'}
+              </p>
+            </div>
+          </div>
           <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            onClick={handleClose}
+            disabled={submitting}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100 disabled:opacity-50"
           >
             <FaTimes size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tên dịch vụ</label>
-            <input
-              type="text"
-              required
-              value={formData.service_name}
-              onChange={e => setFormData({ ...formData, service_name: e.target.value })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Loại dịch vụ</label>
-            <input
-              type="text"
-              required
-              value={formData.service_type}
-              onChange={e => setFormData({ ...formData, service_type: e.target.value })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nhóm xét nghiệm</label>
-            <input
-              type="text"
-              required
-              value={formData.test_category}
-              onChange={e => setFormData({ ...formData, test_category: e.target.value })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
-            <textarea
-              required
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              rows={3}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Giá</label>
-            <input
-              type="number"
-              required
-              min="0"
-              step="0.01"
-              value={formData.price}
-              onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian (ngày)</label>
-            <input
-              type="number"
-              required
-              min="1"
-              step="1"
-              value={formData.duration_days}
-              onChange={e => setFormData({ ...formData, duration_days: parseInt(e.target.value, 10) })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phương thức lấy mẫu</label>
-            <select
-              multiple
-              value={formData.collection_methods}
-              onChange={e => setFormData({ ...formData, collection_methods: Array.from(e.target.selectedOptions, opt => opt.value) })}
-              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              <option value="In-Clinic">In-Clinic</option>
-              <option value="Home Kit">Home Kit</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={formData.requires_legal_documents}
-              onChange={e => setFormData({ ...formData, requires_legal_documents: e.target.checked })}
-              id="requires_legal_documents"
-            />
-            <label htmlFor="requires_legal_documents" className="text-sm font-medium text-gray-700">Yêu cầu giấy tờ pháp lý</label>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={formData.is_active}
-              onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
-              id="is_active"
-            />
-            <label htmlFor="is_active" className="text-sm font-medium text-gray-700">Đang hoạt động</label>
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-            >
-              Huỷ
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600"
-            >
-              {service ? 'Lưu thay đổi' : 'Thêm dịch vụ'}
-            </button>
-          </div>
-        </form>
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Service Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tên dịch vụ <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="service_name"
+                value={form.service_name || ''}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder="Nhập tên dịch vụ"
+                required
+                disabled={submitting}
+                autoFocus
+              />
+            </div>
+
+            {/* Service Type and Category */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Loại dịch vụ <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="service_type"
+                  value={form.service_type || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  required
+                  disabled={submitting}
+                >
+                  <option value="">Chọn loại dịch vụ</option>
+                  <option value="Nhanh">Nhanh</option>
+                  <option value="Tiêu chuẩn">Tiêu chuẩn</option>
+                  <option value="Cao cấp">Cao cấp</option>
+                  <option value="Pháp lý">Pháp lý</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Danh mục <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="test_category"
+                  value={form.test_category || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  required
+                  disabled={submitting}
+                >
+                  <option value="">Chọn danh mục</option>
+                  <option value="Cơ bản">Cơ bản</option>
+                  <option value="Cha con">Cha con</option>
+                  <option value="Mẹ con">Mẹ con</option>
+                  <option value="Anh chị em">Anh chị em</option>
+                  <option value="Huyết thống">Huyết thống</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mô tả <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                name="description"
+                value={form.description || ''}
+                onChange={handleChange}
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder="Nhập mô tả chi tiết về dịch vụ"
+                required
+                disabled={submitting}
+              />
+            </div>
+
+            {/* Price and Duration */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Giá dịch vụ (VNĐ) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="price"
+                  value={form.price || ''}
+                  onChange={handleChange}
+                  min="0"
+                  step="1000"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="0"
+                  required
+                  disabled={submitting}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Thời gian xử lý (ngày) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="duration_days"
+                  value={form.duration_days || ''}
+                  onChange={handleChange}
+                  min="1"
+                  max="30"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  placeholder="7"
+                  required
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+
+            {/* Collection Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Phương thức lấy mẫu
+              </label>
+              <select
+                name="collection_methods"
+                value={form.collection_methods || 'facility_collect'}
+                onChange={handleChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                disabled={submitting}
+              >
+                <option value="facility_collect">Lấy mẫu tại cơ sở</option>
+                <option value="self_collect">Tự lấy mẫu</option>
+                <option value="self_collect,facility_collect">Cả hai phương thức</option>
+              </select>
+            </div>
+
+            {/* Legal Documents Required */}
+            <div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  name="requires_legal_documents"
+                  checked={form.requires_legal_documents || false}
+                  onChange={handleChange}
+                  id="requires_legal_documents"
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  disabled={submitting}
+                />
+                <label htmlFor="requires_legal_documents" className="text-sm font-medium text-gray-700">
+                  Yêu cầu giấy tờ pháp lý
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 ml-7">
+                Dịch vụ này có yêu cầu khách hàng cung cấp giấy tờ pháp lý không?
+              </p>
+            </div>
+
+            {/* Information Note */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-1 bg-blue-100 rounded">
+                  <FaFlask className="text-blue-600" size={16} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">
+                    Lưu ý quan trọng
+                  </h4>
+                  <p className="text-sm text-blue-700">
+                    Vui lòng đảm bảo thông tin chính xác. Giá và thời gian xử lý sẽ được hiển thị 
+                    cho khách hàng trên website.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={submitting}
+            className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit}
+            disabled={submitting || !isFormValid()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+          >
+            {submitting ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                {service ? (
+                  <>
+                    <FaFlask size={16} />
+                    Cập nhật
+                  </>
+                ) : (
+                  <>
+                    <FaFlask size={16} />
+                    Thêm dịch vụ
+                  </>
+                )}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default ServiceModal;
