@@ -45,7 +45,7 @@ apiClient.interceptors.response.use(
     console.error("❌ Staff Appointment API Response error:", error);
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
-      localStorage.removeUser("user");
+      localStorage.removeItem("user");
       window.location.href = "/login";
     }
     return Promise.reject(error);
@@ -60,17 +60,42 @@ export interface ApiResponse<T> {
   result: T;
 }
 
-// ✅ Updated ApiAppointment interface to match new API structure
+// ✅ Add Doctor interfaces based on API schema
+export interface ApiDoctor {
+  userId: string;
+  doctorId: string;
+  doctorCode: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DoctorRequest {
+  doctorCode: string;
+  isActive: boolean;
+}
+
+// ✅ Enhanced ApiAppointment interface
 export interface ApiAppointment {
   id: string;
-  appointment_date: string; // ISO date string
+  appointment_date: string;
   appointment_type: string;
-  status: boolean; // ✅ Changed from string to boolean
+  status: boolean;
   notes: string;
   userId: string;
   serviceId: string;
   createdAt: string;
   updatedAt: string;
+  // ✅ Add doctor field if available in API response
+  doctorId?: string;
+}
+
+export interface AppointmentStatusData {
+  id: string;
+  currentStep: number;
+  status: string;
+  lastUpdated: string;
+  completedSteps: string[];
 }
 
 export interface ApiTask {
@@ -138,8 +163,8 @@ export interface ApiUser {
   password?: string;
   email: string;
   full_name: string;
-  phone?: string; // ✅ Added phone field
-  address?: string; // ✅ Added address field
+  phone?: string;
+  address?: string;
   dob: string;
   roles: Array<{
     name: string;
@@ -147,7 +172,7 @@ export interface ApiUser {
   }>;
 }
 
-// Frontend compatible appointment interface
+// ✅ Enhanced Appointment interface with doctor info
 export interface Appointment {
   id: string;
   customerName: string;
@@ -162,15 +187,26 @@ export interface Appointment {
   legalType: 'Pháp Lý' | 'Dân Sự';
   address?: string;
   notes?: string;
-  orderId?: string; // ✅ Made optional since it might not always exist
-  orderDetailId?: string; // ✅ Made optional since it might not always exist
-  tasks?: ApiTask[]; // ✅ Made optional since tasks might not exist for all appointments
-  rawData?: { // ✅ Made optional
+  orderId?: string;
+  orderDetailId?: string;
+  tasks?: ApiTask[];
+  // ✅ Add doctor information
+  doctor?: {
+    id: string;
+    code: string;
+    name: string;
+    isActive: boolean;
+  };
+  currentStep?: number;
+  completedSteps?: string[];
+  lastStatusUpdate?: string;
+  rawData?: {
     appointment: ApiAppointment;
     order?: ApiOrder;
     orderDetail?: ApiOrderDetail;
     service?: ApiService;
     user?: ApiUser;
+    doctor?: ApiDoctor; // ✅ Add doctor to raw data
   };
 }
 
@@ -195,13 +231,154 @@ export interface NotificationData {
 
 export class StaffAppointmentService {
   
-  // ✅ Updated to handle new API structure with simpler approach
+  // Status persistence utilities (keep existing)
+  static STORAGE_KEY_PREFIX = 'appointment_status_';
+  
+  static saveAppointmentStatus(appointmentId: string, status: string, step: number): void {
+    try {
+      const statusData: AppointmentStatusData = {
+        id: appointmentId,
+        currentStep: step,
+        status: status,
+        lastUpdated: new Date().toISOString(),
+        completedSteps: this.getCompletedSteps(step)
+      };
+      
+      localStorage.setItem(
+        `${this.STORAGE_KEY_PREFIX}${appointmentId}`, 
+        JSON.stringify(statusData)
+      );
+      
+      console.log(`💾 Saved appointment status: ${appointmentId} -> ${status} (step ${step})`);
+    } catch (error) {
+      console.warn('Failed to save appointment status to localStorage:', error);
+    }
+  }
+  
+  static loadAppointmentStatus(appointmentId: string): AppointmentStatusData | null {
+    try {
+      const stored = localStorage.getItem(`${this.STORAGE_KEY_PREFIX}${appointmentId}`);
+      if (stored) {
+        const statusData = JSON.parse(stored) as AppointmentStatusData;
+        console.log(`📖 Loaded appointment status: ${appointmentId} -> ${statusData.status} (step ${statusData.currentStep})`);
+        return statusData;
+      }
+    } catch (error) {
+      console.warn('Failed to load appointment status from localStorage:', error);
+    }
+    return null;
+  }
+  
+  static clearAppointmentStatus(appointmentId: string): void {
+    try {
+      localStorage.removeItem(`${this.STORAGE_KEY_PREFIX}${appointmentId}`);
+      console.log(`🗑️ Cleared stored status for appointment: ${appointmentId}`);
+    } catch (error) {
+      console.warn('Failed to clear appointment status:', error);
+    }
+  }
+  
+  static getCompletedSteps(currentStep: number): string[] {
+    const steps = [
+      'booking', 'confirmed', 'kit_delivered', 'sample_received', 'testing', 'completed'
+    ];
+    return steps.slice(0, currentStep);
+  }
+  
+  static getStepFromStatus(status: string): number {
+    const statusStepMap: Record<string, number> = {
+      'Pending': 1,
+      'Confirmed': 2,
+      'DeliveringKit': 2,
+      'KitDelivered': 3,
+      'SampleReceived': 4,
+      'Testing': 5,
+      'Completed': 6,
+      'Cancelled': 0
+    };
+    return statusStepMap[status] || 1;
+  }
+
+  // ✅ NEW: Doctor-related methods
+  static async getAllDoctors(): Promise<ApiDoctor[]> {
+    try {
+      console.log("👨‍⚕️ Fetching all doctors...");
+      
+      const response = await apiClient.get<ApiResponse<ApiDoctor[]>>("/doctors");
+      
+      if (response.data.code === 200) {
+        console.log("✅ Fetched doctors:", response.data.result.length);
+        return response.data.result;
+      } else {
+        console.warn("⚠️ Failed to fetch doctors:", response.data.message);
+        return [];
+      }
+    } catch (error) {
+      console.error("❌ Error fetching doctors:", error);
+      return [];
+    }
+  }
+
+  static async getDoctorById(doctorId: string): Promise<ApiDoctor | null> {
+    try {
+      console.log(`👨‍⚕️ Fetching doctor ${doctorId}...`);
+      
+      const response = await apiClient.get<ApiResponse<ApiDoctor>>(`/doctors/${doctorId}`);
+      
+      if (response.data.code === 200) {
+        console.log("✅ Fetched doctor:", response.data.result);
+        return response.data.result;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn(`Failed to fetch doctor ${doctorId}:`, error);
+      return null;
+    }
+  }
+
+  static async createDoctor(doctorData: DoctorRequest): Promise<ApiDoctor | null> {
+    try {
+      console.log("👨‍⚕️ Creating new doctor...");
+      
+      const response = await apiClient.post<ApiResponse<ApiDoctor>>("/doctors", doctorData);
+      
+      if (response.data.code === 200) {
+        console.log("✅ Doctor created successfully");
+        return response.data.result;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("❌ Error creating doctor:", error);
+      return null;
+    }
+  }
+
+  static async updateDoctor(doctorId: string, doctorData: DoctorRequest): Promise<boolean> {
+    try {
+      console.log(`👨‍⚕️ Updating doctor ${doctorId}...`);
+      
+      const response = await apiClient.put(`/doctors/${doctorId}`, doctorData);
+      
+      if (response.data.code === 200) {
+        console.log("✅ Doctor updated successfully");
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("❌ Error updating doctor:", error);
+      return false;
+    }
+  }
+
+  // ✅ Enhanced getAllAppointments with doctor info
   static async getAllAppointments(): Promise<Appointment[]> {
     try {
-      console.log("📅 Fetching all appointments...");
+      console.log("📅 Fetching all appointments with doctor info...");
 
-      // 1. Lấy appointments với API mới
-      const appointmentsResponse = await apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment");
+      const appointmentsResponse = await apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment/all");
       
       if (appointmentsResponse.data.code !== 200) {
         throw new Error(`Failed to fetch appointments: ${appointmentsResponse.data.message}`);
@@ -210,23 +387,37 @@ export class StaffAppointmentService {
       const appointments = appointmentsResponse.data.result;
       console.log("✅ Fetched appointments:", appointments.length);
 
-      // 2. Process each appointment với error handling tốt hơn
+      // ✅ Fetch all doctors once for better performance
+      const doctors = await this.getAllDoctors();
+      const doctorMap = new Map(doctors.map(doctor => [doctor.doctorId, doctor]));
+
       const enrichedAppointments = await Promise.all(
         appointments.map(async (appointment) => {
           try {
-            return await this.enrichAppointmentData(appointment);
+            const enrichedAppointment = await this.enrichAppointmentDataWithDoctor(appointment, doctorMap);
+            
+            // Restore status from localStorage if available
+            const storedStatus = this.loadAppointmentStatus(appointment.id);
+            if (storedStatus) {
+              enrichedAppointment.status = storedStatus.status as Appointment['status'];
+              enrichedAppointment.currentStep = storedStatus.currentStep;
+              enrichedAppointment.completedSteps = storedStatus.completedSteps;
+              enrichedAppointment.lastStatusUpdate = storedStatus.lastUpdated;
+              
+              console.log(`🔄 Restored status for ${appointment.id}: ${storedStatus.status}`);
+            }
+            
+            return enrichedAppointment;
           } catch (error) {
             console.error(`Error processing appointment ${appointment.id}:`, error);
-            // Return basic appointment data even if enrichment fails
             return this.createBasicAppointment(appointment);
           }
         })
       );
 
-      // Filter out null values
       const validAppointments = enrichedAppointments.filter(Boolean) as Appointment[];
       
-      console.log("✅ Successfully processed appointments:", validAppointments.length);
+      console.log("✅ Successfully processed appointments with doctor info:", validAppointments.length);
       return validAppointments;
 
     } catch (error) {
@@ -235,8 +426,11 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ New method to enrich appointment data
-  static async enrichAppointmentData(appointment: ApiAppointment): Promise<Appointment> {
+  // ✅ Enhanced enrichment method with doctor info
+  static async enrichAppointmentDataWithDoctor(
+    appointment: ApiAppointment, 
+    doctorMap: Map<string, ApiDoctor>
+  ): Promise<Appointment> {
     try {
       // Get user data
       const user = await this.getUserById(appointment.userId);
@@ -244,13 +438,30 @@ export class StaffAppointmentService {
       // Get service data  
       const service = await this.getServiceById(appointment.serviceId);
 
+      // ✅ Get doctor data if available
+      let doctor: ApiDoctor | undefined;
+      if (appointment.doctorId) {
+        doctor = doctorMap.get(appointment.doctorId);
+        if (!doctor) {
+          // Fallback: try to fetch doctor individually
+          doctor = await this.getDoctorById(appointment.doctorId) || undefined;
+        }
+      } else if (service && service.collection_method === 2) {
+        // ✅ For facility-based services, try to assign a doctor
+        // This might need business logic to assign available doctors
+        const availableDoctors = Array.from(doctorMap.values()).filter(d => d.isActive);
+        if (availableDoctors.length > 0) {
+          // Simple assignment: could be enhanced with scheduling logic
+          doctor = availableDoctors[0];
+        }
+      }
+
       // Try to get related order/task data (optional)
       let order: ApiOrder | undefined;
       let orderDetail: ApiOrderDetail | undefined;
       let tasks: ApiTask[] = [];
 
       try {
-        // This part is optional and may fail
         const ordersResponse = await apiClient.get<ApiResponse<ApiOrder[]>>("/orders");
         if (ordersResponse.data.code === 200) {
           order = ordersResponse.data.result.find(o => o.userId === appointment.userId);
@@ -277,8 +488,7 @@ export class StaffAppointmentService {
         console.warn(`Could not fetch order/task data for appointment ${appointment.id}:`, error);
       }
 
-      // Map to frontend format
-      return this.mapToFrontendAppointment(appointment, user, service, order, orderDetail, tasks);
+      return this.mapToFrontendAppointmentWithDoctor(appointment, user, service, doctor, order, orderDetail, tasks);
 
     } catch (error) {
       console.error(`Error enriching appointment ${appointment.id}:`, error);
@@ -286,7 +496,77 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Helper method to get user by ID
+  // ✅ Enhanced mapping method with doctor info
+  static mapToFrontendAppointmentWithDoctor(
+    appointment: ApiAppointment,
+    user: ApiUser | null,
+    service: ApiService | null,
+    doctor: ApiDoctor | undefined,
+    order?: ApiOrder,
+    orderDetail?: ApiOrderDetail,
+    tasks: ApiTask[] = []
+  ): Appointment {
+    
+    const appointmentDate = new Date(appointment.appointment_date);
+    const status = this.mapAppointmentStatus(appointment.status, tasks);
+    
+    // ✅ Create doctor info object
+    let doctorInfo: Appointment['doctor'] | undefined;
+    if (doctor && user) {
+      // Get doctor's user info for full name
+      this.getUserById(doctor.userId).then(doctorUser => {
+        if (doctorUser) {
+          doctorInfo = {
+            id: doctor.doctorId,
+            code: doctor.doctorCode,
+            name: doctorUser.full_name || doctorUser.username || 'Unknown Doctor',
+            isActive: doctor.isActive
+          };
+        }
+      }).catch(() => {
+        // Fallback if can't get doctor user info
+        doctorInfo = {
+          id: doctor.doctorId,
+          code: doctor.doctorCode,
+          name: `Doctor ${doctor.doctorCode}`,
+          isActive: doctor.isActive
+        };
+      });
+    }
+    
+    return {
+      id: appointment.id,
+      customerName: user?.full_name || user?.username || 'N/A',
+      phone: user?.phone || 'N/A',
+      email: user?.email || 'N/A',
+      date: appointmentDate.toISOString().split('T')[0],
+      time: appointmentDate.toTimeString().split(' ')[0].substring(0, 5),
+      serviceType: service?.service_category || appointment.appointment_type,
+      serviceName: service?.service_name || appointment.appointment_type,
+      status: status,
+      locationType: this.mapLocationType(service?.collection_method || 0),
+      legalType: this.mapLegalType(service?.required_legal_document || false),
+      address: user?.address,
+      notes: appointment.notes || '',
+      orderId: order?.orderId,
+      orderDetailId: orderDetail?.id,
+      tasks: tasks,
+      doctor: doctorInfo, // ✅ Add doctor info
+      currentStep: this.getStepFromStatus(status),
+      completedSteps: this.getCompletedSteps(this.getStepFromStatus(status)),
+      lastStatusUpdate: appointment.updatedAt,
+      rawData: {
+        appointment,
+        order,
+        orderDetail,
+        service: service || undefined,
+        user: user || undefined,
+        doctor: doctor // ✅ Add doctor to raw data
+      }
+    };
+  }
+
+  // ✅ Keep all existing methods unchanged...
   static async getUserById(userId: string): Promise<ApiUser | null> {
     try {
       const response = await apiClient.get<ApiResponse<ApiUser>>(`/user/${userId}`);
@@ -297,7 +577,6 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Helper method to get service by ID
   static async getServiceById(serviceId: string): Promise<ApiService | null> {
     try {
       const response = await apiClient.get<ApiResponse<ApiService>>(`/service/${serviceId}`);
@@ -308,13 +587,12 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Create basic appointment when full data is not available
   static createBasicAppointment(appointment: ApiAppointment): Appointment {
     const appointmentDate = new Date(appointment.appointment_date);
     
     return {
       id: appointment.id,
-      customerName: 'Loading...', // Will be updated when user data loads
+      customerName: 'Loading...',
       phone: 'N/A',
       email: 'N/A',
       date: appointmentDate.toISOString().split('T')[0],
@@ -331,62 +609,19 @@ export class StaffAppointmentService {
     };
   }
 
-  // ✅ Updated mapping method with better null handling
-  static mapToFrontendAppointment(
-    appointment: ApiAppointment,
-    user: ApiUser | null,
-    service: ApiService | null,
-    order?: ApiOrder,
-    orderDetail?: ApiOrderDetail,
-    tasks: ApiTask[] = []
-  ): Appointment {
-    
-    const appointmentDate = new Date(appointment.appointment_date);
-    
-    return {
-      id: appointment.id,
-      customerName: user?.full_name || user?.username || 'N/A',
-      phone: user?.phone || 'N/A',
-      email: user?.email || 'N/A',
-      date: appointmentDate.toISOString().split('T')[0], // YYYY-MM-DD
-      time: appointmentDate.toTimeString().split(' ')[0].substring(0, 5), // HH:MM
-      serviceType: service?.service_category || appointment.appointment_type,
-      serviceName: service?.service_name || appointment.appointment_type,
-      status: this.mapAppointmentStatus(appointment.status, tasks),
-      locationType: this.mapLocationType(service?.collection_method || 0),
-      legalType: this.mapLegalType(service?.required_legal_document || false),
-      address: user?.address,
-      notes: appointment.notes || '',
-      orderId: order?.orderId,
-      orderDetailId: orderDetail?.id,
-      tasks: tasks,
-      rawData: {
-        appointment,
-        order,
-        orderDetail,
-        service: service || undefined,
-        user: user || undefined
-      }
-    };
-  }
-
-  // ✅ Updated status mapping for boolean status
   static mapAppointmentStatus(apiStatus: boolean, tasks: ApiTask[]): Appointment['status'] {
     if (!apiStatus) return 'Cancelled';
     
-    // If no tasks, determine status based on appointment status
     if (!tasks || tasks.length === 0) {
       return apiStatus ? 'Confirmed' : 'Pending';
     }
     
-    // Dựa vào tasks để xác định status chi tiết
     const completedTasks = tasks.filter(task => task.status === 'COMPLETED').length;
     const totalTasks = tasks.length;
     
     if (completedTasks === 0) return 'Confirmed';
     if (completedTasks === totalTasks) return 'Completed';
     
-    // Dựa vào task type để xác định trạng thái cụ thể
     const sampleTask = tasks.find(task => task.task_type === 'SAMPLE_COLLECTION');
     const testingTask = tasks.find(task => task.task_type === 'TESTING');
     
@@ -401,29 +636,57 @@ export class StaffAppointmentService {
     return 'Confirmed';
   }
 
-  // ✅ Updated location type mapping
   static mapLocationType(collectionMethod: number): 'Tại nhà' | 'Cơ sở y tế' {
-    // Assuming: 1 = at home, 2 = at facility (adjust based on your API)
     return collectionMethod === 1 ? 'Tại nhà' : 'Cơ sở y tế';
   }
 
-  // ✅ Keep existing legal type mapping
   static mapLegalType(requiredLegalDocument: boolean): 'Pháp Lý' | 'Dân Sự' {
     return requiredLegalDocument ? 'Pháp Lý' : 'Dân Sự';
   }
 
-  // ✅ Updated appointment confirmation
+  // ✅ Keep all other existing methods...
+  static async updateAppointmentStatusWithPersistence(
+    appointmentId: string, 
+    newStatus: Appointment['status'],
+    notes?: string
+  ): Promise<boolean> {
+    try {
+      console.log(`🔄 Updating appointment ${appointmentId}: ${newStatus}`);
+      
+      const success = await this.updateAppointmentStatus(
+        appointmentId, 
+        newStatus !== 'Cancelled', 
+        notes
+      );
+      
+      if (success) {
+        const step = this.getStepFromStatus(newStatus);
+        this.saveAppointmentStatus(appointmentId, newStatus, step);
+        
+        console.log(`✅ Successfully updated and persisted status: ${appointmentId} -> ${newStatus}`);
+        return true;
+      }
+      
+      return false;
+      
+    } catch (error) {
+      console.error("❌ Error updating appointment status with persistence:", error);
+      return false;
+    }
+  }
+
   static async confirmAppointment(appointmentId: string): Promise<boolean> {
     try {
       console.log(`✅ Confirming appointment ${appointmentId}...`);
 
       const response = await apiClient.put(`/appointment/${appointmentId}`, {
-        status: true, // Set to confirmed
+        status: true,
         notes: "Appointment confirmed by staff"
       });
 
       if (response.data.code === 200) {
-        console.log("✅ Appointment confirmed successfully");
+        this.saveAppointmentStatus(appointmentId, 'Confirmed', 2);
+        console.log("✅ Appointment confirmed and status saved");
         return true;
       } else {
         console.error("❌ Failed to confirm appointment:", response.data.message);
@@ -436,18 +699,18 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Updated appointment cancellation
   static async cancelAppointment(appointmentId: string, reason?: string): Promise<boolean> {
     try {
       console.log(`❌ Cancelling appointment ${appointmentId}...`);
 
       const response = await apiClient.put(`/appointment/${appointmentId}`, {
-        status: false, // Set to cancelled
+        status: false,
         notes: reason || "Appointment cancelled by staff"
       });
 
       if (response.data.code === 200) {
-        console.log("✅ Appointment cancelled successfully");
+        this.saveAppointmentStatus(appointmentId, 'Cancelled', 0);
+        console.log("✅ Appointment cancelled and status saved");
         return true;
       } else {
         console.error("❌ Failed to cancel appointment:", response.data.message);
@@ -460,7 +723,52 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Keep existing task update method
+  static async completeAppointment(
+    appointment: Appointment, 
+    medicalData: MedicalRecordData,
+    notificationMessage: string
+  ): Promise<boolean> {
+    try {
+      console.log(`🎯 Completing appointment ${appointment.id}...`);
+
+      const response = await apiClient.put(`/appointment/${appointment.id}`, {
+        status: true,
+        notes: "Appointment completed with test results"
+      });
+
+      if (response.data.code !== 200) {
+        throw new Error('Failed to update appointment status');
+      }
+
+      if (appointment.tasks && appointment.tasks.length > 0) {
+        const taskUpdates = appointment.tasks.map(task => 
+          this.updateTaskStatus(task.id, 'COMPLETED', 'Completed by staff')
+        );
+        await Promise.all(taskUpdates);
+      }
+
+      await this.createMedicalRecord(medicalData);
+
+      if (appointment.rawData?.user?.id) {
+        await this.sendNotification(appointment.rawData.user.id, {
+          title: "Kết quả xét nghiệm đã sẵn sàng",
+          message: notificationMessage,
+          type: "RESULT_READY",
+          is_read: false
+        });
+      }
+
+      this.saveAppointmentStatus(appointment.id, 'Completed', 6);
+
+      console.log("✅ Appointment completed successfully and status persisted");
+      return true;
+
+    } catch (error) {
+      console.error("❌ Error completing appointment:", error);
+      return false;
+    }
+  }
+
   static async updateTaskStatus(taskId: string, status: string, notes?: string): Promise<boolean> {
     try {
       console.log(`📝 Updating task ${taskId} to status: ${status}`);
@@ -485,7 +793,6 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Keep existing medical record creation
   static async createMedicalRecord(data: MedicalRecordData): Promise<boolean> {
     try {
       console.log("🏥 Creating medical record...");
@@ -506,7 +813,6 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Keep existing notification sending
   static async sendNotification(userId: string, data: NotificationData): Promise<boolean> {
     try {
       console.log(`🔔 Sending notification to user ${userId}...`);
@@ -530,49 +836,6 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ Keep existing complete appointment workflow
-  static async completeAppointment(
-    appointment: Appointment, 
-    medicalData: MedicalRecordData,
-    notificationMessage: string
-  ): Promise<boolean> {
-    try {
-      console.log(`🎯 Completing appointment ${appointment.id}...`);
-
-      // 1. Update appointment status to completed
-      await this.confirmAppointment(appointment.id);
-
-      // 2. Complete all tasks if they exist
-      if (appointment.tasks && appointment.tasks.length > 0) {
-        const taskUpdates = appointment.tasks.map(task => 
-          this.updateTaskStatus(task.id, 'COMPLETED', 'Completed by staff')
-        );
-        await Promise.all(taskUpdates);
-      }
-
-      // 3. Create medical record
-      await this.createMedicalRecord(medicalData);
-
-      // 4. Send notification if user data exists
-      if (appointment.rawData?.user?.id) {
-        await this.sendNotification(appointment.rawData.user.id, {
-          title: "Kết quả xét nghiệm đã sẵn sàng",
-          message: notificationMessage,
-          type: "RESULT_READY",
-          is_read: false
-        });
-      }
-
-      console.log("✅ Appointment completed successfully");
-      return true;
-
-    } catch (error) {
-      console.error("❌ Error completing appointment:", error);
-      return false;
-    }
-  }
-
-  // ✅ Keep existing get appointment by ID
   static async getAppointmentById(appointmentId: string): Promise<Appointment | null> {
     try {
       console.log(`🔍 Fetching appointment ${appointmentId}...`);
@@ -581,7 +844,22 @@ export class StaffAppointmentService {
       
       if (response.data.code === 200) {
         const apiAppointment = response.data.result;
-        return await this.enrichAppointmentData(apiAppointment);
+        
+        // Get doctors for enrichment
+        const doctors = await this.getAllDoctors();
+        const doctorMap = new Map(doctors.map(doctor => [doctor.doctorId, doctor]));
+        
+        const enrichedAppointment = await this.enrichAppointmentDataWithDoctor(apiAppointment, doctorMap);
+        
+        const storedStatus = this.loadAppointmentStatus(appointmentId);
+        if (storedStatus) {
+          enrichedAppointment.status = storedStatus.status as Appointment['status'];
+          enrichedAppointment.currentStep = storedStatus.currentStep;
+          enrichedAppointment.completedSteps = storedStatus.completedSteps;
+          enrichedAppointment.lastStatusUpdate = storedStatus.lastUpdated;
+        }
+        
+        return enrichedAppointment;
       }
 
       return null;
@@ -592,7 +870,6 @@ export class StaffAppointmentService {
     }
   }
 
-  // ✅ New method to update appointment status generically
   static async updateAppointmentStatus(appointmentId: string, status: boolean, notes?: string): Promise<boolean> {
     try {
       console.log(`🔄 Updating appointment ${appointmentId} status to: ${status}`);

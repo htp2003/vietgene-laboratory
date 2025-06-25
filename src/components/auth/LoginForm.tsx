@@ -93,7 +93,7 @@ const LoginForm: React.FC = () => {
 
         // ✅ Navigate to dashboard
         setTimeout(() => {
-          navigate("/dashboard");
+          navigate("/staff");
         }, 1000);
       } else {
         console.error("❌ Login failed:", response.message);
