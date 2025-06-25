@@ -194,15 +194,15 @@ export interface NotificationData {
 // ===================== SERVICE CLASS =====================
 
 export class StaffAppointmentService {
-  
+
   // ✅ Updated to handle new API structure with simpler approach
   static async getAllAppointments(): Promise<Appointment[]> {
     try {
       console.log("📅 Fetching all appointments...");
 
       // 1. Lấy appointments với API mới
-      const appointmentsResponse = await apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment");
-      
+      const appointmentsResponse = await apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment/all");
+
       if (appointmentsResponse.data.code !== 200) {
         throw new Error(`Failed to fetch appointments: ${appointmentsResponse.data.message}`);
       }
@@ -225,7 +225,7 @@ export class StaffAppointmentService {
 
       // Filter out null values
       const validAppointments = enrichedAppointments.filter(Boolean) as Appointment[];
-      
+
       console.log("✅ Successfully processed appointments:", validAppointments.length);
       return validAppointments;
 
@@ -240,7 +240,7 @@ export class StaffAppointmentService {
     try {
       // Get user data
       const user = await this.getUserById(appointment.userId);
-      
+
       // Get service data  
       const service = await this.getServiceById(appointment.serviceId);
 
@@ -254,14 +254,14 @@ export class StaffAppointmentService {
         const ordersResponse = await apiClient.get<ApiResponse<ApiOrder[]>>("/orders");
         if (ordersResponse.data.code === 200) {
           order = ordersResponse.data.result.find(o => o.userId === appointment.userId);
-          
+
           if (order) {
             const orderDetailsResponse = await apiClient.get<ApiResponse<ApiOrderDetail[]>>(
               `/order-details/${order.orderId}/all`
             );
             if (orderDetailsResponse.data.code === 200) {
               orderDetail = orderDetailsResponse.data.result[0];
-              
+
               if (orderDetail) {
                 const tasksResponse = await apiClient.get<ApiResponse<ApiTask[]>>(
                   `/tasks/order-detail/${orderDetail.id}`
@@ -311,7 +311,7 @@ export class StaffAppointmentService {
   // ✅ Create basic appointment when full data is not available
   static createBasicAppointment(appointment: ApiAppointment): Appointment {
     const appointmentDate = new Date(appointment.appointment_date);
-    
+
     return {
       id: appointment.id,
       customerName: 'Loading...', // Will be updated when user data loads
@@ -340,9 +340,9 @@ export class StaffAppointmentService {
     orderDetail?: ApiOrderDetail,
     tasks: ApiTask[] = []
   ): Appointment {
-    
+
     const appointmentDate = new Date(appointment.appointment_date);
-    
+
     return {
       id: appointment.id,
       customerName: user?.full_name || user?.username || 'N/A',
@@ -373,31 +373,31 @@ export class StaffAppointmentService {
   // ✅ Updated status mapping for boolean status
   static mapAppointmentStatus(apiStatus: boolean, tasks: ApiTask[]): Appointment['status'] {
     if (!apiStatus) return 'Cancelled';
-    
+
     // If no tasks, determine status based on appointment status
     if (!tasks || tasks.length === 0) {
       return apiStatus ? 'Confirmed' : 'Pending';
     }
-    
+
     // Dựa vào tasks để xác định status chi tiết
     const completedTasks = tasks.filter(task => task.status === 'COMPLETED').length;
     const totalTasks = tasks.length;
-    
+
     if (completedTasks === 0) return 'Confirmed';
     if (completedTasks === totalTasks) return 'Completed';
-    
+
     // Dựa vào task type để xác định trạng thái cụ thể
     const sampleTask = tasks.find(task => task.task_type === 'SAMPLE_COLLECTION');
     const testingTask = tasks.find(task => task.task_type === 'TESTING');
-    
+
     if (sampleTask?.status === 'COMPLETED' && testingTask?.status !== 'COMPLETED') {
       return 'SampleReceived';
     }
-    
+
     if (testingTask?.status === 'IN_PROGRESS') {
       return 'Testing';
     }
-    
+
     return 'Confirmed';
   }
 
@@ -532,7 +532,7 @@ export class StaffAppointmentService {
 
   // ✅ Keep existing complete appointment workflow
   static async completeAppointment(
-    appointment: Appointment, 
+    appointment: Appointment,
     medicalData: MedicalRecordData,
     notificationMessage: string
   ): Promise<boolean> {
@@ -544,7 +544,7 @@ export class StaffAppointmentService {
 
       // 2. Complete all tasks if they exist
       if (appointment.tasks && appointment.tasks.length > 0) {
-        const taskUpdates = appointment.tasks.map(task => 
+        const taskUpdates = appointment.tasks.map(task =>
           this.updateTaskStatus(task.id, 'COMPLETED', 'Completed by staff')
         );
         await Promise.all(taskUpdates);
@@ -578,7 +578,7 @@ export class StaffAppointmentService {
       console.log(`🔍 Fetching appointment ${appointmentId}...`);
 
       const response = await apiClient.get<ApiResponse<ApiAppointment>>(`/appointment/${appointmentId}`);
-      
+
       if (response.data.code === 200) {
         const apiAppointment = response.data.result;
         return await this.enrichAppointmentData(apiAppointment);

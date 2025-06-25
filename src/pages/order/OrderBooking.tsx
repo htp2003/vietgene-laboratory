@@ -392,13 +392,12 @@ const OrderBooking: React.FC = () => {
           return (
             <div key={step.number} className="flex items-center">
               <div
-                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                  isCompleted
+                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${isCompleted
                     ? "bg-green-500 border-green-500 text-white"
                     : isActive
-                    ? "bg-red-600 border-red-600 text-white"
-                    : "border-gray-300 text-gray-400"
-                }`}
+                      ? "bg-red-600 border-red-600 text-white"
+                      : "border-gray-300 text-gray-400"
+                  }`}
               >
                 {isCompleted ? (
                   <CheckCircle className="w-6 h-6" />
@@ -407,21 +406,19 @@ const OrderBooking: React.FC = () => {
                 )}
               </div>
               <span
-                className={`ml-2 text-sm font-medium hidden sm:block ${
-                  isActive
+                className={`ml-2 text-sm font-medium hidden sm:block ${isActive
                     ? "text-red-600"
                     : isCompleted
-                    ? "text-green-600"
-                    : "text-gray-400"
-                }`}
+                      ? "text-green-600"
+                      : "text-gray-400"
+                  }`}
               >
                 {step.title}
               </span>
               {index < steps.length - 1 && (
                 <div
-                  className={`w-8 sm:w-16 h-0.5 mx-2 sm:mx-4 ${
-                    isCompleted ? "bg-green-500" : "bg-gray-300"
-                  }`}
+                  className={`w-8 sm:w-16 h-0.5 mx-2 sm:mx-4 ${isCompleted ? "bg-green-500" : "bg-gray-300"
+                    }`}
                 />
               )}
             </div>
@@ -622,11 +619,10 @@ const OrderBooking: React.FC = () => {
 
       <div className="grid md:grid-cols-2 gap-6">
         <div
-          className={`p-6 border-2 rounded-xl cursor-pointer transition-all ${
-            formData.serviceInfo.collectionMethod === "home"
+          className={`p-6 border-2 rounded-xl cursor-pointer transition-all ${formData.serviceInfo.collectionMethod === "home"
               ? "border-red-500 bg-red-50"
               : "border-gray-200 hover:border-gray-300"
-          }`}
+            }`}
           onClick={() =>
             updateFormData("serviceInfo", { collectionMethod: "home" })
           }
@@ -650,11 +646,10 @@ const OrderBooking: React.FC = () => {
         </div>
 
         <div
-          className={`p-6 border-2 rounded-xl cursor-pointer transition-all ${
-            formData.serviceInfo.collectionMethod === "facility"
+          className={`p-6 border-2 rounded-xl cursor-pointer transition-all ${formData.serviceInfo.collectionMethod === "facility"
               ? "border-red-500 bg-red-50"
               : "border-gray-200 hover:border-gray-300"
-          }`}
+            }`}
           onClick={() =>
             updateFormData("serviceInfo", {
               collectionMethod: "facility",
@@ -688,14 +683,7 @@ const OrderBooking: React.FC = () => {
             </label>
 
             {/* Debug: Show doctors data */}
-            <div className="mb-4 p-2 bg-yellow-100 rounded text-xs">
-              <p>Debug - Doctors count: {doctors.length}</p>
-              {doctors.length > 0 && (
-                <pre className="mt-2 overflow-auto max-h-32">
-                  {JSON.stringify(doctors[0], null, 2)}
-                </pre>
-              )}
-            </div>
+
 
             <div className="grid md:grid-cols-2 gap-4">
               {doctors.map((doctor, index) => {
@@ -709,11 +697,10 @@ const OrderBooking: React.FC = () => {
                 return (
                   <div
                     key={doctorId}
-                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                      formData.serviceInfo.doctorId === doctorId
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${formData.serviceInfo.doctorId === doctorId
                         ? "border-red-500 bg-red-50"
                         : "border-gray-200 hover:border-gray-300"
-                    }`}
+                      }`}
                     onClick={() => handleDoctorSelect(doctorId)}
                   >
                     <div className="flex items-start gap-3">
@@ -724,8 +711,7 @@ const OrderBooking: React.FC = () => {
                         <h3 className="font-semibold text-gray-900 mb-1">
                           {doctor.doctorName ||
                             doctor.name ||
-                            `Bác sĩ ${
-                              doctor.doctorCode || doctor.code || index + 1
+                            `Bác sĩ ${doctor.doctorCode || doctor.code || index + 1
                             }`}
                         </h3>
                         <p className="text-sm text-gray-600 mb-2">
@@ -774,11 +760,10 @@ const OrderBooking: React.FC = () => {
                   .map((slot) => (
                     <div
                       key={slot.id}
-                      className={`p-3 border-2 rounded-lg cursor-pointer transition-all text-center ${
-                        formData.serviceInfo.timeSlotId === slot.id.toString()
+                      className={`p-3 border-2 rounded-lg cursor-pointer transition-all text-center ${formData.serviceInfo.timeSlotId === slot.id.toString()
                           ? "border-red-500 bg-red-50 text-red-700"
                           : "border-gray-200 hover:border-gray-300"
-                      }`}
+                        }`}
                       onClick={() => handleTimeSlotSelect(slot.id.toString())}
                     >
                       <div className="font-medium text-sm">
@@ -792,13 +777,13 @@ const OrderBooking: React.FC = () => {
               </div>
               {availableTimeSlots.filter((slot) => slot.isAvailable).length ===
                 0 && (
-                <div className="text-center py-4">
-                  <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">
-                    Bác sĩ này hiện không có lịch trống
-                  </p>
-                </div>
-              )}
+                  <div className="text-center py-4">
+                    <Clock className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">
+                      Bác sĩ này hiện không có lịch trống
+                    </p>
+                  </div>
+                )}
             </div>
           )}
 
@@ -872,11 +857,10 @@ const OrderBooking: React.FC = () => {
           return (
             <div
               key={method.value}
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                formData.paymentInfo.method === method.value
+              className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${formData.paymentInfo.method === method.value
                   ? "border-red-500 bg-red-50"
                   : "border-gray-200 hover:border-gray-300"
-              }`}
+                }`}
               onClick={() =>
                 updateFormData("paymentInfo", { method: method.value })
               }
@@ -1007,11 +991,10 @@ const OrderBooking: React.FC = () => {
             <button
               onClick={() => currentStep > 1 && setCurrentStep(currentStep - 1)}
               disabled={currentStep === 1}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                currentStep === 1
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${currentStep === 1
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
+                }`}
             >
               ← Quay lại
             </button>
@@ -1034,11 +1017,10 @@ const OrderBooking: React.FC = () => {
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !validateStep(4)}
-                className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                  submitting || !validateStep(4)
+                className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center gap-2 ${submitting || !validateStep(4)
                     ? "bg-gray-400 text-white cursor-not-allowed"
                     : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
+                  }`}
               >
                 {submitting && <Loader className="w-4 h-4 animate-spin" />}
                 {submitting ? "Đang xử lý..." : "Hoàn tất đặt hàng"}

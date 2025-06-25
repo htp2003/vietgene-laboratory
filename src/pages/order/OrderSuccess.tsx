@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   CheckCircle,
   Clock,
@@ -10,86 +10,353 @@ import {
   ArrowRight,
   Home,
   User,
+  Loader,
+  AlertCircle,
+  CreditCard,
 } from "lucide-react";
+import { orderService } from "../../services/orderService";
+import { ServiceService, formatPrice } from "../../services/serviceService";
 
-// Mock order data - normally would come from API/state
-const mockOrderData = {
-  orderId: "VG" + Date.now().toString().slice(-8),
-  orderCode: "DNA-" + Math.random().toString(36).substr(2, 8).toUpperCase(),
+interface OrderSuccessData {
+  orderId: string;
+  orderCode: string;
   service: {
-    name: "Xét nghiệm quan hệ cha con",
-    type: "civil",
-    price: 2500000,
-    duration: 5,
-  },
+    name: string;
+    type: string;
+    price: number;
+    duration: number;
+  };
   customer: {
-    name: "Nguyễn Văn A",
-    email: "nguyenvana@email.com",
-    phone: "0987654321",
-  },
-  collectionMethod: "self_collect", // or 'facility_collect'
-  appointmentDate: "2025-06-10",
-  participants: [
-    { name: "Nguyễn Văn A", relationship: "Cha", age: "35" },
-    { name: "Nguyễn Văn B", relationship: "Con", age: "8" },
-  ],
+    name: string;
+    email: string;
+    phone: string;
+  };
+  collectionMethod: string;
+  appointmentDate?: string;
+  participants: Array<{
+    name: string;
+    relationship: string;
+    age: string;
+  }>;
   payment: {
-    method: "transfer",
-    status: "pending",
-    amount: 2500000,
-  },
-  estimatedResult: "2025-06-15",
-  trackingSteps: [
-    {
-      step: 1,
-      title: "Đơn hàng được xác nhận",
-      status: "completed",
-      date: "2025-06-04",
-    },
-    { step: 2, title: "Chuẩn bị kit xét nghiệm", status: "current", date: "" },
-    { step: 3, title: "Gửi kit đến khách hàng", status: "pending", date: "" },
-    { step: 4, title: "Thu thập mẫu", status: "pending", date: "" },
-    { step: 5, title: "Phân tích tại phòng lab", status: "pending", date: "" },
-    { step: 6, title: "Kết quả hoàn thành", status: "pending", date: "" },
-  ],
-};
+    method: string;
+    status: string;
+    amount: number;
+  };
+  estimatedResult: string;
+  trackingSteps: Array<{
+    step: number;
+    title: string;
+    status: string;
+    date: string;
+  }>;
+}
 
 const OrderSuccess: React.FC = () => {
   const navigate = useNavigate();
-  const [orderData] = useState(mockOrderData);
+  const location = useLocation();
+
+  const [orderData, setOrderData] = useState<OrderSuccessData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Scroll to top when component mounts
     window.scrollTo(0, 0);
+    loadOrderData();
   }, []);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
+  const loadOrderData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get order data from location state (passed from OrderBooking)
+      const stateData = location.state;
+
+      if (stateData?.orderId) {
+        console.log("🔍 Loading order data from API for ID:", stateData.orderId);
+
+        // Fetch complete order data from API
+        const completeOrderData = await orderService.getCompleteOrderData(stateData.orderId);
+        console.log("✅ Complete order data:", completeOrderData);
+
+        // Get service details
+        let serviceData = null;
+        if (completeOrderData.orderDetails && completeOrderData.orderDetails.length > 0) {
+          const firstDetail = completeOrderData.orderDetails[0];
+          if (firstDetail.dnaServiceId) {
+            try {
+              const serviceResponse = await ServiceService.getServiceById(firstDetail.dnaServiceId);
+              serviceData = serviceResponse;
+              console.log("✅ Service data loaded:", serviceData);
+            } catch (err) {
+              console.warn("⚠️ Could not load service data:", err);
+            }
+          }
+        }
+
+        // Transform API data to component format
+        const transformedData: OrderSuccessData = {
+          orderId: completeOrderData.orderId || completeOrderData.id,
+          orderCode: completeOrderData.order_code || `DNA-${completeOrderData.orderId?.slice(-8) || Date.now().toString().slice(-8)}`,
+          service: {
+            name: serviceData?.service_name || stateData.service?.name || "Xét nghiệm DNA",
+            type: serviceData?.service_type === "civil" ? "civil" : "legal",
+            price: serviceData?.price || stateData.service?.price || completeOrderData.total_amount || 0,
+            duration: serviceData?.duration_days || stateData.service?.duration || 7,
+          },
+          customer: {
+            name: stateData.customer?.name || "Khách hàng",
+            email: stateData.customer?.email || "",
+            phone: stateData.customer?.phone || "",
+          },
+          collectionMethod: stateData.collectionMethod || "home",
+          appointmentDate: stateData.appointmentDate || completeOrderData.appointment?.appointment_date,
+          participants: completeOrderData.participants || stateData.participants || [],
+          payment: {
+            method: completeOrderData.payment_method || stateData.payment?.method || "transfer",
+            status: completeOrderData.payment_status || stateData.payment?.status || "pending",
+            amount: completeOrderData.total_amount || stateData.payment?.amount || 0,
+          },
+          estimatedResult: calculateEstimatedResult(
+            completeOrderData.created_at || completeOrderData.createdAt,
+            serviceData?.duration_days || 7
+          ),
+          trackingSteps: generateTrackingSteps(completeOrderData),
+        };
+
+        setOrderData(transformedData);
+        console.log("✅ Order data transformed:", transformedData);
+
+      } else if (stateData) {
+        // Use data passed from OrderBooking (fallback)
+        console.log("📋 Using state data from OrderBooking");
+        const transformedData: OrderSuccessData = {
+          orderId: stateData.orderId || "ORDER_" + Date.now(),
+          orderCode: stateData.orderCode || `DNA-${Date.now().toString().slice(-8)}`,
+          service: stateData.service || {
+            name: "Xét nghiệm DNA",
+            type: "civil",
+            price: 2500000,
+            duration: 7,
+          },
+          customer: stateData.customer || {
+            name: "Khách hàng",
+            email: "",
+            phone: "",
+          },
+          collectionMethod: stateData.collectionMethod || "home",
+          appointmentDate: stateData.appointmentDate,
+          participants: stateData.participants || [],
+          payment: stateData.payment || {
+            method: "transfer",
+            status: "pending",
+            amount: 2500000,
+          },
+          estimatedResult: calculateEstimatedResult(new Date().toISOString(), 7),
+          trackingSteps: generateDefaultTrackingSteps(),
+        };
+        setOrderData(transformedData);
+      } else {
+        // No data available - redirect to services
+        console.log("⚠️ No order data available, redirecting...");
+        navigate("/services");
+        return;
+      }
+
+    } catch (err) {
+      console.error("❌ Error loading order data:", err);
+      setError(err instanceof Error ? err.message : "Không thể tải thông tin đơn hàng");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateEstimatedResult = (createdDate: string, durationDays: number): string => {
+    try {
+      const created = new Date(createdDate);
+      const estimated = new Date(created);
+      estimated.setDate(estimated.getDate() + durationDays);
+      return estimated.toISOString().split('T')[0];
+    } catch {
+      const fallback = new Date();
+      fallback.setDate(fallback.getDate() + durationDays);
+      return fallback.toISOString().split('T')[0];
+    }
+  };
+
+  const generateTrackingSteps = (orderData: any) => {
+    const createdDate = orderData.created_at || orderData.createdAt || new Date().toISOString();
+    const status = orderData.status || "pending";
+
+    return [
+      {
+        step: 1,
+        title: "Đơn hàng được xác nhận",
+        status: "completed",
+        date: createdDate,
+      },
+      {
+        step: 2,
+        title: "Chuẩn bị kit xét nghiệm",
+        status: status === "pending" ? "current" : "completed",
+        date: status !== "pending" ? orderData.update_at || orderData.updatedAt || "" : "",
+      },
+      {
+        step: 3,
+        title: "Gửi kit đến khách hàng",
+        status: status === "processing" ? "current" : status === "completed" ? "completed" : "pending",
+        date: "",
+      },
+      {
+        step: 4,
+        title: "Thu thập mẫu",
+        status: status === "completed" ? "completed" : "pending",
+        date: "",
+      },
+      {
+        step: 5,
+        title: "Phân tích tại phòng lab",
+        status: status === "completed" ? "completed" : "pending",
+        date: "",
+      },
+      {
+        step: 6,
+        title: "Kết quả hoàn thành",
+        status: status === "completed" ? "completed" : "pending",
+        date: status === "completed" ? orderData.update_at || orderData.updatedAt || "" : "",
+      },
+    ];
+  };
+
+  const generateDefaultTrackingSteps = () => {
+    const now = new Date().toISOString();
+    return [
+      {
+        step: 1,
+        title: "Đơn hàng được xác nhận",
+        status: "completed",
+        date: now,
+      },
+      {
+        step: 2,
+        title: "Chuẩn bị kit xét nghiệm",
+        status: "current",
+        date: "",
+      },
+      {
+        step: 3,
+        title: "Gửi kit đến khách hàng",
+        status: "pending",
+        date: "",
+      },
+      {
+        step: 4,
+        title: "Thu thập mẫu",
+        status: "pending",
+        date: "",
+      },
+      {
+        step: 5,
+        title: "Phân tích tại phòng lab",
+        status: "pending",
+        date: "",
+      },
+      {
+        step: 6,
+        title: "Kết quả hoàn thành",
+        status: "pending",
+        date: "",
+      },
+    ];
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    if (!dateString) return "Chưa xác định";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return "Không hợp lệ";
+    }
   };
 
   const getPaymentMethodName = (method: string) => {
-    const methods = {
+    const methods: Record<string, string> = {
       transfer: "Chuyển khoản",
       cash: "Tiền mặt",
+      card: "Thẻ tín dụng",
     };
-    return methods[method as keyof typeof methods] || method;
+    return methods[method] || method;
   };
 
   const getCollectionMethodName = (method: string) => {
-    return method === "self_collect" ? "Lấy mẫu tại nhà" : "Lấy mẫu tại cơ sở";
+    return method === "home" || method === "self_collect"
+      ? "Lấy mẫu tại nhà"
+      : "Lấy mẫu tại cơ sở";
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-red-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải thông tin đơn hàng...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Có lỗi xảy ra</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="flex gap-4 justify-center">
+            <Link
+              to="/services"
+              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Đặt dịch vụ mới
+            </Link>
+            <Link
+              to="/dashboard"
+              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Xem dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // No data state
+  if (!orderData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Không tìm thấy đơn hàng</h2>
+          <p className="text-gray-600 mb-6">Thông tin đơn hàng không khả dụng</p>
+          <Link
+            to="/services"
+            className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            Đặt dịch vụ mới
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -116,7 +383,7 @@ const OrderSuccess: React.FC = () => {
             </h2>
             <div className="text-right">
               <p className="text-sm text-gray-500">Mã đơn hàng</p>
-              <p className="text-xl font-bold text-red-600">
+              <p className="text-xl font-bold text-red-600 font-mono">
                 {orderData.orderCode}
               </p>
             </div>
@@ -155,38 +422,47 @@ const OrderSuccess: React.FC = () => {
                   <User className="w-4 h-4 text-gray-400" />
                   <span>{orderData.customer.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-gray-400" />
-                  <span>{orderData.customer.email}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-gray-400" />
-                  <span>{orderData.customer.phone}</span>
-                </div>
+                {orderData.customer.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-400" />
+                    <span>{orderData.customer.email}</span>
+                  </div>
+                )}
+                {orderData.customer.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-gray-400" />
+                    <span>{orderData.customer.phone}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Participants */}
-          <div className="mt-8">
-            <h3 className="font-semibold text-gray-900 mb-4">
-              Người tham gia xét nghiệm
-            </h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              {orderData.participants.map((participant, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-4">
-                  <p className="font-medium text-gray-900">
-                    {participant.name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {participant.relationship} - {participant.age} tuổi
-                  </p>
-                </div>
-              ))}
+          {orderData.participants && orderData.participants.length > 0 && (
+            <div className="mt-8">
+              <h3 className="font-semibold text-gray-900 mb-4">
+                Người tham gia xét nghiệm
+              </h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                {orderData.participants.map((participant, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <p className="font-medium text-gray-900">
+                      {participant.participantName ||
+                        participant.participant_name ||
+                        participant.name ||
+                        `Người tham gia ${index + 1}`}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {participant.relationship || "Chưa xác định"} - {participant.age || "?"} tuổi
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Collection Method */}
+          {/* Collection Method and Payment */}
           <div className="mt-8 grid md:grid-cols-2 gap-8">
             <div>
               <h3 className="font-semibold text-gray-900 mb-4">
@@ -198,12 +474,11 @@ const OrderSuccess: React.FC = () => {
                   {getCollectionMethodName(orderData.collectionMethod)}
                 </span>
               </div>
-              {orderData.collectionMethod === "facility_collect" &&
-                orderData.appointmentDate && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    Ngày hẹn: {formatDate(orderData.appointmentDate)}
-                  </p>
-                )}
+              {orderData.appointmentDate && (
+                <p className="text-sm text-gray-600 mt-2">
+                  Ngày hẹn: {formatDate(orderData.appointmentDate)}
+                </p>
+              )}
             </div>
 
             <div>
@@ -215,16 +490,18 @@ const OrderSuccess: React.FC = () => {
                 <p>
                   Trạng thái:
                   <span
-                    className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                      orderData.payment.status === "paid"
+                    className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${orderData.payment.status === "paid"
                         ? "bg-green-100 text-green-800"
                         : "bg-yellow-100 text-yellow-800"
-                    }`}
+                      }`}
                   >
                     {orderData.payment.status === "paid"
                       ? "Đã thanh toán"
                       : "Chờ thanh toán"}
                   </span>
+                </p>
+                <p className="font-semibold text-lg text-red-600">
+                  Tổng: {formatPrice(orderData.payment.amount)}
                 </p>
               </div>
             </div>
@@ -240,13 +517,12 @@ const OrderSuccess: React.FC = () => {
             {orderData.trackingSteps.map((step, index) => (
               <div key={index} className="flex items-center gap-4">
                 <div
-                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-                    step.status === "completed"
+                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border-2 ${step.status === "completed"
                       ? "bg-green-500 border-green-500 text-white"
                       : step.status === "current"
-                      ? "bg-red-600 border-red-600 text-white"
-                      : "border-gray-300 text-gray-400"
-                  }`}
+                        ? "bg-red-600 border-red-600 text-white"
+                        : "border-gray-300 text-gray-400"
+                    }`}
                 >
                   {step.status === "completed" ? (
                     <CheckCircle className="w-5 h-5" />
@@ -256,11 +532,10 @@ const OrderSuccess: React.FC = () => {
                 </div>
                 <div className="flex-1">
                   <p
-                    className={`font-medium ${
-                      step.status === "completed" || step.status === "current"
+                    className={`font-medium ${step.status === "completed" || step.status === "current"
                         ? "text-gray-900"
                         : "text-gray-500"
-                    }`}
+                      }`}
                   >
                     {step.title}
                   </p>
@@ -280,6 +555,109 @@ const OrderSuccess: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* Payment Instructions */}
+        {orderData.payment.status === "pending" && (
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white mb-8">
+            <h3 className="text-2xl font-bold mb-6 text-center">Hướng dẫn thanh toán</h3>
+
+            {orderData.payment.method === "transfer" ? (
+              <div className="space-y-6">
+                <div className="bg-blue-800/30 rounded-lg p-6">
+                  <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Chuyển khoản ngân hàng
+                  </h4>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-blue-200 text-sm">Ngân hàng:</p>
+                        <p className="text-white font-semibold">Vietcombank</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-200 text-sm">Số tài khoản:</p>
+                        <p className="text-white font-mono text-lg">1234567890</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-200 text-sm">Chủ tài khoản:</p>
+                        <p className="text-white font-semibold">VIET GENE LAB</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-blue-200 text-sm">Số tiền:</p>
+                        <p className="text-white font-bold text-xl">
+                          {formatPrice(orderData.payment.amount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-blue-200 text-sm">Nội dung chuyển khoản:</p>
+                        <p className="text-white font-mono bg-blue-900/50 px-3 py-2 rounded">
+                          {orderData.orderCode}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* QR Code Section */}
+                <div className="text-center">
+                  <p className="text-blue-100 mb-4">
+                    💡 Quét mã QR để chuyển khoản nhanh chóng
+                  </p>
+                  <div className="bg-white rounded-lg p-4 inline-block">
+                    <img
+                      src={`https://dna-service-se1857.onrender.com/dna_service/pay/generate?accountNumber=1234567890&bankCode=VCB&accountName=VIET GENE LAB&amount=${orderData.payment.amount}`}
+                      alt="QR Code thanh toán"
+                      className="w-48 h-48 mx-auto"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.nextElementSibling!.classList.remove('hidden');
+                      }}
+                    />
+                    <div className="hidden text-gray-500 text-sm p-8">
+                      QR Code không khả dụng
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : orderData.payment.method === "cash" ? (
+              <div className="bg-blue-800/30 rounded-lg p-6 text-center">
+                <h4 className="text-lg font-semibold mb-4 flex items-center justify-center gap-2">
+                  <Phone className="w-5 h-5" />
+                  Thanh toán tiền mặt
+                </h4>
+                <p className="text-blue-100 mb-4">
+                  Bạn sẽ thanh toán tiền mặt khi nhận dịch vụ
+                </p>
+                <div className="bg-blue-900/50 rounded-lg p-4">
+                  <p className="text-white font-semibold mb-2">
+                    Số tiền cần thanh toán: {formatPrice(orderData.payment.amount)}
+                  </p>
+                  <p className="text-blue-200 text-sm">
+                    Nhân viên sẽ liên hệ để xác nhận thời gian và địa điểm
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-blue-800/30 rounded-lg p-6 text-center">
+                <h4 className="text-lg font-semibold mb-4">
+                  Phương thức thanh toán: {getPaymentMethodName(orderData.payment.method)}
+                </h4>
+                <p className="text-blue-100">
+                  Số tiền: {formatPrice(orderData.payment.amount)}
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 text-center">
+              <p className="text-blue-100 text-sm">
+                ⚡ Sau khi thanh toán, đơn hàng sẽ được xử lý ngay lập tức
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Expected Result */}
         <div className="bg-gradient-to-r from-red-600 to-red-700 rounded-2xl p-8 text-white text-center mb-8">
@@ -307,7 +685,7 @@ const OrderSuccess: React.FC = () => {
               • Chúng tôi sẽ liên hệ với bạn trong vòng 24h để xác nhận thông
               tin
             </li>
-            {orderData.collectionMethod === "self_collect" ? (
+            {orderData.collectionMethod === "home" || orderData.collectionMethod === "self_collect" ? (
               <li>
                 • Kit lấy mẫu sẽ được gửi đến địa chỉ của bạn trong 2-3 ngày làm
                 việc

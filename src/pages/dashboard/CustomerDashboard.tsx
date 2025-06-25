@@ -15,6 +15,7 @@ import {
   Loader,
   Search,
   User,
+  RefreshCw,
 } from "lucide-react";
 import { authService } from "../../services/authService";
 import { orderService } from "../../services/orderService";
@@ -26,11 +27,14 @@ interface Order {
   status: string;
   totalAmount: number;
   paymentStatus: string;
+  paymentMethod: string;
   createdAt: string;
   updatedAt: string;
+  notes?: string;
   service?: {
     name: string;
     type: string;
+    id?: string;
   };
   progress?: number;
   participants?: Array<{
@@ -38,6 +42,18 @@ interface Order {
     participantName: string;
     relationship: string;
     age: number;
+  }>;
+  orderDetails?: Array<{
+    id: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+  }>;
+  samples?: Array<{
+    id: string;
+    sampleCode: string;
+    status: string;
+    collectionMethod: string;
   }>;
 }
 
@@ -50,6 +66,7 @@ const CustomerDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   // Mock notifications (sẽ replace bằng real API sau)
   const [notifications] = useState([
@@ -81,226 +98,212 @@ const CustomerDashboard: React.FC = () => {
 
   // Load dashboard data
   useEffect(() => {
-    const loadDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Check authentication
-        if (!authService.isAuthenticated()) {
-          navigate("/login");
-          return;
-        }
-
-        // Get current user
-        const user = authService.getCurrentUser();
-        if (!user) {
-          navigate("/login");
-          return;
-        }
-        setCurrentUser(user);
-
-        // Load user orders with real participants data
-        const userOrders = await loadUserOrdersWithParticipants(user.id);
-        setOrders(userOrders);
-        setFilteredOrders(userOrders);
-
-        console.log("✅ Dashboard loaded:", userOrders.length, "orders");
-      } catch (err) {
-        console.error("❌ Error loading dashboard:", err);
-        setError("Không thể tải dữ liệu dashboard");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadDashboardData();
   }, [navigate]);
 
-  // Load user orders with real participants data
-  const loadUserOrdersWithParticipants = async (
-    userId: string
-  ): Promise<Order[]> => {
+  const loadDashboardData = async () => {
     try {
-      // Start with just the real order from DB
-      const realOrders: Order[] = [
-        {
-          id: "5488737e-de38-4d90-9bb5-e4943a6c1ce6", // Real order ID
-          orderCode: "DNA-5488737E",
-          status: "pending",
-          totalAmount: 2500000,
-          paymentStatus: "paid",
-          createdAt: "2024-06-20T10:30:00Z",
-          updatedAt: "2024-06-21T14:20:00Z",
-          service: {
-            name: "Xét nghiệm quan hệ cha con (dân sự)",
-            type: "paternity",
-          },
-          progress: 25,
-        },
-      ];
+      setLoading(true);
+      setError(null);
 
-      // Add mock orders for demo (these won't call real API)
-      const mockOrders: Order[] = [
-        {
-          id: "mock_ord_001",
-          orderCode: "DNA-ABC12345",
-          status: "processing",
-          totalAmount: 3000000,
-          paymentStatus: "paid",
-          createdAt: "2024-06-15T09:15:00Z",
-          updatedAt: "2024-06-22T16:45:00Z",
-          service: {
-            name: "Xét nghiệm anh chị em ruột",
-            type: "sibling",
-          },
-          progress: 60,
-        },
-        {
-          id: "mock_ord_002",
-          orderCode: "DNA-XYZ67890",
-          status: "completed",
-          totalAmount: 3500000,
-          paymentStatus: "paid",
-          createdAt: "2024-06-10T14:20:00Z",
-          updatedAt: "2024-06-18T11:30:00Z",
-          service: {
-            name: "Xét nghiệm quan hệ cha con (pháp lý)",
-            type: "paternity",
-          },
-          progress: 100,
-        },
-      ];
+      // Check authentication
+      if (!authService.isAuthenticated()) {
+        navigate("/login");
+        return;
+      }
 
-      const allOrders = [...realOrders, ...mockOrders];
+      // Get current user
+      const user = authService.getCurrentUser();
+      if (!user) {
+        navigate("/login");
+        return;
+      }
+      setCurrentUser(user);
+      console.log("👤 Current user:", user);
 
-      // Load participants for each order
-      const ordersWithParticipants = await Promise.all(
-        allOrders.map(async (order) => {
-          try {
-            // Only call API for real orders (not mock)
-            if (order.id.startsWith("mock_")) {
-              console.log(`🎭 Using mock participants for order: ${order.id}`);
-              const mockParticipants = getMockParticipantsByServiceType(
-                order.service?.type || "paternity"
-              );
-              return {
-                ...order,
-                participants: mockParticipants,
-              };
-            }
+      // Load user orders from real API
+      await loadUserOrders(user.id);
 
-            console.log(`🔍 Loading participants for real order: ${order.id}`);
-
-            // Try to get real participants from API
-            const participants = await loadOrderParticipants(order.id);
-
-            return {
-              ...order,
-              participants,
-            };
-          } catch (error) {
-            console.warn(
-              `⚠️ Failed to load participants for ${order.id}:`,
-              error
-            );
-
-            // Fallback to mock participants based on service type
-            const mockParticipants = getMockParticipantsByServiceType(
-              order.service?.type || "paternity"
-            );
-
-            return {
-              ...order,
-              participants: mockParticipants,
-            };
-          }
-        })
+      console.log("✅ Dashboard loaded successfully");
+    } catch (err) {
+      console.error("❌ Error loading dashboard:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Không thể tải dữ liệu dashboard. Vui lòng thử lại sau."
       );
-
-      return ordersWithParticipants;
-    } catch (error) {
-      console.error("❌ Error loading orders:", error);
-      return [];
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Load real participants from API
-  const loadOrderParticipants = async (orderId: string) => {
+  const loadUserOrders = async (userId: string) => {
     try {
-      // Use the orderService to get participants
-      const orderData = await orderService.getCompleteOrderData(orderId);
+      console.log("🔍 Loading orders for user:", userId);
 
-      if (orderData.participants && orderData.participants.length > 0) {
-        console.log(
-          `✅ Found ${orderData.participants.length} participants for order ${orderId}`
+      // Call real API to get user orders
+      const userOrders = await orderService.getUserOrders(userId);
+      console.log("📦 Raw orders from API:", userOrders);
+
+      if (userOrders && userOrders.length > 0) {
+        // Transform and enhance orders with additional data
+        const enhancedOrders = await Promise.all(
+          userOrders.map(async (apiOrder: any) => {
+            try {
+              // Get complete order data including participants, samples, etc.
+              const completeOrderData = await orderService.getCompleteOrderData(
+                apiOrder.orderId || apiOrder.id
+              );
+
+              console.log(`📋 Complete data for order ${apiOrder.orderId}:`, completeOrderData);
+
+              // Transform API data to component format
+              const transformedOrder: Order = {
+                id: apiOrder.orderId || apiOrder.id,
+                orderCode: apiOrder.order_code || apiOrder.orderCode || `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
+                status: apiOrder.status || "pending",
+                totalAmount: apiOrder.total_amount || apiOrder.totalAmount || 0,
+                paymentStatus: apiOrder.payment_status || apiOrder.paymentStatus || "pending",
+                paymentMethod: apiOrder.payment_method || apiOrder.paymentMethod || "transfer",
+                createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
+                updatedAt: apiOrder.updatedAt || apiOrder.updated_at || apiOrder.update_at || new Date().toISOString(),
+                notes: apiOrder.notes || "",
+
+                // Service info from order details
+                service: {
+                  name: getServiceNameFromOrderDetails(completeOrderData.orderDetails) || "Xét nghiệm DNA",
+                  type: "dna_test",
+                  id: completeOrderData.orderDetails?.[0]?.dnaServiceId,
+                },
+
+                // Participants
+                participants: completeOrderData.participants?.map((p: any) => ({
+                  id: p.id,
+                  participantName: p.participantName || p.participant_name || "Không xác định",
+                  relationship: p.relationship || "Không xác định",
+                  age: p.age || 0,
+                })) || [],
+
+                // Order details
+                orderDetails: completeOrderData.orderDetails?.map((od: any) => ({
+                  id: od.id,
+                  quantity: od.quantity || 1,
+                  unitPrice: od.unit_price || od.unitPrice || 0,
+                  subtotal: od.subtotal || 0,
+                })) || [],
+
+                // Samples
+                samples: completeOrderData.samples?.map((s: any) => ({
+                  id: s.id,
+                  sampleCode: s.sample_code || s.sampleCode || "",
+                  status: s.status || "pending",
+                  collectionMethod: s.collection_method || s.collectionMethod || "home",
+                })) || [],
+
+                // Calculate progress based on status and samples
+                progress: calculateOrderProgress(apiOrder.status, completeOrderData.samples),
+              };
+
+              return transformedOrder;
+            } catch (error) {
+              console.warn(`⚠️ Error loading complete data for order ${apiOrder.orderId}:`, error);
+
+              // Fallback to basic order data
+              return {
+                id: apiOrder.orderId || apiOrder.id,
+                orderCode: apiOrder.order_code || `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
+                status: apiOrder.status || "pending",
+                totalAmount: apiOrder.total_amount || 0,
+                paymentStatus: apiOrder.payment_status || "pending",
+                paymentMethod: apiOrder.payment_method || "transfer",
+                createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
+                updatedAt: apiOrder.updatedAt || apiOrder.updated_at || new Date().toISOString(),
+                service: {
+                  name: "Xét nghiệm DNA",
+                  type: "dna_test",
+                },
+                participants: [],
+                progress: getStatusInfo(apiOrder.status || "pending").progress,
+              } as Order;
+            }
+          })
         );
 
-        // Normalize participant data structure
-        return orderData.participants.map((p: any) => ({
-          id: p.id,
-          participantName: p.participantName || p.participant_name,
-          relationship: p.relationship,
-          age: p.age,
-        }));
+        console.log("✅ Enhanced orders:", enhancedOrders);
+        setOrders(enhancedOrders);
+        setFilteredOrders(enhancedOrders);
       } else {
-        console.log(`⚠️ No participants found for order ${orderId}`);
-        return [];
+        console.log("📭 No orders found for user");
+        setOrders([]);
+        setFilteredOrders([]);
       }
     } catch (error) {
-      console.error(`❌ Error loading participants for ${orderId}:`, error);
-      throw error;
+      console.error("❌ Error loading user orders:", error);
+      throw new Error("Không thể tải danh sách đơn hàng của bạn");
     }
   };
 
-  // Mock participants based on service type (fallback)
-  const getMockParticipantsByServiceType = (serviceType: string) => {
-    const mockParticipants: Record<string, any[]> = {
-      paternity: [
-        {
-          id: "p1",
-          participantName: "Nguyễn Văn Cha",
-          relationship: "Cha",
-          age: 35,
-        },
-        {
-          id: "p2",
-          participantName: "Nguyễn Văn Con",
-          relationship: "Con",
-          age: 8,
-        },
-      ],
-      sibling: [
-        {
-          id: "p1",
-          participantName: "Nguyễn Văn A",
-          relationship: "Anh",
-          age: 25,
-        },
-        {
-          id: "p2",
-          participantName: "Nguyễn Văn B",
-          relationship: "Em",
-          age: 22,
-        },
-      ],
-      default: [
-        {
-          id: "p1",
-          participantName: "Người tham gia 1",
-          relationship: "Không xác định",
-          age: 30,
-        },
-        {
-          id: "p2",
-          participantName: "Người tham gia 2",
-          relationship: "Không xác định",
-          age: 25,
-        },
-      ],
+  // Helper function to get service name from order details
+  const getServiceNameFromOrderDetails = (orderDetails: any[]): string => {
+    if (!orderDetails || orderDetails.length === 0) {
+      return "Xét nghiệm DNA";
+    }
+
+    // You can enhance this to map service IDs to actual names
+    const serviceId = orderDetails[0]?.dnaServiceId;
+
+    // For now, return generic names based on common patterns
+    const serviceNames: Record<string, string> = {
+      "paternity": "Xét nghiệm quan hệ cha con",
+      "sibling": "Xét nghiệm anh chị em ruột",
+      "grandparent": "Xét nghiệm quan hệ ông bà cháu",
+      "maternity": "Xét nghiệm quan hệ mẹ con",
     };
 
-    return mockParticipants[serviceType] || mockParticipants.default;
+    // Default service name
+    return "Xét nghiệm quan hệ huyết thống DNA";
+  };
+
+  // Calculate progress based on order status and samples
+  const calculateOrderProgress = (status: string, samples: any[]): number => {
+    const baseProgress = getStatusInfo(status).progress;
+
+    if (samples && samples.length > 0) {
+      // Calculate average sample progress
+      const sampleProgressMap: Record<string, number> = {
+        pending_collection: 10,
+        scheduled: 20,
+        collected: 40,
+        shipped: 50,
+        received: 60,
+        analyzing: 80,
+        completed: 100,
+      };
+
+      const avgSampleProgress = samples.reduce((acc, sample) => {
+        return acc + (sampleProgressMap[sample.status] || 0);
+      }, 0) / samples.length;
+
+      // Return the higher of base progress or sample progress
+      return Math.max(baseProgress, avgSampleProgress);
+    }
+
+    return baseProgress;
+  };
+
+  // Refresh orders
+  const handleRefresh = async () => {
+    if (!currentUser) return;
+
+    try {
+      setRefreshing(true);
+      await loadUserOrders(currentUser.id);
+    } catch (error) {
+      console.error("❌ Error refreshing orders:", error);
+      setError("Không thể làm mới dữ liệu");
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Filter orders when filter or search changes
@@ -366,7 +369,7 @@ const CustomerDashboard: React.FC = () => {
       processing: {
         label: "Đang xét nghiệm",
         color: "bg-orange-100 text-orange-800",
-        icon: Clock,
+        icon: RefreshCw,
         progress: 80,
       },
       completed: {
@@ -438,12 +441,24 @@ const CustomerDashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Page Title */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-2">
-            Xin chào,{" "}
-            {currentUser?.full_name || currentUser?.fullName || "Khách hàng"}!
-            Quản lý đơn hàng và theo dõi kết quả xét nghiệm của bạn.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+              <p className="text-gray-600 mt-2">
+                Xin chào,{" "}
+                {currentUser?.full_name || currentUser?.fullName || "Khách hàng"}!
+                Quản lý đơn hàng và theo dõi kết quả xét nghiệm của bạn.
+              </p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? "Đang tải..." : "Làm mới"}
+            </button>
+          </div>
         </div>
 
         {/* Error Display */}
@@ -452,6 +467,12 @@ const CustomerDashboard: React.FC = () => {
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-600" />
               <p className="text-red-800">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="ml-auto text-red-600 hover:text-red-800"
+              >
+                ✕
+              </button>
             </div>
           </div>
         )}
@@ -528,24 +549,22 @@ const CustomerDashboard: React.FC = () => {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {filterOptions.map((option) => (
                       <button
                         key={option.value}
                         onClick={() => setActiveFilter(option.value)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                          activeFilter === option.value
-                            ? "bg-red-600 text-white"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        }`}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeFilter === option.value
+                          ? "bg-red-600 text-white"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
                       >
                         {option.label}
                         <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            activeFilter === option.value
-                              ? "bg-red-500 text-white"
-                              : "bg-gray-200 text-gray-600"
-                          }`}
+                          className={`px-2 py-1 rounded-full text-xs ${activeFilter === option.value
+                            ? "bg-red-500 text-white"
+                            : "bg-gray-200 text-gray-600"
+                            }`}
                         >
                           {option.count}
                         </span>
@@ -597,23 +616,30 @@ const CustomerDashboard: React.FC = () => {
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                <StatusIcon className="w-5 h-5 text-red-600" />
+                                <StatusIcon className={`w-5 h-5 text-red-600 ${statusInfo.icon === RefreshCw ? 'animate-spin' : ''}`} />
                               </div>
                               <div>
                                 <h3 className="font-semibold text-gray-900 mb-1">
                                   {order.service?.name || "Dịch vụ DNA"}
                                 </h3>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-gray-500 font-mono">
                                   Mã: {order.orderCode}
                                 </p>
-                                {/* Show participants count */}
-                                {order.participants &&
-                                  order.participants.length > 0 && (
-                                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                {/* Show participants count and samples count */}
+                                <div className="flex items-center gap-4 mt-1">
+                                  {order.participants && order.participants.length > 0 && (
+                                    <p className="text-xs text-gray-400 flex items-center gap-1">
                                       <User className="w-3 h-3" />
                                       {order.participants.length} người tham gia
                                     </p>
                                   )}
+                                  {order.samples && order.samples.length > 0 && (
+                                    <p className="text-xs text-gray-400 flex items-center gap-1">
+                                      <Package className="w-3 h-3" />
+                                      {order.samples.length} mẫu
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             <div className="text-right">
@@ -626,19 +652,21 @@ const CustomerDashboard: React.FC = () => {
                             </div>
                           </div>
 
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                          {/* Progress Bar */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
                               <span>Tiến độ</span>
                               <span>{progress}%</span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <div
-                                className="bg-red-600 h-2 rounded-full transition-all"
+                                className="bg-red-600 h-2 rounded-full transition-all duration-300"
                                 style={{ width: `${progress}%` }}
                               ></div>
                             </div>
                           </div>
 
+                          {/* Order Info and Actions */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4 text-sm text-gray-600">
                               <span>
@@ -706,11 +734,10 @@ const CustomerDashboard: React.FC = () => {
                 {notifications.slice(0, 3).map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      notification.isRead
-                        ? "border-gray-200 bg-gray-50"
-                        : "border-red-200 bg-red-50"
-                    }`}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${notification.isRead
+                      ? "border-gray-200 bg-gray-50"
+                      : "border-red-200 bg-red-50"
+                      }`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium text-gray-900 text-sm">
@@ -756,6 +783,9 @@ const CustomerDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Debug Info (remove in production) */}
+
       </div>
     </div>
   );
