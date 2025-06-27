@@ -16,8 +16,18 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-// ✅ Import shared types
-import { Appointment, AppointmentModalProps } from '../../types/appointment';
+// ✅ Updated imports - using new structure
+import { Appointment } from '../../types/appointment';
+
+// ✅ Updated interface for modal props
+interface AppointmentModalProps {
+  appointment: Appointment | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (appointment: Appointment) => Promise<void>;
+  onCancel: (appointmentId: string) => Promise<void>;
+  onUpdateStatus: (appointmentId: string, newStatus: Appointment['status']) => Promise<void>;
+}
 
 const AppointmentModal: React.FC<AppointmentModalProps> = ({
   appointment,
@@ -275,7 +285,7 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
             )}
           </div>
 
-          {/* ✅ Doctor Information - only show for facility-based appointments */}
+          {/* ✅ Updated Doctor Information - using doctorInfo instead of doctor */}
           {appointment.locationType === 'Cơ sở y tế' && (
             <div className="bg-blue-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -283,26 +293,33 @@ const AppointmentModal: React.FC<AppointmentModalProps> = ({
                 Thông Tin Bác Sĩ
               </h3>
               
-              {appointment.doctor ? (
+              {appointment.doctorInfo ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tên bác sĩ</label>
-                    <p className="text-gray-900 font-medium">{appointment.doctor.name}</p>
+                    <p className="text-gray-900 font-medium">{appointment.doctorInfo.name}</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mã bác sĩ</label>
-                    <p className="text-gray-900">{appointment.doctor.code}</p>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Khung giờ</label>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <p className="text-gray-900">{appointment.doctorInfo.timeSlot}</p>
+                    </div>
                   </div>
                   
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ngày trong tuần</label>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <p className="text-gray-900">{appointment.doctorInfo.dayOfWeek}</p>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      appointment.doctor.isActive 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {appointment.doctor.isActive ? 'Hoạt động' : 'Không hoạt động'}
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      Đã phân công
                     </span>
                   </div>
                 </div>

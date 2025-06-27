@@ -13,10 +13,9 @@ import OrderDetail from "./pages/order/OrderDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import AdminLayout from "./layouts/AdminLayout/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
 import ServicesManagement from "./pages/Admin/ServicesManagement";
 import BlogManagement from "./pages/admin/BlogManagement";
-import StaffAppointments from "./pages/staff/appointment";
+import AppointmentService from "./pages/staff/appointment";
 import StaffLayout from "./layouts/StaffLayout/StaffLayout";
 import UserManagement from "./pages/Admin/UserManagement";
 import DoctorManagement from "./pages/Admin/DoctorManagement";
@@ -24,8 +23,9 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
-import APITestPage from "./pages/APITestPage";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import StaffMedicalRecordPage from "./pages/staff/StaffMedicalRecord";
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
@@ -194,13 +194,31 @@ export default function useRouteElements() {
         </AdminLayout>
       ),
     },
+    {
+      path: "/admin/notification",
+      element: (
+        <AdminLayout>
+          <BlogManagement />
+        </AdminLayout>
+      ),
+    },
+    {
+      path: "/admin/profile",
+      element: (
+        <ProtectedRoute>
+          <AdminLayout>
+            <Profile />
+          </AdminLayout>
+        </ProtectedRoute>
+      ),
+    },
 
     // Staff
     {
       path: "/staff",
       element: (
         <StaffLayout>
-          <StaffAppointments />
+          <AppointmentService />
         </StaffLayout>
       ),
     },
@@ -212,6 +230,14 @@ export default function useRouteElements() {
         </StaffLayout>
       ),
     },
+    {
+      path: "/staff/medical-records",
+      element: (
+        <StaffLayout>
+          <StaffMedicalRecordPage />
+        </StaffLayout>
+      )
+    }
   ]);
   return routeElemets;
 }

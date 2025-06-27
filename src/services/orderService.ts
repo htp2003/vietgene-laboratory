@@ -52,6 +52,21 @@ export interface TimeSlot {
   doctorId: string;
 }
 
+export interface Sample {
+  id: string;
+  sample_code: string;
+  sample_type: string;
+  collection_method: string;
+  collection_date: string;
+  received_date: string | null;
+  status: string;
+  shipping_tracking: string;
+  notes: string;
+  sample_quality: string;
+  userId: string;
+  orderId: string;
+}
+
 export interface CreateOrderRequest {
   customerInfo: {
     fullName: string;
@@ -425,14 +440,14 @@ class OrderService {
   // ===== COMPLETE ORDER FLOW =====
 
   async createCompleteOrder(orderData: CreateOrderRequest): Promise<string> {
-    console.log("🚀 Starting simplified order creation flow...");
+    console.log("🚀 Starting complete order creation flow...");
 
     try {
       // Step 1: Handle user registration
       console.log("👤 Step 1: Handling user...");
       const userId = await this.handleUserRegistration(orderData.customerInfo);
 
-      // Step 2: Create main order (simplified)
+      // Step 2: Create main order
       console.log("📦 Step 2: Creating order...");
       const orderResult = await this.createOrder({
         customerId: userId,
@@ -442,14 +457,13 @@ class OrderService {
         notes: orderData.serviceInfo.notes,
       });
       const orderId = orderResult.orderId;
-      console.log("✅ Order created with ID:", orderId);
 
-      // Step 3: Add order details (simplified)
+      // Step 3: Add order details
       console.log("📋 Step 3: Adding order details...");
       try {
         await this.createOrderDetail(orderId, orderData.serviceInfo.serviceId, {
           quantity: orderData.serviceInfo.quantity,
-          unitPrice: 2500000, // Fixed price for now
+          unitPrice: 2500000,
           notes: orderData.serviceInfo.notes,
         });
         console.log("✅ Order details added");
@@ -457,7 +471,7 @@ class OrderService {
         console.warn("⚠️ Could not add order details, continuing...");
       }
 
-      // Step 4: Add participants (simplified)
+      // Step 4: Add participants
       console.log("👨‍👩‍👧‍👦 Step 4: Adding participants...");
       for (const participant of orderData.participantInfo.participants) {
         try {
@@ -475,7 +489,7 @@ class OrderService {
         }
       }
 
-      // Step 5: Create appointment ONLY if facility collection AND user selected doctor
+      // Step 5: Create appointment (if facility collection)
       if (
         orderData.serviceInfo.collectionMethod === "facility" &&
         orderData.serviceInfo.appointmentDate &&
@@ -499,8 +513,26 @@ class OrderService {
         }
       }
 
-      // Step 6: Process payment (mock)
-      console.log("💳 Step 6: Processing payment...");
+      // Step 6: Create samples for each participant *** NEW ***
+      console.log("🧪 Step 6: Creating samples for participants...");
+      for (const participant of orderData.participantInfo.participants) {
+        try {
+          await this.createSample(orderId, {
+            sampleType: "saliva", // Default sample type
+            collectionMethod: orderData.serviceInfo.collectionMethod,
+            participantName: participant.name,
+            notes: `Sample for ${participant.name} (${participant.relationship}, ${participant.age} years old)`,
+          });
+          console.log(`✅ Sample created for ${participant.name}`);
+        } catch (error) {
+          console.warn(
+            `⚠️ Could not create sample for ${participant.name}: ${error}`
+          );
+        }
+      }
+
+      // Step 7: Process payment
+      console.log("💳 Step 7: Processing payment...");
       const totalAmount = 2500000 * orderData.serviceInfo.quantity;
       await this.processPayment(orderId, {
         method: orderData.paymentInfo.method,
@@ -529,17 +561,7 @@ class OrderService {
         throw new Error("Order not found");
       }
       const order = orderResponse.data.result;
-
-      // Get participants
-      let participants = [];
-      try {
-        const participantsResponse = await apiClient.get(
-          `/OrderParticipants/order/${orderId}`
-        );
-        participants = participantsResponse.data.result || [];
-      } catch (error) {
-        console.warn("⚠️ Could not fetch participants");
-      }
+      console.log("📦 Main order data:", order);
 
       // Get order details
       let orderDetails = [];
@@ -548,8 +570,21 @@ class OrderService {
           `/order-details/${orderId}/all`
         );
         orderDetails = detailsResponse.data.result || [];
+        console.log("📋 Order details:", orderDetails);
       } catch (error) {
-        console.warn("⚠️ Could not fetch order details");
+        console.warn("⚠️ Could not fetch order details:", error);
+      }
+
+      // Get participants
+      let participants = [];
+      try {
+        const participantsResponse = await apiClient.get(
+          `/OrderParticipants/order/${orderId}`
+        );
+        participants = participantsResponse.data.result || [];
+        console.log("👥 Participants:", participants);
+      } catch (error) {
+        console.warn("⚠️ Could not fetch participants:", error);
       }
 
       // Get appointment if exists
@@ -558,44 +593,191 @@ class OrderService {
         const appointmentResponse = await apiClient.get(`/appointment`);
         const appointments = appointmentResponse.data.result || [];
         appointment = appointments.find((app: any) => app.orderId === orderId);
+        console.log("📅 Appointment:", appointment);
       } catch (error) {
-        console.warn("⚠️ Could not fetch appointment");
+        console.warn("⚠️ Could not fetch appointment:", error);
       }
 
-      console.log("✅ Complete order data retrieved");
+      // Get samples (new API)
+      let samples = [];
+      try {
+        const samplesResponse = await apiClient.get(
+          `/samples/order/${orderId}`
+        );
+        samples = samplesResponse.data.result || [];
+        console.log("🧪 Samples:", samples);
+      } catch (error) {
+        console.warn("⚠️ Could not fetch samples:", error);
+      }
+
+      console.log("✅ Complete order data assembled");
+
       return {
         ...order,
-        participants,
         orderDetails,
+        participants,
         appointment,
+        samples,
       };
     } catch (error: any) {
       console.error("❌ Error fetching order data:", error);
-      throw new Error("Không thể tải thông tin đơn hàng");
+      throw new Error(
+        "Không thể tải thông tin đơn hàng: " +
+          (error.response?.data?.message || error.message)
+      );
     }
   }
 
   // ===== GET USER ORDERS =====
-  async getUserOrders(userId: string): Promise<any[]> {
+  async getUserOrders(userId?: string): Promise<any[]> {
     try {
-      console.log("🔍 Fetching orders for user:", userId);
-      const response = await apiClient.get(`/orders/user/${userId}`);
+      let ordersData = [];
 
-      if (response.data.code === 200) {
-        const orders = response.data.result || [];
-        console.log("✅ User orders loaded:", orders.length);
-        return orders.sort(
-          (a: any, b: any) =>
-            new Date(b.createdAt || b.created_at).getTime() -
-            new Date(a.createdAt || a.created_at).getTime()
-        );
+      if (userId) {
+        // Get orders for specific user
+        console.log("🔍 Fetching orders for user:", userId);
+        const response = await apiClient.get(`/orders/user/${userId}`);
+        ordersData = response.data.result || [];
+      } else {
+        // Get all orders for current user (using token)
+        console.log("🔍 Fetching orders for current user");
+        const response = await apiClient.get(`/orders/all`);
+        ordersData = response.data.result || [];
+      }
+
+      if (ordersData.length > 0) {
+        console.log("✅ Orders loaded:", ordersData.length);
+
+        // Sort by created date (newest first)
+        const sortedOrders = ordersData.sort((a: any, b: any) => {
+          const dateA = new Date(
+            a.createdAt || a.created_at || a.createddate || 0
+          );
+          const dateB = new Date(
+            b.createdAt || b.created_at || b.createddate || 0
+          );
+          return dateB.getTime() - dateA.getTime();
+        });
+
+        return sortedOrders;
       }
 
       return [];
     } catch (error: any) {
-      console.error("❌ Error fetching user orders:", error);
+      console.error(
+        "❌ Error fetching user orders:",
+        error.response?.data || error.message
+      );
       return [];
     }
+  }
+  // ===== SAMPLES METHODS =====
+  // Get samples by order ID
+  async getSamplesByOrderId(orderId: string): Promise<Sample[]> {
+    try {
+      console.log("🔍 Fetching samples for order:", orderId);
+      const response = await apiClient.get(`/samples/order/${orderId}`);
+
+      if (response.data.code === 200) {
+        const samples = response.data.result || [];
+        console.log("✅ Samples loaded:", samples.length);
+        return samples;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error(
+        "❌ Samples API failed:",
+        error.response?.data || error.message
+      );
+      return [];
+    }
+  }
+
+  // Create sample
+  async createSample(
+    orderId: string,
+    sampleData: {
+      sampleType: string;
+      collectionMethod: string;
+      participantName?: string;
+      notes?: string;
+    }
+  ): Promise<{ sampleId: string }> {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+      const payload = {
+        sample_code: `SAM_${Date.now()}`,
+        sample_type: sampleData.sampleType || "saliva",
+        collection_method: sampleData.collectionMethod,
+        collection_date: new Date().toISOString(),
+        received_date: null,
+        status:
+          sampleData.collectionMethod === "home"
+            ? "pending_collection"
+            : "scheduled",
+        shipping_tracking: "",
+        notes:
+          sampleData.notes ||
+          `Sample for ${sampleData.participantName || "participant"}`,
+        sample_quality: "",
+        userId: currentUser.id || "guest",
+        orderId: orderId,
+      };
+
+      console.log("📤 Creating sample:", payload);
+      const response = await apiClient.post("/samples", payload);
+
+      if (response.data.code === 200) {
+        console.log("✅ Sample created:", response.data.result.id);
+        return { sampleId: response.data.result.id };
+      }
+
+      throw new Error("Sample creation failed");
+    } catch (error: any) {
+      console.error(
+        "❌ Sample creation error:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tạo mẫu xét nghiệm");
+    }
+  }
+  // Helper function to get order status info
+  getOrderStatusInfo(status: string) {
+    const statusMap: Record<string, any> = {
+      pending: {
+        label: "Chờ xử lý",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: "Clock",
+        description: "Đơn hàng đang được xử lý",
+      },
+      confirmed: {
+        label: "Đã xác nhận",
+        color: "bg-blue-100 text-blue-800",
+        icon: "CheckCircle",
+        description: "Đơn hàng đã được xác nhận",
+      },
+      processing: {
+        label: "Đang xử lý",
+        color: "bg-purple-100 text-purple-800",
+        icon: "RefreshCw",
+        description: "Đang chuẩn bị và xử lý mẫu",
+      },
+      completed: {
+        label: "Hoàn thành",
+        color: "bg-green-100 text-green-800",
+        icon: "CheckCircle",
+        description: "Xét nghiệm hoàn thành, kết quả đã sẵn sàng",
+      },
+      cancelled: {
+        label: "Đã hủy",
+        color: "bg-red-100 text-red-800",
+        icon: "AlertCircle",
+        description: "Đơn hàng đã bị hủy",
+      },
+    };
+    return statusMap[status] || statusMap.pending;
   }
 }
 

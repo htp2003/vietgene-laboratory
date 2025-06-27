@@ -179,18 +179,13 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             <span className="text-sm font-medium text-blue-800">Bác sĩ phụ trách</span>
           </div>
           
-          {appointment.doctor ? (
+          {appointment.doctorInfo ? (
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-900">{appointment.doctor.name}</p>
-                <p className="text-xs text-blue-700">Mã BS: {appointment.doctor.code}</p>
-              </div>
-              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                appointment.doctor.isActive 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-gray-100 text-gray-700'
-              }`}>
-                {appointment.doctor.isActive ? 'Hoạt động' : 'Không hoạt động'}
+                <p className="text-sm font-medium text-blue-900">{appointment.doctorInfo.name}</p>
+                <p className="text-sm font-medium text-blue-900">
+                  {appointment.doctorInfo.timeSlot} - {appointment.doctorInfo.dayOfWeek}
+                </p>
               </div>
             </div>
           ) : (

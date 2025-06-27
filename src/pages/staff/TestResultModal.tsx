@@ -232,9 +232,9 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
                 {appointment.customerName} - {serviceType}
               </p>
               {/* ✅ Show doctor info if available */}
-              {appointment.doctor && (
+              {appointment.doctorInfo && (
                 <p className="text-xs text-blue-600 mt-1">
-                  Bác sĩ: {appointment.doctor.name} ({appointment.doctor.code})
+                  Bác sĩ: {appointment.doctorInfo.name}
                 </p>
               )}
             </div>

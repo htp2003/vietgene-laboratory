@@ -23,7 +23,11 @@ interface RegisterFormData {
   agreeTerms: boolean;
 }
 
-const RegisterForm: React.FC = () => {
+interface RegisterFormProps {
+  onSubmit: (registerData: RegisterFormData) => void;
+}
+
+const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);

@@ -1,165 +1,306 @@
-import React, { useEffect, useState } from 'react';
-import { Doctor } from '../../../api/doctors.api';
-import { User, mockUsers } from '../../../api/users.api';
+import React from 'react';
+import { FaTimes, FaUserMd, FaStethoscope, FaToggleOn, FaToggleOff, FaEnvelope, FaPhone, FaUser } from 'react-icons/fa';
+import { DoctorRequest } from '../../../services/doctorService';
 
 interface DoctorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Doctor, 'id' | 'created_at'> & { user_id: string }) => void | Promise<void>;
-  doctor?: Doctor;
+  onSubmit: (e: React.FormEvent) => void;
+  form: DoctorRequest;
+  onFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  editing: boolean;
+  submitting?: boolean;
 }
 
-export default function DoctorModal({ isOpen, onClose, onSave, doctor }: DoctorModalProps) {
-  // Find the user linked to this doctor (if any)
-  const linkedUser = doctor ? mockUsers.find(u => u.doctor_id === doctor.id) : undefined;
-  // List users who can be linked (role staff/admin, not already linked)
-  const availableUsers = mockUsers.filter(
-    u => (u.role === 'staff' || u.role === 'admin') && (u.doctor_id == null || (doctor && u.doctor_id === doctor.id))
-  );
-
-  const [formData, setFormData] = useState<{
-    user_id: string;
-    doctor_code: string;
-    licensce_number: string;
-    is_active: boolean;
-  }>({
-    user_id: linkedUser?.id || '',
-    doctor_code: doctor?.doctor_code || '',
-    licensce_number: doctor?.licensce_number || '',
-    is_active: doctor?.is_active ?? true,
-  });
-
-  useEffect(() => {
-    setFormData({
-      user_id: linkedUser?.id || '',
-      doctor_code: doctor?.doctor_code || '',
-      licensce_number: doctor?.licensce_number || '',
-      is_active: doctor?.is_active ?? true,
-    });
-  }, [doctor]);
-
-  // Get selected user info
-  const selectedUser = mockUsers.find(u => u.id === formData.user_id);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox'
-        ? (e.target as HTMLInputElement).checked
-        : value
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.user_id || !formData.doctor_code || !formData.licensce_number) {
-      alert('Vui lòng điền đầy đủ thông tin!');
-      return;
-    }
-    onSave(formData);
-  };
-
+const DoctorModal: React.FC<DoctorModalProps> = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  form,
+  onFormChange,
+  editing,
+  submitting = false
+}) => {
   if (!isOpen) return null;
 
+  const handleClose = () => {
+    if (!submitting) {
+      onClose();
+    }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(e);
+  };
+
+  // Validation helpers
+  const isEmailValid = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const isPhoneValid = (phone: string) => {
+    const phoneRegex = /^(0|\+84)[0-9]{8,10}$/;
+    return phoneRegex.test(phone.replace(/\s/g, ''));
+  };
+
+  const isFormValid = () => {
+    return form.doctorCode.trim() &&
+           form.doctorName.trim() &&
+           form.doctorEmail.trim() &&
+           form.doctorPhone.trim() &&
+           isEmailValid(form.doctorEmail) &&
+           isPhoneValid(form.doctorPhone);
+  };
+
   return (
-    <div className='fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-40'>
-      <div className='bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative'>
-        <h2 className='text-xl font-bold mb-4'>{doctor ? 'Chỉnh sửa bác sĩ' : 'Thêm bác sĩ mới'}</h2>
-        <form onSubmit={handleSubmit} className='space-y-4'>
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Chọn nhân viên</label>
-            <select
-              name='user_id'
-              value={formData.user_id}
-              onChange={handleChange}
-              required
-              className='w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'
-              disabled={!!doctor}
-            >
-              <option value=''>-- Chọn nhân viên --</option>
-              {availableUsers.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.email})
-                </option>
-              ))}
-            </select>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FaUserMd className="text-blue-600" size={20} />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900">
+                {editing ? 'Chỉnh sửa bác sĩ' : 'Thêm bác sĩ mới'}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {editing ? 'Cập nhật thông tin bác sĩ' : 'Tạo hồ sơ bác sĩ mới'}
+              </p>
+            </div>
           </div>
+          <button
+            onClick={handleClose}
+            disabled={submitting}
+            className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100 disabled:opacity-50"
+          >
+            <FaTimes size={20} />
+          </button>
+        </div>
 
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Full Name</label>
-            <input
-              type='text'
-              value={selectedUser?.fullName || ''}
-              readOnly
-              className='w-full p-2 border rounded bg-gray-100'/>
-          </div>
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          <form onSubmit={handleFormSubmit} className="space-y-6">
+            {/* Doctor Code */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaStethoscope size={14} />
+                  Mã bác sĩ <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="text"
+                name="doctorCode"
+                value={form.doctorCode}
+                onChange={onFormChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder="Nhập mã bác sĩ (VD: BS001, DOC123)"
+                required
+                disabled={submitting}
+                autoFocus
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Mã bác sĩ duy nhất để xác định trong hệ thống
+              </p>
+            </div>
 
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Email</label>
-            <input
-              type='email'
-              value={selectedUser?.email || ''}
-              readOnly
-              className='w-full p-2 border rounded bg-gray-100'/>
-          </div>
+            {/* Doctor Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaUser size={14} />
+                  Họ và tên <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="text"
+                name="doctorName"
+                value={form.doctorName}
+                onChange={onFormChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder="Nhập họ và tên bác sĩ"
+                required
+                disabled={submitting}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Họ và tên đầy đủ của bác sĩ
+              </p>
+            </div>
 
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Phone</label>
-            <input
-              type='text'
-              value={selectedUser?.phone || ''}
-              readOnly
-              className='w-full p-2 border rounded bg-gray-100'/>
-          </div>
+            {/* Doctor Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaEnvelope size={14} />
+                  Email <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="email"
+                name="doctorEmail"
+                value={form.doctorEmail}
+                onChange={onFormChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  form.doctorEmail && !isEmailValid(form.doctorEmail) 
+                    ? 'border-red-300 bg-red-50' 
+                    : 'border-gray-300'
+                }`}
+                placeholder="Nhập email bác sĩ"
+                required
+                disabled={submitting}
+              />
+              {form.doctorEmail && !isEmailValid(form.doctorEmail) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Email không đúng định dạng
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Email liên hệ của bác sĩ
+              </p>
+            </div>
 
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>Doctor Code</label>
-            <input
-              type='text'
-              name='doctor_code'
-              value={formData.doctor_code}
-              onChange={handleChange}
-              required
-              className='w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'/>
-          </div>
+            {/* Doctor Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="flex items-center gap-2">
+                  <FaPhone size={14} />
+                  Số điện thoại <span className="text-red-500">*</span>
+                </div>
+              </label>
+              <input
+                type="tel"
+                name="doctorPhone"
+                value={form.doctorPhone}
+                onChange={onFormChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  form.doctorPhone && !isPhoneValid(form.doctorPhone) 
+                    ? 'border-red-300 bg-red-50' 
+                    : 'border-gray-300'
+                }`}
+                placeholder="Nhập số điện thoại (VD: 0901234567)"
+                required
+                disabled={submitting}
+              />
+              {form.doctorPhone && !isPhoneValid(form.doctorPhone) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Số điện thoại không đúng định dạng (VD: 0901234567 hoặc +84901234567)
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Số điện thoại liên hệ của bác sĩ
+              </p>
+            </div>
 
-          <div>
-            <label className='block text-sm font-medium text-gray-700 mb-1'>License Number</label>
-            <input
-              type='text'
-              name='licensce_number'
-              value={formData.licensce_number}
-              onChange={handleChange}
-              required
-              className='w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:outline-none'/>
-          </div>
+            {/* Status */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Trạng thái hoạt động
+              </label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="isActive"
+                    value="true"
+                    checked={form.isActive === true}
+                    onChange={onFormChange}
+                    disabled={submitting}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="flex items-center gap-2 text-sm">
+                    <FaToggleOn className="text-green-500" size={16} />
+                    Đang hoạt động
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="isActive"
+                    value="false"
+                    checked={form.isActive === false}
+                    onChange={onFormChange}
+                    disabled={submitting}
+                    className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="flex items-center gap-2 text-sm">
+                    <FaToggleOff className="text-gray-400" size={16} />
+                    Ngưng hoạt động
+                  </span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Chọn trạng thái hoạt động của bác sĩ trong hệ thống
+              </p>
+            </div>
 
-          <div className='flex items-center gap-2'>
-            <input
-              type='checkbox'
-              name='is_active'
-              checked={formData.is_active}
-              onChange={handleChange}
-              className='h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500'/>
-            <label className='text-sm font-medium text-gray-700'>Active</label>
-          </div>
+            {/* Information Note */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-1 bg-blue-100 rounded">
+                  <FaUserMd className="text-blue-600" size={16} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">
+                    Thông tin bổ sung
+                  </h4>
+                  <p className="text-sm text-blue-700">
+                    Sau khi tạo hồ sơ bác sĩ, bạn có thể cập nhật thêm thông tin chi tiết như 
+                    chuyên khoa, kinh nghiệm, và lịch làm việc trong phần quản lý bác sĩ.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
 
-          <div className='flex justify-end gap-3 mt-6'>
-            <button
-              type='button'
-              onClick={onClose}
-              className='px-4 py-2 text-gray-700 bg-gray-100 rounded hover:bg-gray-200'>
-              Cancel
-            </button>
-            <button
-              type='submit'
-              className='px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600'>
-              {doctor ? 'Save Changes' : 'Add Doctor'}
-            </button>
-          </div>
-        </form>
+        {/* Footer */}
+        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={submitting}
+            className="px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            onClick={handleFormSubmit}
+            disabled={submitting || !isFormValid()}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors font-medium flex items-center gap-2 disabled:cursor-not-allowed"
+          >
+            {submitting ? (
+              <>
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                </svg>
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                {editing ? (
+                  <>
+                    <FaUserMd size={16} />
+                    Cập nhật
+                  </>
+                ) : (
+                  <>
+                    <FaUserMd size={16} />
+                    Thêm bác sĩ
+                  </>
+                )}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default DoctorModal;

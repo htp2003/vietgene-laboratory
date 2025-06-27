@@ -11,7 +11,11 @@ interface LoginFormData {
   remember: boolean;
 }
 
-const LoginForm: React.FC = () => {
+interface LoginFormProps {
+  onSubmit: (loginData: LoginFormData) => void;
+}
+
+const LoginForm: React.FC<LoginFormProps> = ({ onSubmit }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -92,8 +96,17 @@ const LoginForm: React.FC = () => {
         toast.success("Đăng nhập thành công!", { id: loadingToast });
 
         // ✅ Navigate to dashboard
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
+        const roles = userData.roles || [];
+        const role = Array.isArray(roles) && roles.length > 0 ? roles[0].name : "ROLE_CUSTOMER";
         setTimeout(() => {
-          navigate("/staff");
+          if (role === "ROLE_ADMIN") {
+            navigate("/admin");
+          } else if (role === "ROLE_STAFF") {
+            navigate("/staff");
+          } else {
+            navigate("/dashboard");
+          }
         }, 1000);
       } else {
         console.error("❌ Login failed:", response.message);
