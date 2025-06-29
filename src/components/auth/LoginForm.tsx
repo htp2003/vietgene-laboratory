@@ -100,12 +100,19 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit }) => {
         const roles = userData.roles || [];
         const role = Array.isArray(roles) && roles.length > 0 ? roles[0].name : "ROLE_CUSTOMER";
         setTimeout(() => {
-          if (role === "ROLE_ADMIN") {
-            navigate("/admin");
-          } else if (role === "ROLE_STAFF") {
-            navigate("/staff");
-          } else {
-            navigate("/dashboard");
+          switch (role) {
+            case "ROLE_ADMIN":
+              navigate("/admin");
+              break;
+            case "ROLE_STAFF":
+              navigate("/staff");
+              break;
+            case "ROLE_DOCTOR":
+              navigate("/doctor");
+              break;
+            default:
+              navigate("/dashboard");
+              break;
           }
         }, 1000);
       } else {
