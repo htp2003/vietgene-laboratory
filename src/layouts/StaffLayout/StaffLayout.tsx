@@ -9,7 +9,7 @@ import {
   FaHome,
   FaBlog,
 } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { href, Link } from "react-router-dom";
 
 interface StaffLayoutProps {
   children: React.ReactNode;
@@ -26,6 +26,7 @@ const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       icon: <FaCalendarAlt size={20} />,
     },
     { name: "Hồ sơ", href: "/staff/profile", icon: <FaUser size={20} /> },
+    { name: "Hồ sơ bệnh án", href: "/staff/medical-records", icon: <FaFlask size={20} /> },
   ];
 
   const toggleSidebar = () => {
