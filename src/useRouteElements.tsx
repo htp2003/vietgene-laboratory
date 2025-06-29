@@ -25,6 +25,7 @@ import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
+
 import DoctorDashboard from "./pages/Doctor/DoctorDashboard";
 import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
 import DoctorCertificates from "./pages/Doctor/DoctorCertificates";
@@ -32,6 +33,9 @@ import DoctorSchedule from "./pages/Doctor/DoctorSchedule";
 import Unauthorized from "./pages/Unauthorized";
 import StaffAppointments from "./pages/staff/appointment";
 import StaffMedicalRecord from "./pages/staff/StaffMedicalRecord";
+
+
+import StaffMedicalRecordPage from "./pages/staff/StaffMedicalRecord";
 
 export default function useRouteElements() {
   const routeElemets = useRoutes([
@@ -236,6 +240,7 @@ export default function useRouteElements() {
     {
       path: "/staff",
       element: (
+
         <ProtectedRoute roles={["ROLE_STAFF"]}>
           <StaffLayout>
             <StaffAppointments />
@@ -246,9 +251,21 @@ export default function useRouteElements() {
     {
       path: "/staff/profile",
       element: (
+
         <ProtectedRoute roles={["ROLE_STAFF"]}>
           <StaffLayout>
             <StaffProfileComponent/>
+          </StaffLayout>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/staff/medical-records",
+      element: (
+
+        <ProtectedRoute roles={["ROLE_STAFF"]}>
+          <StaffLayout>
+            <StaffMedicalRecord/>
           </StaffLayout>
         </ProtectedRoute>
       ),
@@ -270,7 +287,7 @@ export default function useRouteElements() {
       element: (
         <ProtectedRoute roles={["ROLE_DOCTOR"]}>
           <DoctorLayout>
-            <DoctorDashboard />
+            <DoctorCertificates />
           </DoctorLayout>
         </ProtectedRoute>
       ),
