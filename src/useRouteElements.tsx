@@ -31,6 +31,8 @@ import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
 import DoctorCertificates from "./pages/Doctor/DoctorCertificates";
 import DoctorSchedule from "./pages/Doctor/DoctorSchedule";
 import Unauthorized from "./pages/Unauthorized";
+import StaffAppointments from "./pages/staff/appointment";
+import StaffMedicalRecord from "./pages/staff/StaffMedicalRecord";
 
 
 import StaffMedicalRecordPage from "./pages/staff/StaffMedicalRecord";
@@ -244,11 +246,6 @@ export default function useRouteElements() {
             <StaffAppointments />
           </StaffLayout>
         </ProtectedRoute>
-
-        <StaffLayout>
-          <AppointmentService />
-        </StaffLayout>
-
       ),
     },
     {
@@ -257,14 +254,9 @@ export default function useRouteElements() {
 
         <ProtectedRoute roles={["ROLE_STAFF"]}>
           <StaffLayout>
-            <StaffAppointmentsWithTestMode/>
+            <StaffProfileComponent/>
           </StaffLayout>
         </ProtectedRoute>
-
-        <StaffLayout>
-          <StaffProfileComponent/>
-        </StaffLayout>
-
       ),
     },
     {
@@ -273,7 +265,17 @@ export default function useRouteElements() {
 
         <ProtectedRoute roles={["ROLE_STAFF"]}>
           <StaffLayout>
-            <StaffProfileComponent/>
+            <StaffMedicalRecord/>
+          </StaffLayout>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/staff/medical-record",
+      element: (
+        <ProtectedRoute roles={["ROLE_STAFF"]}>
+          <StaffLayout>
+            <StaffMedicalRecord/>
           </StaffLayout>
         </ProtectedRoute>
       ),
@@ -285,7 +287,7 @@ export default function useRouteElements() {
       element: (
         <ProtectedRoute roles={["ROLE_DOCTOR"]}>
           <DoctorLayout>
-            <DoctorDashboard />
+            <DoctorCertificates />
           </DoctorLayout>
         </ProtectedRoute>
       ),
@@ -314,13 +316,6 @@ export default function useRouteElements() {
       path: "/unauthorized",
       element: <Unauthorized />,
     },
-
-        <StaffLayout>
-          <StaffMedicalRecordPage />
-        </StaffLayout>
-      )
-    }
-
   ]);
   return routeElemets;
 }
