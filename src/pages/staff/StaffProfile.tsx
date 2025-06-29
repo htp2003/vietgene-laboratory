@@ -1,27 +1,14 @@
-import React, { useState } from 'react';
-import { User, Mail, Calendar, Shield, Edit3, Save, X, Lock, Eye, EyeOff, Phone, MapPin, IdCard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Mail, Calendar, Shield, Edit3, Save, X, Lock, Eye, EyeOff, Phone, MapPin, IdCard, Loader } from 'lucide-react';
 
+// ✅ Import UserService và types từ cấu trúc mới
+import { UserService} from '../../services/staffService/userService';
+import { ApiUser, UserUpdateRequest } from '../../types/appointment';
+import authService from '../../services/authService';
 const StaffProfileComponent = () => {
-  // Mock data - thay thế bằng API call sau này
-  const [profile, setProfile] = useState({
-    id: "STF001",
-    username: "nguyenvana",
-    email: "nguyenvana@vietgenelab.com",
-    full_name: "Nguyễn Văn A",
-    dob: "1990-05-15",
-    phone: "0901234567",
-    address: "123 Đường ABC, Quận 1, TP.HCM",
-    employee_id: "VGL2024001",
-    department: "Phòng Lab",
-    position: "Kỹ thuật viên xét nghiệm",
-    hire_date: "2024-01-15",
-    avatar: null,
-    roles: [
-      { name: "STAFF", description: "Nhân viên" },
-      { name: "LAB_TECHNICIAN", description: "Kỹ thuật viên phòng lab" }
-    ]
-  });
-
+  // ✅ State cho profile data từ API
+  const [profile, setProfile] = useState<ApiUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [passwordMode, setPasswordMode] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
@@ -33,13 +20,12 @@ const StaffProfileComponent = () => {
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Form data cho chỉnh sửa profile
-  const [formData, setFormData] = useState({
-    full_name: profile.full_name,
-    email: profile.email,
-    phone: profile.phone,
-    address: profile.address,
-    dob: profile.dob
+  // ✅ Form data cho chỉnh sửa profile (based on UserUpdateRequest)
+  const [formData, setFormData] = useState<UserUpdateRequest>({
+    full_name: '',
+    email: '',
+    username: '',
+    dob: ''
   });
 
   // Form data cho đổi mật khẩu
@@ -49,8 +35,47 @@ const StaffProfileComponent = () => {
     confirmPassword: ''
   });
 
+  // ✅ Load user profile khi component mount
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  // ✅ Function để load user profile từ API
+  const loadUserProfile = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      console.log("👤 Loading user profile...");
+      
+      // Lấy profile của user hiện tại
+      const userProfile = await UserService.getCurrentUserProfile();
+      
+      if (userProfile) {
+        setProfile(userProfile);
+        
+        // Khởi tạo form data với dữ liệu hiện tại
+        setFormData({
+          username: userProfile.username,
+          full_name: userProfile.full_name,
+          email: userProfile.email,
+          dob: userProfile.dob
+        });
+        
+        console.log("✅ User profile loaded successfully");
+      } else {
+        setError('Không thể tải thông tin người dùng');
+      }
+    } catch (err: any) {
+      console.error("❌ Error loading user profile:", err);
+      setError('Có lỗi xảy ra khi tải thông tin người dùng');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Helper functions
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     if (!dateString) return 'Chưa cập nhật';
     try {
       const date = new Date(dateString);
@@ -64,8 +89,8 @@ const StaffProfileComponent = () => {
     }
   };
 
-  const getRoleDisplayName = (roleName) => {
-    const roleMap = {
+  const getRoleDisplayName = (roleName: string) => {
+    const roleMap: Record<string, string> = {
       'STAFF': 'Nhân viên',
       'MANAGER': 'Quản lý',
       'ADMIN': 'Quản trị viên',
@@ -76,7 +101,7 @@ const StaffProfileComponent = () => {
     return roleMap[roleName] || roleName;
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -84,7 +109,7 @@ const StaffProfileComponent = () => {
     }));
   };
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({
       ...prev,
@@ -92,40 +117,51 @@ const StaffProfileComponent = () => {
     }));
   };
 
-  const togglePasswordVisibility = (field) => {
+  const togglePasswordVisibility = (field: 'current' | 'new' | 'confirm') => {
     setShowPasswords(prev => ({
       ...prev,
       [field]: !prev[field]
     }));
   };
 
+  // ✅ Function để save profile sử dụng UserService.updateUser
   const handleSaveProfile = async () => {
     try {
       setSaving(true);
       setError('');
       setSuccess('');
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!profile?.id) {
+        setError('Không tìm thấy ID người dùng');
+        return;
+      }
 
-      // Update profile with new data
-      setProfile(prev => ({
-        ...prev,
-        ...formData
-      }));
+      console.log("💾 Updating user profile...", formData);
 
-      setEditMode(false);
-      setSuccess('Cập nhật thông tin thành công!');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
+      // ✅ Gọi API để cập nhật user
+      const updatedUser = await UserService.updateUser(profile.id, formData);
+
+      if (updatedUser) {
+        setProfile(updatedUser);
+        setEditMode(false);
+        setSuccess('Cập nhật thông tin thành công!');
+        
+        console.log("✅ Profile updated successfully");
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError('Không thể cập nhật thông tin');
+      }
+    } catch (err: any) {
+      console.error("❌ Error updating profile:", err);
       setError('Có lỗi xảy ra khi cập nhật thông tin');
     } finally {
       setSaving(false);
     }
   };
 
+  // ✅ Function để change password (có thể cần implement riêng nếu API có endpoint khác)
   const handleChangePassword = async () => {
     try {
       setSaving(true);
@@ -144,20 +180,38 @@ const StaffProfileComponent = () => {
         return;
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!profile?.id) {
+        setError('Không tìm thấy ID người dùng');
+        return;
+      }
 
-      setPasswordMode(false);
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      setSuccess('Đổi mật khẩu thành công!');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
+      console.log("🔐 Changing password...");
+
+      // ✅ Gọi API để đổi mật khẩu (sử dụng updateUser với password)
+      const updateData: UserUpdateRequest = {
+        password: passwordData.newPassword
+      };
+
+      const updatedUser = await UserService.updateUser(profile.id, updateData);
+
+      if (updatedUser) {
+        setPasswordMode(false);
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+        setSuccess('Đổi mật khẩu thành công!');
+        
+        console.log("✅ Password changed successfully");
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError('Không thể đổi mật khẩu');
+      }
+    } catch (err: any) {
+      console.error("❌ Error changing password:", err);
       setError('Có lỗi xảy ra khi đổi mật khẩu');
     } finally {
       setSaving(false);
@@ -165,15 +219,19 @@ const StaffProfileComponent = () => {
   };
 
   const cancelEdit = () => {
+    if (!profile) return;
+    
     setEditMode(false);
     setPasswordMode(false);
+    
+    // Reset form data về giá trị ban đầu
     setFormData({
+      username: profile.username,
       full_name: profile.full_name,
       email: profile.email,
-      phone: profile.phone,
-      address: profile.address,
       dob: profile.dob
     });
+    
     setPasswordData({
       currentPassword: '',
       newPassword: '',
@@ -181,6 +239,41 @@ const StaffProfileComponent = () => {
     });
     setError('');
   };
+
+  // ✅ Show loading state
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto p-6 bg-white">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600">Đang tải thông tin người dùng...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Show error state if no profile
+  if (!profile) {
+    return (
+      <div className="max-w-6xl mx-auto p-6 bg-white">
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-red-600" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Không thể tải thông tin</h3>
+          <p className="text-gray-600 mb-4">Vui lòng thử lại sau</p>
+          <button
+            onClick={loadUserProfile}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-6 bg-white">
@@ -239,7 +332,7 @@ const StaffProfileComponent = () => {
             {/* Avatar */}
             <div className="relative inline-block mb-4">
               <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                {profile.full_name?.charAt(0) || 'A'}
+                {profile.full_name?.charAt(0) || profile.username?.charAt(0) || 'U'}
               </div>
               {editMode && (
                 <button className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 transition-colors">
@@ -248,21 +341,9 @@ const StaffProfileComponent = () => {
               )}
             </div>
 
-            <h3 className="text-xl font-bold text-gray-900 mb-1">{profile.full_name}</h3>
-            <p className="text-gray-600 mb-2">{profile.position}</p>
-            <p className="text-sm text-gray-500">{profile.department}</p>
-
-            {/* Quick Stats */}
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Mã nhân viên:</span>
-                <span className="font-medium text-gray-900">{profile.employee_id}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Ngày vào làm:</span>
-                <span className="font-medium text-gray-900">{formatDate(profile.hire_date)}</span>
-              </div>
-            </div>
+            <h3 className="text-xl font-bold text-gray-900 mb-1">{profile.full_name || profile.username}</h3>
+            <p className="text-gray-600 mb-2">Nhân viên</p>
+            <p className="text-sm text-gray-500">DNA Service</p>
 
             {/* Roles */}
             <div className="mt-6">
@@ -299,7 +380,7 @@ const StaffProfileComponent = () => {
                     <input
                       type="text"
                       name="full_name"
-                      value={formData.full_name}
+                      value={formData.full_name || ''}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                       placeholder="Nhập họ và tên"
@@ -321,7 +402,7 @@ const StaffProfileComponent = () => {
                     <input
                       type="email"
                       name="email"
-                      value={formData.email}
+                      value={formData.email || ''}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                       placeholder="Nhập email"
@@ -345,28 +426,6 @@ const StaffProfileComponent = () => {
                   <p className="text-xs text-gray-500 mt-1">Không thể thay đổi tên đăng nhập</p>
                 </div>
 
-                {/* Phone */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                    <Phone size={16} />
-                    Số điện thoại
-                  </label>
-                  {editMode ? (
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                      placeholder="Nhập số điện thoại"
-                    />
-                  ) : (
-                    <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                      {profile.phone || 'Chưa cập nhật'}
-                    </div>
-                  )}
-                </div>
-
                 {/* Date of Birth */}
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
@@ -377,7 +436,7 @@ const StaffProfileComponent = () => {
                     <input
                       type="date"
                       name="dob"
-                      value={formData.dob}
+                      value={formData.dob || ''}
                       onChange={handleInputChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     />
@@ -386,71 +445,6 @@ const StaffProfileComponent = () => {
                       {formatDate(profile.dob)}
                     </div>
                   )}
-                </div>
-
-                {/* Employee ID */}
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                    <IdCard size={16} />
-                    Mã nhân viên
-                  </label>
-                  <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600">
-                    {profile.employee_id}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Được cấp bởi hệ thống</p>
-                </div>
-              </div>
-
-              {/* Address - Full width */}
-              <div className="mt-6">
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                  <MapPin size={16} />
-                  Địa chỉ
-                </label>
-                {editMode ? (
-                  <textarea
-                    name="address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
-                    placeholder="Nhập địa chỉ"
-                  />
-                ) : (
-                  <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900">
-                    {profile.address || 'Chưa cập nhật'}
-                  </div>
-                )}
-              </div>
-
-              {/* Work Information */}
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Shield size={18} className="text-green-600" />
-                  Thông tin công việc
-                </h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Phòng ban</label>
-                    <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600">
-                      {profile.department}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Chức vụ</label>
-                    <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600">
-                      {profile.position}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">Ngày vào làm</label>
-                    <div className="px-4 py-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-600">
-                      {formatDate(profile.hire_date)}
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -462,7 +456,7 @@ const StaffProfileComponent = () => {
                     disabled={saving}
                     className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                   >
-                    <Save size={18} />
+                    {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save size={18} />}
                     {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
                   </button>
                   <button
@@ -579,7 +573,7 @@ const StaffProfileComponent = () => {
                   disabled={saving || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
                   className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                 >
-                  <Save size={18} />
+                  {saving ? <Loader className="w-4 h-4 animate-spin" /> : <Save size={18} />}
                   {saving ? 'Đang cập nhật...' : 'Đổi mật khẩu'}
                 </button>
                 <button

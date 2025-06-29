@@ -13,10 +13,9 @@ import OrderDetail from "./pages/order/OrderDetail";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
 import AdminLayout from "./layouts/AdminLayout/AdminLayout";
-
 import ServicesManagement from "./pages/Admin/ServicesManagement";
 import BlogManagement from "./pages/admin/BlogManagement";
-import StaffAppointments from "./pages/staff/appointment";
+import AppointmentService from "./pages/staff/appointment";
 import StaffLayout from "./layouts/StaffLayout/StaffLayout";
 import UserManagement from "./pages/Admin/UserManagement";
 import DoctorManagement from "./pages/Admin/DoctorManagement";
@@ -24,15 +23,17 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
-import APITestPage from "./pages/APITestPage";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
-import StaffAppointmentsWithTestMode from "./pages/staff/AppointmentWithTestMode";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
+
 import DoctorDashboard from "./pages/Doctor/DoctorDashboard";
 import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
 import DoctorCertificates from "./pages/Doctor/DoctorCertificates";
 import DoctorSchedule from "./pages/Doctor/DoctorSchedule";
 import Unauthorized from "./pages/Unauthorized";
+
+
+import StaffMedicalRecordPage from "./pages/staff/StaffMedicalRecord";
 
 export default function useRouteElements() {
   const routeElemets = useRoutes([
@@ -237,26 +238,39 @@ export default function useRouteElements() {
     {
       path: "/staff",
       element: (
+
         <ProtectedRoute roles={["ROLE_STAFF"]}>
           <StaffLayout>
             <StaffAppointments />
           </StaffLayout>
         </ProtectedRoute>
-      ),
-    },
-    {
-      path: "/staff/appointment",
-      element: (
-        <ProtectedRoute roles={["ROLE_STAFF"]}>
-          <StaffLayout>
-            <StaffAppointmentsWithTestMode/>
-          </StaffLayout>
-        </ProtectedRoute>
+
+        <StaffLayout>
+          <AppointmentService />
+        </StaffLayout>
+
       ),
     },
     {
       path: "/staff/profile",
       element: (
+
+        <ProtectedRoute roles={["ROLE_STAFF"]}>
+          <StaffLayout>
+            <StaffAppointmentsWithTestMode/>
+          </StaffLayout>
+        </ProtectedRoute>
+
+        <StaffLayout>
+          <StaffProfileComponent/>
+        </StaffLayout>
+
+      ),
+    },
+    {
+      path: "/staff/medical-records",
+      element: (
+
         <ProtectedRoute roles={["ROLE_STAFF"]}>
           <StaffLayout>
             <StaffProfileComponent/>
@@ -300,6 +314,13 @@ export default function useRouteElements() {
       path: "/unauthorized",
       element: <Unauthorized />,
     },
+
+        <StaffLayout>
+          <StaffMedicalRecordPage />
+        </StaffLayout>
+      )
+    }
+
   ]);
   return routeElemets;
 }
