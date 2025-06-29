@@ -166,6 +166,62 @@ export const authService = {
   getToken: (): string | null => {
     return localStorage.getItem("token");
   },
+
+  // Thêm hàm refreshToken
+  refreshToken: async (refreshToken: string) => {
+    try {
+      const response = await apiClient.post("/auth/refresh", { token: refreshToken });
+      if (response.data.code === 200 && response.data.result?.token) {
+        localStorage.setItem("token", response.data.result.token);
+        return {
+          success: true,
+          token: response.data.result.token,
+        };
+      }
+      return { success: false, message: response.data.message };
+    } catch (error) {
+      return { success: false, message: "Làm mới token thất bại" };
+    }
+  },
 };
+
+// Interceptor tự động refresh token khi gặp lỗi 401
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true;
+      try {
+        const refresh_token = localStorage.getItem("refresh_token");
+        if (!refresh_token) throw new Error("No refresh token");
+        const refreshResult = await authService.refreshToken(refresh_token);
+        if (refreshResult.success && refreshResult.token) {
+          // Gắn token mới vào header và thử lại request cũ
+          originalRequest.headers["Authorization"] = "Bearer " + refreshResult.token;
+          return apiClient(originalRequest);
+        } else {
+          // Nếu refresh thất bại, logout
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("refresh_token");
+          window.location.href = "/login";
+          return Promise.reject(error);
+        }
+      } catch (refreshError) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("refresh_token");
+        window.location.href = "/login";
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default authService;

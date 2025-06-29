@@ -28,13 +28,19 @@ import APITestPage from "./pages/APITestPage";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
 import StaffAppointmentsWithTestMode from "./pages/staff/AppointmentWithTestMode";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
+import DoctorDashboard from "./pages/Doctor/DoctorDashboard";
+import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
+import DoctorCertificates from "./pages/Doctor/DoctorCertificates";
+import DoctorSchedule from "./pages/Doctor/DoctorSchedule";
+import Unauthorized from "./pages/Unauthorized";
+
 export default function useRouteElements() {
   const routeElemets = useRoutes([
     {
       path: "/",
       index: true,
       element: (
-        <ProtectedRoute>
+        <ProtectedRoute >
           <MainLayout>
             <Home />
           </MainLayout>
@@ -159,55 +165,67 @@ export default function useRouteElements() {
     {
       path: "/admin",
       element: (
-        <AdminLayout>
-          <AdminDashboard />
-        </AdminLayout>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
+          <AdminLayout>
+            <AdminDashboard />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/admin/users",
       element: (
-        <AdminLayout>
-          <UserManagement />
-        </AdminLayout>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
+          <AdminLayout>
+            <UserManagement />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/admin/doctors",
       element: (
-        <AdminLayout>
-          <DoctorManagement />
-        </AdminLayout>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
+          <AdminLayout>
+            <DoctorManagement />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/admin/services",
       element: (
-        <AdminLayout>
-          <ServicesManagement />
-        </AdminLayout>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
+          <AdminLayout>
+            <ServicesManagement />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/admin/blog",
       element: (
-        <AdminLayout>
-          <BlogManagement />
-        </AdminLayout>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
+          <AdminLayout>
+            <BlogManagement />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/admin/notification",
       element: (
-        <AdminLayout>
-          <BlogManagement />
-        </AdminLayout>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
+          <AdminLayout>
+            <BlogManagement />
+          </AdminLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/admin/profile",
       element: (
-        <ProtectedRoute>
+        <ProtectedRoute roles={["ROLE_ADMIN"]}>
           <AdminLayout>
             <Profile />
           </AdminLayout>
@@ -219,26 +237,68 @@ export default function useRouteElements() {
     {
       path: "/staff",
       element: (
-        <StaffLayout>
-          <StaffAppointments />
-        </StaffLayout>
+        <ProtectedRoute roles={["ROLE_STAFF"]}>
+          <StaffLayout>
+            <StaffAppointments />
+          </StaffLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/staff/appointment",
       element: (
-        <StaffLayout>
-          <StaffAppointmentsWithTestMode/>
-        </StaffLayout>
+        <ProtectedRoute roles={["ROLE_STAFF"]}>
+          <StaffLayout>
+            <StaffAppointmentsWithTestMode/>
+          </StaffLayout>
+        </ProtectedRoute>
       ),
     },
     {
       path: "/staff/profile",
       element: (
-        <StaffLayout>
-          <StaffProfileComponent/>
-        </StaffLayout>
+        <ProtectedRoute roles={["ROLE_STAFF"]}>
+          <StaffLayout>
+            <StaffProfileComponent/>
+          </StaffLayout>
+        </ProtectedRoute>
       ),
+    },
+
+    // Doctor
+    {
+      path: "/doctor",
+      element: (
+        <ProtectedRoute roles={["ROLE_DOCTOR"]}>
+          <DoctorLayout>
+            <DoctorDashboard />
+          </DoctorLayout>
+        </ProtectedRoute>
+      ),
+    },
+    // {
+    //   path: "/doctor/schedule",
+    //   element: (
+    //     <ProtectedRoute roles={["ROLE_DOCTOR"]}>
+    //       <DoctorLayout>
+    //         <DoctorSchedule doctorId={doctorId} doctorName={doctorName} />
+    //       </DoctorLayout>
+    //     </ProtectedRoute>
+    //   ),
+    // },
+    {
+      path: "/doctor/certificates",
+      element: (
+        <ProtectedRoute roles={["ROLE_DOCTOR"]}>
+          <DoctorLayout>
+            <DoctorCertificates />
+          </DoctorLayout>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/unauthorized",
+      element: <Unauthorized />,
     },
   ]);
   return routeElemets;
