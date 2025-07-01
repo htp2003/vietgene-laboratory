@@ -55,6 +55,14 @@ interface Order {
     status: string;
     collectionMethod: string;
   }>;
+  appointment?: {
+    id: string;
+    appointmentDate: string;
+    appointmentType: string;
+    status: string;
+    notes?: string;
+    doctorTimeSlot?: string;
+  } | null;
 }
 
 const CustomerDashboard: React.FC = () => {
@@ -136,7 +144,6 @@ const CustomerDashboard: React.FC = () => {
       setLoading(false);
     }
   };
-
   const loadUserOrders = async (userId: string) => {
     try {
       console.log("🔍 Loading orders for user:", userId);
@@ -150,74 +157,133 @@ const CustomerDashboard: React.FC = () => {
         const enhancedOrders = await Promise.all(
           userOrders.map(async (apiOrder: any) => {
             try {
-              // Get complete order data including participants, samples, etc.
+              // ✅ FIX: Use the corrected getCompleteOrderData method
               const completeOrderData = await orderService.getCompleteOrderData(
                 apiOrder.orderId || apiOrder.id
               );
 
-              console.log(`📋 Complete data for order ${apiOrder.orderId}:`, completeOrderData);
+              console.log(
+                `📋 Complete data for order ${apiOrder.orderId}:`,
+                completeOrderData
+              );
 
               // Transform API data to component format
               const transformedOrder: Order = {
                 id: apiOrder.orderId || apiOrder.id,
-                orderCode: apiOrder.order_code || apiOrder.orderCode || `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
+                orderCode:
+                  apiOrder.order_code ||
+                  apiOrder.orderCode ||
+                  `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
                 status: apiOrder.status || "pending",
                 totalAmount: apiOrder.total_amount || apiOrder.totalAmount || 0,
-                paymentStatus: apiOrder.payment_status || apiOrder.paymentStatus || "pending",
-                paymentMethod: apiOrder.payment_method || apiOrder.paymentMethod || "transfer",
-                createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
-                updatedAt: apiOrder.updatedAt || apiOrder.updated_at || apiOrder.update_at || new Date().toISOString(),
+                paymentStatus:
+                  apiOrder.payment_status ||
+                  apiOrder.paymentStatus ||
+                  "pending",
+                paymentMethod:
+                  apiOrder.payment_method ||
+                  apiOrder.paymentMethod ||
+                  "transfer",
+                createdAt:
+                  apiOrder.createdAt ||
+                  apiOrder.created_at ||
+                  new Date().toISOString(),
+                updatedAt:
+                  apiOrder.updatedAt ||
+                  apiOrder.updated_at ||
+                  apiOrder.update_at ||
+                  new Date().toISOString(),
                 notes: apiOrder.notes || "",
 
                 // Service info from order details
                 service: {
-                  name: getServiceNameFromOrderDetails(completeOrderData.orderDetails) || "Xét nghiệm DNA",
+                  name:
+                    getServiceNameFromOrderDetails(
+                      completeOrderData.orderDetails
+                    ) || "Xét nghiệm DNA",
                   type: "dna_test",
                   id: completeOrderData.orderDetails?.[0]?.dnaServiceId,
                 },
 
                 // Participants
-                participants: completeOrderData.participants?.map((p: any) => ({
-                  id: p.id,
-                  participantName: p.participantName || p.participant_name || "Không xác định",
-                  relationship: p.relationship || "Không xác định",
-                  age: p.age || 0,
-                })) || [],
+                participants:
+                  completeOrderData.participants?.map((p: any) => ({
+                    id: p.id,
+                    participantName:
+                      p.participantName ||
+                      p.participant_name ||
+                      "Không xác định",
+                    relationship: p.relationship || "Không xác định",
+                    age: p.age || 0,
+                  })) || [],
 
                 // Order details
-                orderDetails: completeOrderData.orderDetails?.map((od: any) => ({
-                  id: od.id,
-                  quantity: od.quantity || 1,
-                  unitPrice: od.unit_price || od.unitPrice || 0,
-                  subtotal: od.subtotal || 0,
-                })) || [],
+                orderDetails:
+                  completeOrderData.orderDetails?.map((od: any) => ({
+                    id: od.id,
+                    quantity: od.quantity || 1,
+                    unitPrice: od.unit_price || od.unitPrice || 0,
+                    subtotal: od.subtotal || 0,
+                  })) || [],
 
                 // Samples
-                samples: completeOrderData.samples?.map((s: any) => ({
-                  id: s.id,
-                  sampleCode: s.sample_code || s.sampleCode || "",
-                  status: s.status || "pending",
-                  collectionMethod: s.collection_method || s.collectionMethod || "home",
-                })) || [],
+                samples:
+                  completeOrderData.samples?.map((s: any) => ({
+                    id: s.id,
+                    sampleCode: s.sample_code || s.sampleCode || "",
+                    status: s.status || "pending",
+                    collectionMethod:
+                      s.collection_method || s.collectionMethod || "home",
+                  })) || [],
+
+                // ✅ FIX: Handle appointment data properly
+                appointment: completeOrderData.appointment
+                  ? {
+                      id: completeOrderData.appointment.id,
+                      appointmentDate:
+                        completeOrderData.appointment.appointment_date,
+                      appointmentType:
+                        completeOrderData.appointment.appointment_type,
+                      status: completeOrderData.appointment.status,
+                      notes: completeOrderData.appointment.notes,
+                      doctorTimeSlot:
+                        completeOrderData.appointment.doctor_time_slot,
+                    }
+                  : null,
 
                 // Calculate progress based on status and samples
-                progress: calculateOrderProgress(apiOrder.status, completeOrderData.samples),
+                progress: calculateOrderProgress(
+                  apiOrder.status,
+                  completeOrderData.samples,
+                  completeOrderData.appointment
+                ),
               };
 
               return transformedOrder;
             } catch (error) {
-              console.warn(`⚠️ Error loading complete data for order ${apiOrder.orderId}:`, error);
+              console.warn(
+                `⚠️ Error loading complete data for order ${apiOrder.orderId}:`,
+                error
+              );
 
               // Fallback to basic order data
               return {
                 id: apiOrder.orderId || apiOrder.id,
-                orderCode: apiOrder.order_code || `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
+                orderCode:
+                  apiOrder.order_code ||
+                  `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
                 status: apiOrder.status || "pending",
                 totalAmount: apiOrder.total_amount || 0,
                 paymentStatus: apiOrder.payment_status || "pending",
                 paymentMethod: apiOrder.payment_method || "transfer",
-                createdAt: apiOrder.createdAt || apiOrder.created_at || new Date().toISOString(),
-                updatedAt: apiOrder.updatedAt || apiOrder.updated_at || new Date().toISOString(),
+                createdAt:
+                  apiOrder.createdAt ||
+                  apiOrder.created_at ||
+                  new Date().toISOString(),
+                updatedAt:
+                  apiOrder.updatedAt ||
+                  apiOrder.updated_at ||
+                  new Date().toISOString(),
                 service: {
                   name: "Xét nghiệm DNA",
                   type: "dna_test",
@@ -243,6 +309,44 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
+  // ===== ENHANCED: Calculate progress with appointment data =====
+
+  const calculateOrderProgress = (
+    status: string,
+    samples: any[],
+    appointment: any
+  ): number => {
+    const baseProgress = getStatusInfo(status).progress;
+
+    // Factor in appointment status
+    let appointmentProgress = 0;
+    if (appointment) {
+      appointmentProgress = appointment.status ? 30 : 20; // Confirmed vs scheduled
+    }
+
+    // Factor in sample progress
+    let sampleProgress = 0;
+    if (samples && samples.length > 0) {
+      const sampleProgressMap: Record<string, number> = {
+        pending_collection: 10,
+        scheduled: 20,
+        collected: 40,
+        shipped: 50,
+        received: 60,
+        analyzing: 80,
+        completed: 100,
+      };
+
+      sampleProgress =
+        samples.reduce((acc, sample) => {
+          return acc + (sampleProgressMap[sample.status] || 0);
+        }, 0) / samples.length;
+    }
+
+    // Return the highest progress value
+    return Math.max(baseProgress, appointmentProgress, sampleProgress);
+  };
+
   // Helper function to get service name from order details
   const getServiceNameFromOrderDetails = (orderDetails: any[]): string => {
     if (!orderDetails || orderDetails.length === 0) {
@@ -254,41 +358,14 @@ const CustomerDashboard: React.FC = () => {
 
     // For now, return generic names based on common patterns
     const serviceNames: Record<string, string> = {
-      "paternity": "Xét nghiệm quan hệ cha con",
-      "sibling": "Xét nghiệm anh chị em ruột",
-      "grandparent": "Xét nghiệm quan hệ ông bà cháu",
-      "maternity": "Xét nghiệm quan hệ mẹ con",
+      paternity: "Xét nghiệm quan hệ cha con",
+      sibling: "Xét nghiệm anh chị em ruột",
+      grandparent: "Xét nghiệm quan hệ ông bà cháu",
+      maternity: "Xét nghiệm quan hệ mẹ con",
     };
 
     // Default service name
     return "Xét nghiệm quan hệ huyết thống DNA";
-  };
-
-  // Calculate progress based on order status and samples
-  const calculateOrderProgress = (status: string, samples: any[]): number => {
-    const baseProgress = getStatusInfo(status).progress;
-
-    if (samples && samples.length > 0) {
-      // Calculate average sample progress
-      const sampleProgressMap: Record<string, number> = {
-        pending_collection: 10,
-        scheduled: 20,
-        collected: 40,
-        shipped: 50,
-        received: 60,
-        analyzing: 80,
-        completed: 100,
-      };
-
-      const avgSampleProgress = samples.reduce((acc, sample) => {
-        return acc + (sampleProgressMap[sample.status] || 0);
-      }, 0) / samples.length;
-
-      // Return the higher of base progress or sample progress
-      return Math.max(baseProgress, avgSampleProgress);
-    }
-
-    return baseProgress;
   };
 
   // Refresh orders
@@ -446,8 +523,10 @@ const CustomerDashboard: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-gray-600 mt-2">
                 Xin chào,{" "}
-                {currentUser?.full_name || currentUser?.fullName || "Khách hàng"}!
-                Quản lý đơn hàng và theo dõi kết quả xét nghiệm của bạn.
+                {currentUser?.full_name ||
+                  currentUser?.fullName ||
+                  "Khách hàng"}
+                ! Quản lý đơn hàng và theo dõi kết quả xét nghiệm của bạn.
               </p>
             </div>
             <button
@@ -455,7 +534,9 @@ const CustomerDashboard: React.FC = () => {
               disabled={refreshing}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+              />
               {refreshing ? "Đang tải..." : "Làm mới"}
             </button>
           </div>
@@ -554,17 +635,19 @@ const CustomerDashboard: React.FC = () => {
                       <button
                         key={option.value}
                         onClick={() => setActiveFilter(option.value)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${activeFilter === option.value
-                          ? "bg-red-600 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                          activeFilter === option.value
+                            ? "bg-red-600 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
                       >
                         {option.label}
                         <span
-                          className={`px-2 py-1 rounded-full text-xs ${activeFilter === option.value
-                            ? "bg-red-500 text-white"
-                            : "bg-gray-200 text-gray-600"
-                            }`}
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            activeFilter === option.value
+                              ? "bg-red-500 text-white"
+                              : "bg-gray-200 text-gray-600"
+                          }`}
                         >
                           {option.count}
                         </span>
@@ -616,7 +699,13 @@ const CustomerDashboard: React.FC = () => {
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                <StatusIcon className={`w-5 h-5 text-red-600 ${statusInfo.icon === RefreshCw ? 'animate-spin' : ''}`} />
+                                <StatusIcon
+                                  className={`w-5 h-5 text-red-600 ${
+                                    statusInfo.icon === RefreshCw
+                                      ? "animate-spin"
+                                      : ""
+                                  }`}
+                                />
                               </div>
                               <div>
                                 <h3 className="font-semibold text-gray-900 mb-1">
@@ -627,18 +716,21 @@ const CustomerDashboard: React.FC = () => {
                                 </p>
                                 {/* Show participants count and samples count */}
                                 <div className="flex items-center gap-4 mt-1">
-                                  {order.participants && order.participants.length > 0 && (
-                                    <p className="text-xs text-gray-400 flex items-center gap-1">
-                                      <User className="w-3 h-3" />
-                                      {order.participants.length} người tham gia
-                                    </p>
-                                  )}
-                                  {order.samples && order.samples.length > 0 && (
-                                    <p className="text-xs text-gray-400 flex items-center gap-1">
-                                      <Package className="w-3 h-3" />
-                                      {order.samples.length} mẫu
-                                    </p>
-                                  )}
+                                  {order.participants &&
+                                    order.participants.length > 0 && (
+                                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                                        <User className="w-3 h-3" />
+                                        {order.participants.length} người tham
+                                        gia
+                                      </p>
+                                    )}
+                                  {order.samples &&
+                                    order.samples.length > 0 && (
+                                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                                        <Package className="w-3 h-3" />
+                                        {order.samples.length} mẫu
+                                      </p>
+                                    )}
                                 </div>
                               </div>
                             </div>
@@ -734,10 +826,11 @@ const CustomerDashboard: React.FC = () => {
                 {notifications.slice(0, 3).map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${notification.isRead
-                      ? "border-gray-200 bg-gray-50"
-                      : "border-red-200 bg-red-50"
-                      }`}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                      notification.isRead
+                        ? "border-gray-200 bg-gray-50"
+                        : "border-red-200 bg-red-50"
+                    }`}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium text-gray-900 text-sm">
@@ -785,7 +878,6 @@ const CustomerDashboard: React.FC = () => {
         </div>
 
         {/* Debug Info (remove in production) */}
-
       </div>
     </div>
   );
