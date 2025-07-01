@@ -389,6 +389,114 @@ class OrderService {
       );
     }
   }
+
+  // ===== NEW APPOINTMENT METHODS =====
+
+  // Get all appointments (admin)
+  async getAllAppointments(): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching all appointments...");
+      const response = await apiClient.get("/appointment/all");
+
+      if (response.data.code === 200) {
+        const appointments = response.data.result || [];
+        console.log("✅ All appointments loaded:", appointments.length);
+        return appointments;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error(
+        "❌ Error fetching all appointments:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tải danh sách lịch hẹn");
+    }
+  }
+
+  // Get user appointments
+  async getUserAppointments(): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching user appointments...");
+      const response = await apiClient.get("/appointment/user/all");
+
+      if (response.data.code === 200) {
+        const appointments = response.data.result || [];
+        console.log("✅ User appointments loaded:", appointments.length);
+        return appointments;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error(
+        "❌ Error fetching user appointments:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tải lịch hẹn của bạn");
+    }
+  }
+
+  // Get specific appointment by ID
+  async getAppointmentById(appointmentId: string): Promise<any> {
+    try {
+      console.log("🔍 Fetching appointment:", appointmentId);
+      const response = await apiClient.get(`/appointment/${appointmentId}`);
+
+      if (response.data.code === 200) {
+        console.log("✅ Appointment loaded:", response.data.result);
+        return response.data.result;
+      }
+
+      throw new Error("Appointment not found");
+    } catch (error: any) {
+      console.error(
+        "❌ Error fetching appointment:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tải thông tin lịch hẹn");
+    }
+  }
+
+  // Get appointments by order ID (helper method)
+  async getAppointmentsByOrderId(orderId: string): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching appointments for order:", orderId);
+
+      // Try to get all appointments and filter by orderId
+      const allAppointments = await this.getAllAppointments();
+      const orderAppointments = allAppointments.filter(
+        (app: any) => app.orderId === orderId
+      );
+
+      console.log(
+        `✅ Found ${orderAppointments.length} appointments for order ${orderId}`
+      );
+      return orderAppointments;
+    } catch (error) {
+      console.warn(
+        "⚠️ Could not fetch appointments by order ID, trying user appointments..."
+      );
+
+      try {
+        // Fallback: try user appointments
+        const userAppointments = await this.getUserAppointments();
+        const orderAppointments = userAppointments.filter(
+          (app: any) => app.orderId === orderId
+        );
+
+        console.log(
+          `✅ Found ${orderAppointments.length} user appointments for order ${orderId}`
+        );
+        return orderAppointments;
+      } catch (userError) {
+        console.error(
+          "❌ Could not fetch appointments by any method:",
+          userError
+        );
+        return [];
+      }
+    }
+  }
   // ===== PAYMENT (Mock for now - no API available) =====
   async processPayment(
     orderId: string,
@@ -587,18 +695,36 @@ class OrderService {
         console.warn("⚠️ Could not fetch participants:", error);
       }
 
-      // Get appointment if exists
+      // ✅ FIX: Get appointment - use correct endpoint
       let appointment = null;
       try {
-        const appointmentResponse = await apiClient.get(`/appointment`);
+        // Method 1: Try to get all appointments and filter by orderId
+        const appointmentResponse = await apiClient.get(`/appointment/all`);
         const appointments = appointmentResponse.data.result || [];
         appointment = appointments.find((app: any) => app.orderId === orderId);
-        console.log("📅 Appointment:", appointment);
+        console.log("📅 Appointment found:", appointment);
       } catch (error) {
-        console.warn("⚠️ Could not fetch appointment:", error);
+        console.warn(
+          "⚠️ Could not fetch appointments from /appointment/all:",
+          error
+        );
+
+        // Method 2: Try user appointments endpoint
+        try {
+          const userAppointmentResponse = await apiClient.get(
+            `/appointment/user/all`
+          );
+          const userAppointments = userAppointmentResponse.data.result || [];
+          appointment = userAppointments.find(
+            (app: any) => app.orderId === orderId
+          );
+          console.log("📅 User appointment found:", appointment);
+        } catch (userError) {
+          console.warn("⚠️ Could not fetch user appointments:", userError);
+        }
       }
 
-      // Get samples (new API)
+      // Get samples
       let samples = [];
       try {
         const samplesResponse = await apiClient.get(

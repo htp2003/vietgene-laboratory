@@ -1,48 +1,51 @@
-/**
- * Order utilities and helper functions
- */
+// ===== ORDER UTILITIES =====
 
-// Format price to Vietnamese currency
 export const formatPrice = (price: number): string => {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(price);
+  try {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(price);
+  } catch (error) {
+    // Fallback formatting
+    return `${price.toLocaleString("vi-VN")}đ`;
+  }
 };
 
-// Get Vietnamese day name
-export const getDayName = (dayOfWeek: number): string => {
-  const days = [
-    "Chủ nhật",
-    "Thứ 2",
-    "Thứ 3",
-    "Thứ 4",
-    "Thứ 5",
-    "Thứ 6",
-    "Thứ 7",
-  ];
-  return days[dayOfWeek] || "Không xác định";
-};
-
-// Format date to Vietnamese format
 export const formatDate = (dateString: string): string => {
-  if (!dateString) return "";
-  return new Date(dateString).toLocaleDateString("vi-VN");
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch (error) {
+    return dateString;
+  }
 };
 
-// Format date with time
 export const formatDateTime = (dateString: string): string => {
-  if (!dateString) return "";
-  return new Date(dateString).toLocaleDateString("vi-VN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (error) {
+    return dateString;
+  }
 };
 
-// Validation functions
+export const generateOrderCode = (orderId: string): string => {
+  return `DNA-${orderId.slice(-8).toUpperCase()}`;
+};
+
 export const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -58,118 +61,127 @@ export const validateIdentityCard = (idCard: string): boolean => {
   return idRegex.test(idCard.replace(/\s+/g, ""));
 };
 
-// Customer info validation
-export const validateCustomerInfo = (customerInfo: any): boolean => {
-  return !!(
-    customerInfo.fullName &&
-    customerInfo.phone &&
-    validatePhone(customerInfo.phone) &&
-    customerInfo.email &&
-    validateEmail(customerInfo.email) &&
-    customerInfo.address &&
-    customerInfo.identityCard &&
-    validateIdentityCard(customerInfo.identityCard)
-  );
-};
-
-// Participants validation
-export const validateParticipants = (participants: any[]): boolean => {
-  if (participants.length < 2) return false;
-
-  return participants.every(
-    (p) =>
-      p.name?.trim() &&
-      p.relationship?.trim() &&
-      p.age &&
-      Number(p.age) > 0 &&
-      Number(p.age) <= 150
-  );
-};
-
-// Collection method validation
-export const validateCollectionMethod = (serviceInfo: any): boolean => {
-  if (serviceInfo.collectionMethod === "facility") {
-    return !!(
-      serviceInfo.doctorId &&
-      serviceInfo.timeSlotId &&
-      serviceInfo.appointmentDate
-    );
+export const sanitizeFormData = (data: any): any => {
+  if (typeof data === "string") {
+    return data.trim();
   }
-  return true; // Home collection doesn't need additional validation
+
+  if (Array.isArray(data)) {
+    return data.map(sanitizeFormData);
+  }
+
+  if (typeof data === "object" && data !== null) {
+    const sanitized: any = {};
+    for (const key in data) {
+      sanitized[key] = sanitizeFormData(data[key]);
+    }
+    return sanitized;
+  }
+
+  return data;
 };
 
-// Payment method validation
-export const validatePaymentMethod = (paymentInfo: any): boolean => {
-  return !!(
-    paymentInfo.method &&
-    (paymentInfo.method === "cash" || paymentInfo.method === "transfer")
-  );
-};
-
-// Generate order code
-export const generateOrderCode = (orderId: string): string => {
-  return "DNA-" + orderId.slice(-8).toUpperCase();
-};
-
-// Get doctor display name
-export const getDoctorDisplayName = (doctor: any): string => {
-  return (
-    doctor.doctorName ||
-    doctor.name ||
-    `Bác sĩ ${doctor.doctorCode || doctor.code || "N/A"}`
-  );
-};
-
-// Get collection method display text
-export const getCollectionMethodText = (method: string): string => {
-  return method === "home" ? "Lấy mẫu tại nhà" : "Lấy mẫu tại cơ sở";
-};
-
-// Get payment method display text
-export const getPaymentMethodText = (method: string): string => {
-  const methods: { [key: string]: string } = {
-    transfer: "Chuyển khoản",
-    cash: "Tiền mặt",
+export const getOrderStatusBadge = (status: string) => {
+  const statusMap: Record<
+    string,
+    { label: string; color: string; bgColor: string }
+  > = {
+    pending: {
+      label: "Chờ xử lý",
+      color: "text-yellow-800",
+      bgColor: "bg-yellow-100",
+    },
+    confirmed: {
+      label: "Đã xác nhận",
+      color: "text-blue-800",
+      bgColor: "bg-blue-100",
+    },
+    processing: {
+      label: "Đang xử lý",
+      color: "text-purple-800",
+      bgColor: "bg-purple-100",
+    },
+    completed: {
+      label: "Hoàn thành",
+      color: "text-green-800",
+      bgColor: "bg-green-100",
+    },
+    cancelled: {
+      label: "Đã hủy",
+      color: "text-red-800",
+      bgColor: "bg-red-100",
+    },
   };
-  return methods[method] || method;
+
+  return statusMap[status] || statusMap.pending;
 };
 
-// Calculate age from birth year
-export const calculateAge = (birthYear: number): number => {
-  return new Date().getFullYear() - birthYear;
+export const getPaymentStatusBadge = (status: string) => {
+  const statusMap: Record<string, { label: string; color: string }> = {
+    paid: { label: "Đã thanh toán", color: "text-green-600" },
+    pending: { label: "Chờ thanh toán", color: "text-yellow-600" },
+    failed: { label: "Thanh toán thất bại", color: "text-red-600" },
+  };
+
+  return statusMap[status] || statusMap.pending;
 };
 
-// Get relationship options
-export const getRelationshipOptions = (): string[] => {
-  return ["Cha", "Mẹ", "Con", "Anh/Chị", "Em", "Ông", "Bà", "Cháu", "Khác"];
+export const calculateOrderProgress = (status: string): number => {
+  const progressMap: Record<string, number> = {
+    pending: 10,
+    confirmed: 25,
+    kit_sent: 40,
+    sample_collected: 60,
+    processing: 80,
+    completed: 100,
+    cancelled: 0,
+  };
+
+  return progressMap[status] || 0;
 };
 
-// Sanitize participant name for payment reference
-export const sanitizeNameForPayment = (name: string): string => {
-  return name.replace(/\s+/g, "").toUpperCase();
+export const getDayName = (dayOfWeek: number): string => {
+  const days = [
+    "Chủ nhật",
+    "Thứ 2",
+    "Thứ 3",
+    "Thứ 4",
+    "Thứ 5",
+    "Thứ 6",
+    "Thứ 7",
+  ];
+  return days[dayOfWeek] || `Ngày ${dayOfWeek}`;
 };
 
-// Check if date is in the future
-export const isFutureDate = (dateString: string): boolean => {
-  const selectedDate = new Date(dateString);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return selectedDate >= today;
+export const isWeekend = (date: Date): boolean => {
+  const day = date.getDay();
+  return day === 0 || day === 6; // Sunday = 0, Saturday = 6
 };
 
-// Format currency without symbol (for calculations)
-export const parsePrice = (priceString: string): number => {
-  return Number(priceString.replace(/[^\d]/g, ""));
+export const addBusinessDays = (date: Date, days: number): Date => {
+  const result = new Date(date);
+  let addedDays = 0;
+
+  while (addedDays < days) {
+    result.setDate(result.getDate() + 1);
+    if (!isWeekend(result)) {
+      addedDays++;
+    }
+  }
+
+  return result;
 };
 
-// Generate payment reference
-export const generatePaymentReference = (
-  customerName: string,
-  orderId?: string
-): string => {
-  const sanitizedName = sanitizeNameForPayment(customerName);
-  const orderSuffix = orderId
-    ? orderId.slice(-4)
-    : Date.now().toString().slice(-4);
-  return `DNA-${sanitizedName}-${orderSuffix}`;
+export const getMinAppointmentDate = (): string => {
+  // Minimum appointment date is tomorrow
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return tomorrow.toISOString().split("T")[0];
+};
+
+export const getMaxAppointmentDate = (): string => {
+  // Maximum appointment date is 30 days from now
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 30);
+  return maxDate.toISOString().split("T")[0];
 };
