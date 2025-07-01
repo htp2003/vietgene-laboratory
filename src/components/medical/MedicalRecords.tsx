@@ -1,12 +1,8 @@
+// components/medical/MedicalRecords.tsx (View-Only Version)
 import React, { useState, useEffect } from "react";
 import {
   FileText,
-  Plus,
-  Edit,
-  Save,
-  X,
   AlertCircle,
-  CheckCircle,
   Loader,
   Shield,
   Calendar,
@@ -16,85 +12,20 @@ import {
   Pill,
   AlertTriangle,
   History,
+  RefreshCw,
+  Eye,
+  UserX,
+  MessageCircle,
 } from "lucide-react";
-
-// Mock medical records service
-const medicalRecordsService = {
-  async getMyMedicalRecords() {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-    const savedRecord = localStorage.getItem("medicalRecord");
-
-    if (savedRecord) {
-      return [JSON.parse(savedRecord)];
-    }
-
-    return [];
-  },
-
-  async createMedicalRecord(data: any) {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const record = {
-      id: "record_" + Date.now(),
-      recordCode: Math.floor(Math.random() * 1000000),
-      ...data,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem("medicalRecord", JSON.stringify(record));
-    return record;
-  },
-
-  async updateMedicalRecord(id: string, data: any) {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const record = {
-      id,
-      recordCode: 123456,
-      ...data,
-      createdAt: "2024-01-15T10:30:00Z",
-      updatedAt: new Date().toISOString(),
-    };
-
-    localStorage.setItem("medicalRecord", JSON.stringify(record));
-    return record;
-  },
-};
-
-interface MedicalRecord {
-  id: string;
-  recordCode: number;
-  medicalHistory: string;
-  allergies: string;
-  medications: string;
-  healthConditions: string;
-  emergencyContactPhone: string;
-  emergencyContactName: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import {
+  medicalRecordService,
+  MedicalRecord,
+} from "../../services/medicalRecordsService";
 
 const MedicalRecords: React.FC = () => {
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [editMode, setEditMode] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-
-  const [formData, setFormData] = useState({
-    medicalHistory: "",
-    allergies: "",
-    medications: "",
-    healthConditions: "",
-    emergencyContactPhone: "",
-    emergencyContactName: "",
-  });
 
   useEffect(() => {
     loadMedicalRecords();
@@ -105,74 +36,21 @@ const MedicalRecords: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const userRecords = await medicalRecordsService.getMyMedicalRecords();
-      setRecords(userRecords);
+      const response = await medicalRecordService.getMyMedicalRecords();
 
-      if (userRecords.length > 0) {
-        const latest = userRecords[0];
-        setFormData({
-          medicalHistory: latest.medicalHistory,
-          allergies: latest.allergies,
-          medications: latest.medications,
-          healthConditions: latest.healthConditions,
-          emergencyContactPhone: latest.emergencyContactPhone,
-          emergencyContactName: latest.emergencyContactName,
-        });
+      if (response.success && response.data) {
+        setRecords(response.data);
+      } else {
+        setError(response.message);
+        setRecords([]);
       }
-    } catch (err) {
-      setError("Không thể tải hồ sơ y tế");
+    } catch (err: any) {
+      console.error("Load medical records error:", err);
+      setError("Không thể tải hồ sơ y tế. Vui lòng thử lại sau.");
+      setRecords([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      setError(null);
-
-      if (records.length > 0) {
-        await medicalRecordsService.updateMedicalRecord(
-          records[0].id,
-          formData
-        );
-        setSuccess("Hồ sơ y tế đã được cập nhật!");
-      } else {
-        await medicalRecordsService.createMedicalRecord(formData);
-        setSuccess("Hồ sơ y tế đã được tạo!");
-      }
-
-      await loadMedicalRecords();
-      setEditMode(false);
-      setShowCreateForm(false);
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      setError("Có lỗi xảy ra khi lưu hồ sơ");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setEditMode(false);
-    setShowCreateForm(false);
-    setError(null);
-
-    if (records.length > 0) {
-      const latest = records[0];
-      setFormData({
-        medicalHistory: latest.medicalHistory,
-        allergies: latest.allergies,
-        medications: latest.medications,
-        healthConditions: latest.healthConditions,
-        emergencyContactPhone: latest.emergencyContactPhone,
-        emergencyContactName: latest.emergencyContactName,
-      });
-    }
-  };
-
-  const updateField = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const formatDate = (dateString: string) => {
@@ -201,7 +79,7 @@ const MedicalRecords: React.FC = () => {
   }
 
   const hasRecords = records.length > 0;
-  const isFormMode = editMode || showCreateForm;
+  const latestRecord = hasRecords ? records[0] : null;
 
   return (
     <div className="space-y-6">
@@ -214,180 +92,50 @@ const MedicalRecords: React.FC = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Hồ sơ y tế</h2>
-              <p className="text-gray-600">
-                Quản lý thông tin sức khỏe của bạn
-              </p>
+              <p className="text-gray-600">Xem thông tin sức khỏe của bạn</p>
             </div>
           </div>
 
-          {hasRecords && !isFormMode && (
+          <div className="flex items-center gap-3">
+            {/* Refresh Button */}
             <button
-              onClick={() => setEditMode(true)}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              onClick={() => {
+                setError(null);
+                loadMedicalRecords();
+              }}
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg font-medium transition-colors"
+              title="Làm mới dữ liệu"
             >
-              <Edit className="w-4 h-4" />
-              Chỉnh sửa
+              <RefreshCw className="w-4 h-4" />
             </button>
-          )}
 
-          {!hasRecords && !isFormMode && (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Tạo hồ sơ
-            </button>
-          )}
+            {/* View-only indicator */}
+            <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm">
+              <Eye className="w-4 h-4" />
+              Chỉ xem
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <p className="text-red-800">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-green-800">{success}</p>
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-red-800 font-medium">
+                Không thể tải hồ sơ y tế
+              </p>
+              <p className="text-red-700 text-sm">{error}</p>
+            </div>
           </div>
         </div>
       )}
 
       {/* Main Content */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-        {isFormMode ? (
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">
-                {hasRecords ? "Chỉnh sửa hồ sơ y tế" : "Tạo hồ sơ y tế mới"}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleCancel}
-                  disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                  Hủy
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  {saving ? (
-                    <Loader className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-4 h-4" />
-                  )}
-                  {saving ? "Đang lưu..." : "Lưu"}
-                </button>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <History className="w-4 h-4 inline mr-2" />
-                  Tiền sử bệnh lý
-                </label>
-                <textarea
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Mô tả tiền sử bệnh lý, phẫu thuật..."
-                  value={formData.medicalHistory}
-                  onChange={(e) =>
-                    updateField("medicalHistory", e.target.value)
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <AlertTriangle className="w-4 h-4 inline mr-2" />
-                  Dị ứng
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Dị ứng thuốc, thực phẩm..."
-                  value={formData.allergies}
-                  onChange={(e) => updateField("allergies", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Pill className="w-4 h-4 inline mr-2" />
-                  Thuốc đang sử dụng
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Liệt kê các loại thuốc..."
-                  value={formData.medications}
-                  onChange={(e) => updateField("medications", e.target.value)}
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Heart className="w-4 h-4 inline mr-2" />
-                  Tình trạng sức khỏe hiện tại
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Mô tả tình trạng sức khỏe..."
-                  value={formData.healthConditions}
-                  onChange={(e) =>
-                    updateField("healthConditions", e.target.value)
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <User className="w-4 h-4 inline mr-2" />
-                  Người liên hệ khẩn cấp
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="Họ và tên"
-                  value={formData.emergencyContactName}
-                  onChange={(e) =>
-                    updateField("emergencyContactName", e.target.value)
-                  }
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Phone className="w-4 h-4 inline mr-2" />
-                  Số điện thoại khẩn cấp
-                </label>
-                <input
-                  type="tel"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  placeholder="0987654321"
-                  value={formData.emergencyContactPhone}
-                  onChange={(e) =>
-                    updateField("emergencyContactPhone", e.target.value)
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        ) : hasRecords ? (
+        {hasRecords && latestRecord ? (
           <div className="p-6">
             <div className="mb-6">
               <div className="flex items-center justify-between">
@@ -396,7 +144,7 @@ const MedicalRecords: React.FC = () => {
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Calendar className="w-4 h-4" />
-                  Cập nhật: {formatDate(records[0].updatedAt)}
+                  Cập nhật: {formatDate(latestRecord.updatedAt)}
                 </div>
               </div>
             </div>
@@ -409,7 +157,7 @@ const MedicalRecords: React.FC = () => {
                     Tiền sử bệnh lý
                   </h4>
                   <p className="text-gray-700 whitespace-pre-wrap">
-                    {records[0].medicalHistory || "Chưa có thông tin"}
+                    {latestRecord.medical_history || "Chưa có thông tin"}
                   </p>
                 </div>
               </div>
@@ -421,7 +169,7 @@ const MedicalRecords: React.FC = () => {
                     Dị ứng
                   </h4>
                   <p className="text-gray-700 whitespace-pre-wrap">
-                    {records[0].allergies || "Không có dị ứng đã biết"}
+                    {latestRecord.allergies || "Không có dị ứng đã biết"}
                   </p>
                 </div>
               </div>
@@ -433,7 +181,7 @@ const MedicalRecords: React.FC = () => {
                     Thuốc đang sử dụng
                   </h4>
                   <p className="text-gray-700 whitespace-pre-wrap">
-                    {records[0].medications ||
+                    {latestRecord.medications ||
                       "Không sử dụng thuốc thường xuyên"}
                   </p>
                 </div>
@@ -446,7 +194,8 @@ const MedicalRecords: React.FC = () => {
                     Tình trạng sức khỏe hiện tại
                   </h4>
                   <p className="text-gray-700 whitespace-pre-wrap">
-                    {records[0].healthConditions || "Tình trạng sức khỏe tốt"}
+                    {latestRecord.health_conditions ||
+                      "Tình trạng sức khỏe tốt"}
                   </p>
                 </div>
               </div>
@@ -463,7 +212,7 @@ const MedicalRecords: React.FC = () => {
                         Người liên hệ:
                       </p>
                       <p className="font-medium text-gray-900">
-                        {records[0].emergencyContactName || "Chưa cung cấp"}
+                        {latestRecord.emergency_contact_name || "Chưa cung cấp"}
                       </p>
                     </div>
                     <div>
@@ -471,7 +220,8 @@ const MedicalRecords: React.FC = () => {
                         Số điện thoại:
                       </p>
                       <p className="font-medium text-gray-900">
-                        {records[0].emergencyContactPhone || "Chưa cung cấp"}
+                        {latestRecord.emergency_contact_phone ||
+                          "Chưa cung cấp"}
                       </p>
                     </div>
                   </div>
@@ -483,44 +233,57 @@ const MedicalRecords: React.FC = () => {
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <div>
                   Mã hồ sơ:{" "}
-                  <span className="font-mono">{records[0].recordCode}</span>
+                  <span className="font-mono">{latestRecord.record_code}</span>
                 </div>
-                <div>Tạo lúc: {formatDate(records[0].createdAt)}</div>
+                <div>Tạo lúc: {formatDate(latestRecord.createdAt)}</div>
               </div>
             </div>
           </div>
         ) : (
           <div className="p-12 text-center">
-            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <UserX className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               Chưa có hồ sơ y tế
             </h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Tạo hồ sơ y tế để chúng tôi có thể cung cấp dịch vụ tốt nhất cho
-              bạn.
+              Hồ sơ y tế của bạn sẽ được tạo bởi nhân viên y tế khi bạn đặt dịch
+              vụ xét nghiệm.
             </p>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Tạo hồ sơ y tế
-            </button>
+
+            {/* Contact staff info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+              <div className="flex items-center gap-3">
+                <MessageCircle className="w-5 h-5 text-blue-600" />
+                <div className="text-left">
+                  <h4 className="font-medium text-blue-900 text-sm">
+                    Cần hỗ trợ?
+                  </h4>
+                  <p className="text-blue-800 text-xs">
+                    Liên hệ nhân viên để được hỗ trợ tạo hồ sơ y tế
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Privacy Notice */}
+      {/* Info Notice for View-Only */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <Eye className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div>
             <h4 className="font-medium text-blue-900 mb-1">
-              Bảo mật thông tin
+              Thông tin quan trọng
             </h4>
+            <p className="text-sm text-blue-800 mb-2">
+              • Bạn chỉ có thể xem hồ sơ y tế, không thể chỉnh sửa
+            </p>
+            <p className="text-sm text-blue-800 mb-2">
+              • Nhân viên y tế sẽ tạo và cập nhật hồ sơ cho bạn
+            </p>
             <p className="text-sm text-blue-800">
-              Hồ sơ y tế của bạn được mã hóa và bảo mật tuyệt đối. Chúng tôi
-              tuân thủ nghiêm ngặt các quy định về bảo vệ dữ liệu cá nhân.
+              • Hồ sơ được bảo mật tuyệt đối theo quy định y tế
             </p>
           </div>
         </div>
