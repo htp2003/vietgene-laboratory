@@ -9,53 +9,102 @@ import { DoctorService } from './doctorService';
 import { UserService } from './userService';
 import { StaffService } from './staffService';
 import { StatusUtils } from '../../utils/status';
+import { OrderParticipant, OrderParticipantsService } from './orderParticipantService';
 
 export class AppointmentService {
   
-  // ✅ Get all appointments (using correct endpoint)
+  // ✅ Optimized getAllAppointments with chunk processing and error resilience
   static async getAllAppointments(): Promise<Appointment[]> {
     try {
-      console.log("📅 Fetching all appointments...");
+      console.log("📅 Fetching all appointments with optimized processing...");
 
-      const appointmentsResponse = await apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment/all");
+      const appointmentsResponse = await Promise.race([
+        apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment/all"),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('API timeout after 15s')), 15000)
+        )
+      ]) as any;
       
       if (appointmentsResponse.data.code !== 200) {
         throw new Error(`Failed to fetch appointments: ${appointmentsResponse.data.message}`);
       }
 
       const appointments = appointmentsResponse.data.result;
-      console.log("✅ Fetched appointments:", appointments.length);
+      console.log("✅ Fetched basic appointments:", appointments.length);
 
-      const enrichedAppointments = await Promise.all(
-        appointments.map(async (appointment) => {
-          try {
-            const enrichedAppointment = await this.enrichAppointmentData(appointment);
-            
-            // Restore status from localStorage if available
-            const storedStatus = StatusUtils.loadAppointmentStatus(appointment.id);
-            if (storedStatus) {
-              enrichedAppointment.status = storedStatus.status as Appointment['status'];
-              enrichedAppointment.currentStep = storedStatus.currentStep;
-              enrichedAppointment.completedSteps = storedStatus.completedSteps;
-              enrichedAppointment.lastStatusUpdate = storedStatus.lastUpdated;
-            }
-            
-            return enrichedAppointment;
-          } catch (error) {
-            console.error(`Error processing appointment ${appointment.id}:`, error);
-            return this.createBasicAppointment(appointment);
-          }
-        })
-      );
-
-      const validAppointments = enrichedAppointments.filter(Boolean) as Appointment[];
+      // ✅ Chunk processing to avoid overwhelming the API
+      const CHUNK_SIZE = 5;
+      const enrichedAppointments: Appointment[] = [];
       
-      console.log("✅ Successfully processed appointments:", validAppointments.length);
-      return validAppointments;
+      console.log(`🔄 Processing appointments in chunks of ${CHUNK_SIZE}...`);
+      
+      for (let i = 0; i < appointments.length; i += CHUNK_SIZE) {
+        const chunk = appointments.slice(i, i + CHUNK_SIZE);
+        const chunkNumber = Math.floor(i/CHUNK_SIZE) + 1;
+        const totalChunks = Math.ceil(appointments.length/CHUNK_SIZE);
+        
+        console.log(`📦 Processing chunk ${chunkNumber}/${totalChunks} (${chunk.length} appointments)`);
+        
+        // ✅ Process chunk with Promise.allSettled for error resilience
+        const enrichedChunk = await Promise.allSettled(
+          chunk.map(appointment => this.enrichAppointmentDataSafe(appointment))
+        );
+        
+        // ✅ Handle results - keep appointment even if enrichment fails
+        enrichedChunk.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            enrichedAppointments.push(result.value);
+          } else {
+            console.warn(`⚠️ Failed to enrich appointment ${chunk[index].id}:`, result.reason?.message);
+            // Create fallback appointment
+            enrichedAppointments.push(this.createBasicAppointment(chunk[index]));
+          }
+        });
+        
+        // ✅ Brief delay between chunks to avoid API overload
+        if (i + CHUNK_SIZE < appointments.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+
+      // ✅ Restore status from localStorage
+      enrichedAppointments.forEach(appointment => {
+        const storedStatus = StatusUtils.loadAppointmentStatus(appointment.id);
+        if (storedStatus) {
+          appointment.status = storedStatus.status as Appointment['status'];
+          appointment.currentStep = storedStatus.currentStep;
+          appointment.completedSteps = storedStatus.completedSteps;
+          appointment.lastStatusUpdate = storedStatus.lastUpdated;
+        }
+      });
+
+      const successfulEnrichments = enrichedAppointments.filter(a => a.customerName !== 'Loading...').length;
+      console.log(`✅ Successfully processed ${enrichedAppointments.length} appointments (${successfulEnrichments} with full data)`);
+      
+      return enrichedAppointments;
 
     } catch (error) {
       console.error("❌ Error fetching appointments:", error);
       throw new Error(error instanceof Error ? error.message : "Failed to fetch appointments");
+    }
+  }
+
+  // ✅ Safe enrichment with timeout and fallback
+  static async enrichAppointmentDataSafe(appointment: ApiAppointment): Promise<Appointment> {
+    try {
+      // ✅ Timeout wrapper for the entire enrichment process
+      const enrichmentPromise = this.enrichAppointmentData(appointment);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Enrichment timeout for appointment ${appointment.id}`)), 8000)
+      );
+
+      const enrichedAppointment = await Promise.race([enrichmentPromise, timeoutPromise]) as Appointment;
+      
+      return enrichedAppointment;
+      
+    } catch (error) {
+      console.warn(`⚠️ Enrichment failed for appointment ${appointment.id}, using fallback:`, error);
+      return this.createBasicAppointment(appointment);
     }
   }
 
@@ -64,11 +113,16 @@ export class AppointmentService {
     try {
       console.log(`🔍 Fetching appointment ${appointmentId}...`);
 
-      const response = await apiClient.get<ApiResponse<ApiAppointment>>(`/appointment/${appointmentId}`);
+      const response = await Promise.race([
+        apiClient.get<ApiResponse<ApiAppointment>>(`/appointment/${appointmentId}`),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 10000)
+        )
+      ]) as any;
 
       if (response.data.code === 200) {
         const apiAppointment = response.data.result;
-        const enrichedAppointment = await this.enrichAppointmentData(apiAppointment);
+        const enrichedAppointment = await this.enrichAppointmentDataSafe(apiAppointment);
         
         const storedStatus = StatusUtils.loadAppointmentStatus(appointmentId);
         if (storedStatus) {
@@ -193,62 +247,141 @@ export class AppointmentService {
     }
   }
 
-  // ✅ Enrich appointment data with related information
+  // ✅ Optimized enrichAppointmentData with better error handling
   static async enrichAppointmentData(appointment: ApiAppointment): Promise<Appointment> {
     try {
-      // Get user data
-      const user = await UserService.getUserById(appointment.userId);
+      console.log(`🔍 Enriching appointment ${appointment.id}...`);
 
-      // Get doctor info if doctor_time_slot is available
-      let doctorInfo: Appointment['doctorInfo'] | undefined;
-      
-      if (appointment.doctor_time_slot) {
-        try {
-          const timeSlot = await DoctorService.getDoctorTimeSlot(appointment.doctor_time_slot);
-          if (timeSlot) {
-            const doctor = await DoctorService.getDoctorById(timeSlot.doctorId);
-            if (doctor) {
-              doctorInfo = {
-                name: doctor.doctorName,
-                timeSlot: DoctorService.formatTimeSlot(timeSlot),
-                dayOfWeek: DoctorService.formatDayOfWeek(timeSlot.dayOfWeek)
-              };
-            }
-          }
-        } catch (error) {
-          console.warn(`Could not fetch doctor info for appointment ${appointment.id}:`, error);
-        }
+      // ✅ Parallel data fetching with individual error handling
+      const [userResult, doctorResult, orderResult] = await Promise.allSettled([
+        // User data (most important)
+        UserService.getUserById(appointment.userId),
+        
+        // Doctor info (optional)
+        appointment.doctor_time_slot ? this.fetchDoctorInfo(appointment.doctor_time_slot) : Promise.resolve(undefined),
+        
+        // Order/Service data (optional)
+        appointment.orderId ? this.fetchOrderAndServiceInfo(appointment.orderId) : Promise.resolve({ order: undefined, service: undefined, participants: [] })
+      ]);
+
+      // ✅ Extract results with fallbacks
+      const user = userResult.status === 'fulfilled' ? userResult.value : null;
+      const doctorInfo = doctorResult.status === 'fulfilled' ? doctorResult.value : undefined;
+      const { order, service, participants } = orderResult.status === 'fulfilled' ? orderResult.value : { order: undefined, service: undefined, participants: [] };
+
+      if (!user) {
+        console.warn(`⚠️ Could not fetch user data for appointment ${appointment.id}`);
       }
 
-      // Try to get related order and service data
-      let order: any = undefined;
-      let service: any = undefined;
-
-      try {
-        if (appointment.orderId) {
-          const orderResponse = await apiClient.get(`/orders/${appointment.orderId}`);
-          if (orderResponse.data.code === 200) {
-            order = orderResponse.data.result;
-            
-            // Try to get service info from order details
-            const orderDetailsResponse = await apiClient.get(`/order-details/${appointment.orderId}/all`);
-            if (orderDetailsResponse.data.code === 200 && orderDetailsResponse.data.result.length > 0) {
-              const orderDetail = orderDetailsResponse.data.result[0];
-              service = await StaffService.getServiceById(orderDetail.dnaServiceId);
-            }
-          }
-        }
-      } catch (error) {
-        console.warn(`Could not fetch order/service data for appointment ${appointment.id}:`, error);
-      }
-
-      return this.mapToFrontendAppointment(appointment, user, service, doctorInfo, order);
+      return this.mapToFrontendAppointment(appointment, user, service, doctorInfo, order, participants);
 
     } catch (error) {
-      console.error(`Error enriching appointment ${appointment.id}:`, error);
+      console.error(`❌ Error enriching appointment ${appointment.id}:`, error);
       throw error;
     }
   }
+
+  // ✅ Separate doctor info fetching with timeout
+  static async fetchDoctorInfo(doctorTimeSlotId: string): Promise<Appointment['doctorInfo'] | undefined> {
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Doctor info timeout')), 3000)
+      );
+
+      const timeSlot = await Promise.race([
+        DoctorService.getDoctorTimeSlot(doctorTimeSlotId),
+        timeoutPromise
+      ]) as any;
+      
+      if (timeSlot) {
+        const doctor = await Promise.race([
+          DoctorService.getDoctorById(timeSlot.doctorId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Doctor fetch timeout')), 3000))
+        ]) as any;
+        
+        if (doctor) {
+          return {
+            name: doctor.doctorName,
+            timeSlot: DoctorService.formatTimeSlot(timeSlot),
+            dayOfWeek: DoctorService.formatDayOfWeek(timeSlot.dayOfWeek)
+          };
+        }
+      }
+      
+      return undefined;
+      
+    } catch (error) {
+      console.warn(`⚠️ Could not fetch doctor info for time slot ${doctorTimeSlotId}:`, error);
+      return undefined;
+    }
+  }
+
+  // ✅ Separate order/service info fetching with timeout
+  static async fetchOrderAndServiceInfo(orderId: string): Promise<{ order?: any, service?: any, participants?: any[] }> {
+  try {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Order info timeout')), 4000)
+    );
+
+    const orderResponse = await Promise.race([
+      apiClient.get(`/orders/${orderId}`),
+      timeoutPromise
+    ]) as any;
+    
+    if (orderResponse.data.code !== 200) {
+      return { order: undefined, service: undefined, participants: [] };
+    }
+    
+    const order = orderResponse.data.result;
+    
+    // ✅ Parallel loading of service info and participants
+    const [serviceResult, participantsResult] = await Promise.allSettled([
+      // Load service info
+      (async () => {
+        try {
+          const orderDetailsResponse = await Promise.race([
+            apiClient.get(`/order-details/${orderId}/all`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Order details timeout')), 3000))
+          ]) as any;
+          
+          if (orderDetailsResponse.data.code === 200 && orderDetailsResponse.data.result.length > 0) {
+            const orderDetail = orderDetailsResponse.data.result[0];
+            const service = await Promise.race([
+              StaffService.getServiceById(orderDetail.dnaServiceId),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Service timeout')), 3000))
+            ]);
+            
+            return service;
+          }
+          return undefined;
+        } catch (error) {
+          console.warn(`⚠️ Could not fetch service data for order ${orderId}:`, error);
+          return undefined;
+        }
+      })(),
+      
+      // Load participants
+      (async () => {
+        try {
+          const participants = await OrderParticipantsService.getParticipantsByOrderIdCached(orderId);
+          return participants;
+        } catch (error) {
+          console.warn(`⚠️ Could not fetch participants for order ${orderId}:`, error);
+          return [];
+        }
+      })()
+    ]);
+    
+    const service = serviceResult.status === 'fulfilled' ? serviceResult.value : undefined;
+    const participants = participantsResult.status === 'fulfilled' ? participantsResult.value : [];
+    
+    return { order, service, participants };
+    
+  } catch (error) {
+    console.warn(`⚠️ Could not fetch order data for order ${orderId}:`, error);
+    return { order: undefined, service: undefined, participants: [] };
+  }
+}
 
   // ✅ Map API appointment to frontend appointment
   static mapToFrontendAppointment(
@@ -256,7 +389,8 @@ export class AppointmentService {
     user: any,
     service: any,
     doctorInfo?: Appointment['doctorInfo'],
-    order?: any
+    order?: any,
+    participants?: OrderParticipant[]
   ): Appointment {
     
     const appointmentDate = new Date(appointment.appointment_date);
@@ -264,7 +398,7 @@ export class AppointmentService {
     
     return {
       id: appointment.id,
-      customerName: user?.full_name || user?.username || 'N/A',
+      customerName: user?.full_name || user?.username || 'Unknown Customer',
       phone: 'N/A', // Not available in user schema, might need to get from other source
       email: user?.email || 'N/A',
       date: appointmentDate.toISOString().split('T')[0],
@@ -285,18 +419,19 @@ export class AppointmentService {
         appointment,
         order,
         service: service || undefined,
-        user: user || undefined
+        user: user || undefined,
+        participants: participants || []
       }
     };
   }
 
-  // ✅ Create basic appointment (fallback)
+  // ✅ Enhanced createBasicAppointment (fallback)
   static createBasicAppointment(appointment: ApiAppointment): Appointment {
     const appointmentDate = new Date(appointment.appointment_date);
 
     return {
       id: appointment.id,
-      customerName: 'Loading...',
+      customerName: 'Loading...', // Indicator that user data failed to load
       phone: 'N/A',
       email: 'N/A',
       date: appointmentDate.toISOString().split('T')[0],
@@ -304,9 +439,12 @@ export class AppointmentService {
       serviceType: appointment.appointment_type,
       serviceName: appointment.appointment_type,
       status: appointment.status ? 'Confirmed' : 'Pending',
-      locationType: 'Cơ sở y tế',
-      legalType: 'Dân Sự',
+      locationType: 'Cơ sở y tế', // Default fallback
+      legalType: 'Dân Sự', // Default fallback
       notes: appointment.notes || '',
+      currentStep: appointment.status ? 2 : 1,
+      // completedSteps: appointment.status ? [1, 2] : [1],
+      lastStatusUpdate: appointment.updatedAt || appointment.createdAt,
       rawData: {
         appointment
       }
