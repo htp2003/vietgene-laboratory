@@ -11,11 +11,18 @@ import {
   XCircle, 
   ArrowRight,
   Stethoscope,
-  UserCheck
+  UserCheck,
+  Truck,
+  Package,
+  TestTube,
+  AlertCircle
 } from 'lucide-react';
 
 // ✅ Import shared types
 import { Appointment, AppointmentCardProps } from '../../types/appointment';
+import { Users } from 'lucide-react';
+import { OrderParticipantsService, OrderParticipant } from '../../services/staffService/orderParticipantService';
+import { useState, useEffect } from 'react';
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
   appointment,
@@ -24,7 +31,108 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
   onCancel,
   onUpdateStatus
 }) => {
+
+  const [participants, setParticipants] = useState<OrderParticipant[]>([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+
+  useEffect(() => {
+  if (appointment.rawData?.order?.orderId) {
+    loadParticipants(appointment.rawData.order.orderId);
+  }
+}, [appointment.id]);
+
+  const loadParticipants = async (orderId: string) => {
+  try {
+    setLoadingParticipants(true);
+    const participantsList = await OrderParticipantsService.getParticipantsByOrderIdCached(orderId);
+    setParticipants(participantsList);
+  } catch (error) {
+    console.error('Error loading participants:', error);
+  } finally {
+    setLoadingParticipants(false);
+  }
+};
+
   
+  // ✅ Define steps for different service types (same as modal)
+  const getStepsConfig = (locationType: string) => {
+    if (locationType === 'Tại nhà') {
+      // Steps for home service
+      return [
+        { 
+          key: 'Pending', 
+          label: 'Đặt lịch', 
+          icon: Calendar, 
+          description: 'Khách hàng đặt lịch hẹn' 
+        },
+        { 
+          key: 'DeliveringKit', 
+          label: 'Giao kit', 
+          icon: Truck, 
+          description: 'Đang giao kit xét nghiệm' 
+        },
+        { 
+          key: 'KitDelivered', 
+          label: 'Đã giao kit', 
+          icon: Package, 
+          description: 'Kit đã được giao thành công' 
+        },
+        { 
+          key: 'SampleReceived', 
+          label: 'Nhận mẫu', 
+          icon: TestTube, 
+          description: 'Đã nhận mẫu từ khách hàng' 
+        },
+        { 
+          key: 'Testing', 
+          label: 'Xét nghiệm', 
+          icon: AlertCircle, 
+          description: 'Đang tiến hành xét nghiệm' 
+        },
+        { 
+          key: 'Completed', 
+          label: 'Hoàn thành', 
+          icon: CheckCircle, 
+          description: 'Có kết quả xét nghiệm' 
+        }
+      ];
+    } else {
+      // Steps for facility service
+      return [
+        { 
+          key: 'Pending', 
+          label: 'Đặt lịch', 
+          icon: Calendar, 
+          description: 'Khách hàng đặt lịch hẹn' 
+        },
+        { 
+          key: 'Confirmed', 
+          label: 'Check-in', 
+          icon: User, 
+          description: 'Khách hàng check-in tại cơ sở' 
+        },
+        { 
+          key: 'SampleReceived', 
+          label: 'Nhận mẫu', 
+          icon: TestTube, 
+          description: 'Thu thập mẫu xét nghiệm' 
+        },
+        { 
+          key: 'Testing', 
+          label: 'Xét nghiệm', 
+          icon: AlertCircle, 
+          description: 'Đang tiến hành xét nghiệm' 
+        },
+        { 
+          key: 'Completed', 
+          label: 'Hoàn thành', 
+          icon: CheckCircle, 
+          description: 'Có kết quả xét nghiệm' 
+        }
+      ];
+    }
+  };
+
   // Status configuration
   const getStatusConfig = (status: string) => {
     const configs = {
@@ -41,22 +149,22 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       'DeliveringKit': { 
         color: 'bg-purple-100 text-purple-800 border-purple-200', 
         label: 'Đang giao kit',
-        icon: ArrowRight
+        icon: Truck
       },
       'KitDelivered': { 
         color: 'bg-indigo-100 text-indigo-800 border-indigo-200', 
         label: 'Đã giao kit',
-        icon: CheckCircle
+        icon: Package
       },
       'SampleReceived': { 
         color: 'bg-cyan-100 text-cyan-800 border-cyan-200', 
         label: 'Đã nhận mẫu',
-        icon: CheckCircle
+        icon: TestTube
       },
       'Testing': { 
         color: 'bg-orange-100 text-orange-800 border-orange-200', 
         label: 'Đang xét nghiệm',
-        icon: ArrowRight
+        icon: AlertCircle
       },
       'Completed': { 
         color: 'bg-green-100 text-green-800 border-green-200', 
@@ -72,23 +180,42 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     return configs[status] || configs['Pending'];
   };
 
-  // Get next possible status for progression
+  // Get next possible status for progression based on location type
   const getNextStatus = (currentStatus: string, locationType: string): string | null => {
-    const statusFlow = {
-      'Pending': locationType === 'Tại nhà' ? 'DeliveringKit' : 'Confirmed',
-      'Confirmed': 'SampleReceived',
-      'DeliveringKit': 'KitDelivered',
-      'KitDelivered': 'SampleReceived',
-      'SampleReceived': 'Testing',
-      'Testing': 'Completed'
-    };
-    return statusFlow[currentStatus] || null;
+    if (locationType === 'Tại nhà') {
+      const homeStatusFlow = {
+        'Pending': 'DeliveringKit',
+        'DeliveringKit': 'KitDelivered',
+        'KitDelivered': 'SampleReceived',
+        'SampleReceived': 'Testing',
+        'Testing': 'Completed'
+      };
+      return homeStatusFlow[currentStatus] || null;
+    } else {
+      const facilityStatusFlow = {
+        'Pending': 'Confirmed',
+        'Confirmed': 'SampleReceived',
+        'SampleReceived': 'Testing',
+        'Testing': 'Completed'
+      };
+      return facilityStatusFlow[currentStatus] || null;
+    }
+  };
+
+  // ✅ Get appropriate step configuration based on location type
+  const steps = getStepsConfig(appointment.locationType);
+  const getCurrentStepIndex = () => {
+    const index = steps.findIndex(step => step.key === appointment.status);
+    return index >= 0 ? index : 0;
   };
 
   const statusConfig = getStatusConfig(appointment.status);
   const StatusIcon = statusConfig.icon;
   const nextStatus = getNextStatus(appointment.status, appointment.locationType);
+  const currentStepIndex = getCurrentStepIndex();
+  
 
+  
   // Format date and time
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -213,30 +340,114 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         </div>
       )}
 
-      {/* ✅ Progress Steps - only show for confirmed appointments */}
-      {appointment.currentStep && appointment.currentStep > 1 && (
+      {participants.length > 0 && (
+  <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+    <div className="flex items-center gap-2 mb-2">
+      <Users className="w-4 h-4 text-indigo-600" />
+      <span className="text-sm font-medium text-indigo-800">
+        Người tham gia xét nghiệm ({participants.length})
+      </span>
+    </div>
+    
+    <div className="space-y-2">
+      {participants.slice(0, 2).map((participant, index) => (
+        <div key={participant.id} className="flex items-center justify-between text-sm">
+          <div className="text-indigo-900">
+            <span className="font-medium">{participant.participant_name}</span>
+            {participant.age && (
+              <span className="text-indigo-700"> ({participant.age} tuổi)</span>
+            )}
+          </div>
+          <span className="text-indigo-600 text-xs px-2 py-1 bg-indigo-100 rounded">
+            {OrderParticipantsService.getRelationshipDisplayText(participant.relationship)}
+          </span>
+        </div>
+      ))}
+      
+      {participants.length > 2 && (
+        <div className="text-xs text-indigo-600 font-medium">
+          +{participants.length - 2} người khác
+        </div>
+      )}
+    </div>
+    
+    {loadingParticipants && (
+      <div className="text-xs text-indigo-600 italic">
+        Đang tải thông tin người tham gia...
+      </div>
+    )}
+  </div>
+)}
+
+      {/* ✅ Updated Progress Steps - using dynamic steps based on location type */}
+      {appointment.status !== 'Pending' && appointment.status !== 'Cancelled' && (
         <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Tiến trình</p>
-          <div className="flex items-center gap-2">
-            {[
-              { step: 1, label: 'Đặt lịch', icon: Calendar },
-              { step: 2, label: 'Xác nhận', icon: CheckCircle },
-              { step: 3, label: 'Lấy mẫu', icon: User },
-              { step: 4, label: 'Xét nghiệm', icon: ArrowRight },
-              { step: 5, label: 'Hoàn thành', icon: CheckCircle }
-            ].map(({ step, label, icon: StepIcon }) => (
-              <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  step <= (appointment.currentStep || 1)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  <StepIcon className="w-4 h-4" />
-                </div>
-                <span className="text-xs text-gray-600 ml-1 mr-2">{label}</span>
-                {step < 5 && <ArrowRight className="w-3 h-3 text-gray-400" />}
+          <p className="text-sm font-medium text-gray-700 mb-3">
+            Tiến trình {appointment.locationType === 'Tại nhà' ? '(Tại nhà)' : '(Tại cơ sở)'}
+          </p>
+          
+          {/* Compact progress stepper */}
+          <div className="w-full">
+            <div className="flex items-center justify-between relative">
+              {/* Progress Line */}
+              <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 z-0">
+                <div 
+                  className={`h-full transition-all duration-500 ${
+                    appointment.locationType === 'Tại nhà'
+                      ? 'bg-gradient-to-r from-blue-500 to-green-500'
+                      : 'bg-gradient-to-r from-purple-500 to-blue-500'
+                  }`}
+                  style={{ width: `${(currentStepIndex / (steps.length - 1)) * 100}%` }}
+                />
               </div>
-            ))}
+
+              {steps.map((step, index) => {
+                const StepIcon = step.icon;
+                const isCompleted = index < currentStepIndex;
+                const isCurrent = index === currentStepIndex;
+
+                return (
+                  <div key={step.key} className="flex flex-col items-center relative z-10">
+                    <div className={`
+                      w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm
+                      ${isCompleted 
+                        ? appointment.locationType === 'Tại nhà'
+                          ? 'bg-green-500 text-white shadow-lg transform scale-110'
+                          : 'bg-blue-500 text-white shadow-lg transform scale-110'
+                        : isCurrent 
+                          ? appointment.locationType === 'Tại nhà'
+                            ? 'bg-blue-500 text-white shadow-lg ring-2 ring-blue-100 transform scale-110'
+                            : 'bg-purple-500 text-white shadow-lg ring-2 ring-purple-100 transform scale-110'
+                          : 'bg-gray-200 text-gray-400'
+                      }
+                    `}>
+                      <StepIcon className="w-3 h-3" />
+                    </div>
+                    
+                    <div className="mt-1 text-center max-w-16">
+                      <div className={`text-xs font-medium transition-colors duration-300 ${
+                        isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                      }`}>
+                        {step.label}
+                      </div>
+                    </div>
+                    
+                    {/* Progress indicator dot */}
+                    {(isCompleted || isCurrent) && (
+                      <div className={`absolute -bottom-1 w-1 h-1 rounded-full ${
+                        isCompleted 
+                          ? appointment.locationType === 'Tại nhà' 
+                            ? 'bg-green-500' 
+                            : 'bg-blue-500'
+                          : appointment.locationType === 'Tại nhà'
+                            ? 'bg-blue-500'
+                            : 'bg-purple-500'
+                      } animate-pulse`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

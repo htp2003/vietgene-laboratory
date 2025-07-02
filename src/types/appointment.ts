@@ -1,3 +1,4 @@
+import { OrderParticipant } from "../services/staffService/orderParticipantService";
 
 
 export interface TestResult {
@@ -395,6 +396,7 @@ export interface Appointment {
     user?: ApiUser;
     doctor?: ApiDoctor;
     timeSlot?: ApiDoctorTimeSlot;
+    participants?: OrderParticipant[];
   };
 }
 
