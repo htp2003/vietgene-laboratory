@@ -12,11 +12,11 @@ import {
   Phone,
   Mail,
   Settings,
-  Loader,
   Search,
   User,
   RefreshCw,
 } from "lucide-react";
+
 import { authService } from "../../services/authService";
 import { orderService } from "../../services/orderService";
 import { formatPrice } from "../../services/serviceService";
@@ -65,18 +65,61 @@ interface Order {
   } | null;
 }
 
+// Progress Loading Component
+const ProgressLoader: React.FC<{
+  progress: number;
+  message: string;
+  subMessage?: string;
+}> = ({ progress, message, subMessage }) => {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center max-w-md w-full px-6">
+        {/* Logo or Icon */}
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Package className="w-8 h-8 text-red-600" />
+        </div>
+
+        {/* Main Message */}
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">{message}</h2>
+
+        {/* Sub Message */}
+        {subMessage && <p className="text-gray-600 mb-6">{subMessage}</p>}
+
+        {/* Progress Bar */}
+        <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-red-500 to-red-600 h-3 rounded-full transition-all duration-500 ease-out relative"
+            style={{ width: `${progress}%` }}
+          >
+            {/* Animated shine effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Progress Percentage */}
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-500">Đang tải dữ liệu...</span>
+          <span className="font-medium text-red-600">{progress}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CustomerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState("Đang khởi tạo...");
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Mock notifications (sẽ replace bằng real API sau)
+  // Mock notifications
   const [notifications] = useState([
     {
       id: 1,
@@ -104,7 +147,32 @@ const CustomerDashboard: React.FC = () => {
     },
   ]);
 
-  // Load dashboard data
+  // Simulate loading progress
+  const simulateProgress = (
+    targetProgress: number,
+    message: string,
+    duration: number = 1000
+  ) => {
+    return new Promise<void>((resolve) => {
+      setLoadingMessage(message);
+      const startProgress = loadingProgress;
+      const progressDiff = targetProgress - startProgress;
+      const stepTime = duration / Math.abs(progressDiff);
+
+      let currentProgress = startProgress;
+      const interval = setInterval(() => {
+        currentProgress += progressDiff > 0 ? 1 : -1;
+        setLoadingProgress(currentProgress);
+
+        if (currentProgress === targetProgress) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, stepTime);
+    });
+  };
+
+  // Load dashboard data with progress simulation
   useEffect(() => {
     loadDashboardData();
   }, [navigate]);
@@ -112,25 +180,31 @@ const CustomerDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setLoadingProgress(0);
       setError(null);
 
-      // Check authentication
+      // Step 1: Check authentication
+      await simulateProgress(15, "Đang xác thực người dùng...", 300);
       if (!authService.isAuthenticated()) {
         navigate("/login");
         return;
       }
 
-      // Get current user
+      // Step 2: Get current user
+      await simulateProgress(30, "Đang tải thông tin tài khoản...", 400);
       const user = authService.getCurrentUser();
       if (!user) {
         navigate("/login");
         return;
       }
       setCurrentUser(user);
-      console.log("👤 Current user:", user);
 
-      // Load user orders from real API
+      // Step 3: Load user orders
+      await simulateProgress(50, "Đang tải danh sách đơn hàng...", 500);
       await loadUserOrders(user.id);
+
+      // Step 4: Complete
+      await simulateProgress(100, "Hoàn tất!", 300);
 
       console.log("✅ Dashboard loaded successfully");
     } catch (err) {
@@ -141,22 +215,39 @@ const CustomerDashboard: React.FC = () => {
           : "Không thể tải dữ liệu dashboard. Vui lòng thử lại sau."
       );
     } finally {
-      setLoading(false);
+      // Small delay to show 100% completion
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
   };
+
   const loadUserOrders = async (userId: string) => {
     try {
       console.log("🔍 Loading orders for user:", userId);
 
-      // Call real API to get user orders
+      // Update progress during order loading
+      setLoadingMessage("Đang tải đơn hàng từ server...");
       const userOrders = await orderService.getUserOrders(userId);
+
+      await simulateProgress(70, "Đang xử lý dữ liệu đơn hàng...", 300);
       console.log("📦 Raw orders from API:", userOrders);
 
       if (userOrders && userOrders.length > 0) {
+        await simulateProgress(85, "Đang tải chi tiết đơn hàng...", 400);
+
         // Transform and enhance orders with additional data
         const enhancedOrders = await Promise.all(
-          userOrders.map(async (apiOrder: any) => {
+          userOrders.map(async (apiOrder: any, index: number) => {
             try {
+              // Update progress for each order
+              const progressStep = Math.floor(5 / userOrders.length);
+              await simulateProgress(
+                85 + (index + 1) * progressStep,
+                `Đang xử lý đơn hàng ${index + 1}/${userOrders.length}...`,
+                200
+              );
+
               // ✅ FIX: Use the corrected getCompleteOrderData method
               const completeOrderData = await orderService.getCompleteOrderData(
                 apiOrder.orderId || apiOrder.id
@@ -309,22 +400,17 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  // ===== ENHANCED: Calculate progress with appointment data =====
-
   const calculateOrderProgress = (
     status: string,
     samples: any[],
     appointment: any
   ): number => {
     const baseProgress = getStatusInfo(status).progress;
-
-    // Factor in appointment status
     let appointmentProgress = 0;
     if (appointment) {
-      appointmentProgress = appointment.status ? 30 : 20; // Confirmed vs scheduled
+      appointmentProgress = appointment.status ? 30 : 20;
     }
 
-    // Factor in sample progress
     let sampleProgress = 0;
     if (samples && samples.length > 0) {
       const sampleProgressMap: Record<string, number> = {
@@ -343,43 +429,35 @@ const CustomerDashboard: React.FC = () => {
         }, 0) / samples.length;
     }
 
-    // Return the highest progress value
     return Math.max(baseProgress, appointmentProgress, sampleProgress);
   };
 
-  // Helper function to get service name from order details
   const getServiceNameFromOrderDetails = (orderDetails: any[]): string => {
     if (!orderDetails || orderDetails.length === 0) {
       return "Xét nghiệm DNA";
     }
-
-    // You can enhance this to map service IDs to actual names
-    const serviceId = orderDetails[0]?.dnaServiceId;
-
-    // For now, return generic names based on common patterns
-    const serviceNames: Record<string, string> = {
-      paternity: "Xét nghiệm quan hệ cha con",
-      sibling: "Xét nghiệm anh chị em ruột",
-      grandparent: "Xét nghiệm quan hệ ông bà cháu",
-      maternity: "Xét nghiệm quan hệ mẹ con",
-    };
-
-    // Default service name
     return "Xét nghiệm quan hệ huyết thống DNA";
   };
 
-  // Refresh orders
+  // Refresh with progress
   const handleRefresh = async () => {
     if (!currentUser) return;
 
     try {
       setRefreshing(true);
+      setLoadingProgress(0);
+
+      await simulateProgress(30, "Đang làm mới dữ liệu...", 300);
       await loadUserOrders(currentUser.id);
+      await simulateProgress(100, "Làm mới hoàn tất!", 200);
     } catch (error) {
       console.error("❌ Error refreshing orders:", error);
       setError("Không thể làm mới dữ liệu");
     } finally {
-      setRefreshing(false);
+      setTimeout(() => {
+        setRefreshing(false);
+        setLoadingProgress(0);
+      }, 300);
     }
   };
 
@@ -387,12 +465,10 @@ const CustomerDashboard: React.FC = () => {
   useEffect(() => {
     let filtered = orders;
 
-    // Apply status filter
     if (activeFilter !== "all") {
       filtered = filtered.filter((order) => order.status === activeFilter);
     }
 
-    // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(
         (order) =>
@@ -501,20 +577,37 @@ const CustomerDashboard: React.FC = () => {
     },
   ];
 
-  // Loading state
+  // Show progress loader during initial loading
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="w-12 h-12 text-red-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Đang tải dashboard...</p>
-        </div>
-      </div>
+      <ProgressLoader
+        progress={loadingProgress}
+        message={loadingMessage}
+        subMessage="Vui lòng đợi trong giây lát..."
+      />
     );
   }
 
+  // Show mini progress bar during refresh
+  const MiniProgressBar = () => {
+    if (!refreshing) return null;
+
+    return (
+      <div className="fixed top-0 left-0 w-full z-50">
+        <div className="h-1 bg-gray-200">
+          <div
+            className="h-1 bg-red-600 transition-all duration-300"
+            style={{ width: `${loadingProgress}%` }}
+          ></div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <MiniProgressBar />
+
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Page Title */}
         <div className="mb-8">
@@ -744,17 +837,20 @@ const CustomerDashboard: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Progress Bar */}
+                          {/* Enhanced Progress Bar */}
                           <div className="mb-4">
                             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
                               <span>Tiến độ</span>
                               <span>{progress}%</span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                               <div
-                                className="bg-red-600 h-2 rounded-full transition-all duration-300"
+                                className="bg-gradient-to-r from-red-500 to-red-600 h-3 rounded-full transition-all duration-500 ease-out relative"
                                 style={{ width: `${progress}%` }}
-                              ></div>
+                              >
+                                {/* Animated shine effect */}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-pulse"></div>
+                              </div>
                             </div>
                           </div>
 
@@ -876,8 +972,6 @@ const CustomerDashboard: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Debug Info (remove in production) */}
       </div>
     </div>
   );

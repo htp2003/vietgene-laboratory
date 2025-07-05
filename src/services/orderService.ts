@@ -2,34 +2,70 @@ import axios from "axios";
 
 const API_BASE_URL = "https://dna-service-se1857.onrender.com/dna_service";
 
-// API Client setup
+// ✅ OPTIMIZED: Increased timeout and better config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000, // Increased to 30s
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
 });
 
-// Add auth token to requests
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// ✅ OPTIMIZED: Better request interceptor
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
-// Response interceptor for better error handling
-apiClient.interceptors.response.use(
-  (response) => response,
+    // Add request logging for debugging
+    console.log(
+      `🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`
+    );
+    return config;
+  },
   (error) => {
-    console.error("API Error:", error.response?.data || error.message);
+    console.error("❌ Request interceptor error:", error);
     return Promise.reject(error);
   }
 );
 
+// ✅ OPTIMIZED: Better response interceptor with retry logic
+apiClient.interceptors.response.use(
+  (response) => {
+    console.log(`✅ API Response: ${response.config.url} - ${response.status}`);
+    return response;
+  },
+  async (error) => {
+    const config = error.config;
+
+    // Retry logic for network errors
+    if (!config.__retryCount) {
+      config.__retryCount = 0;
+    }
+
+    if (
+      config.__retryCount < 2 &&
+      (error.code === "ECONNABORTED" || error.response?.status >= 500)
+    ) {
+      config.__retryCount += 1;
+      console.log(
+        `🔄 Retrying request (${config.__retryCount}/2): ${config.url}`
+      );
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * config.__retryCount)
+      );
+      return apiClient(config);
+    }
+
+    console.error("❌ API Error:", error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+);
+
+// ✅ UPDATED V9 Interfaces
 export interface Doctor {
   userId: string;
   doctorId: string;
@@ -57,14 +93,32 @@ export interface Sample {
   sample_code: string;
   sample_type: string;
   collection_method: string;
-  collection_date: string;
-  received_date: string | null;
+  collection_date?: string;
+  received_date?: string;
   status: string;
-  shipping_tracking: string;
-  notes: string;
-  sample_quality: string;
+  shipping_tracking?: string;
+  notes?: string;
+  sample_quality?: string;
   userId: string;
-  orderId: string;
+  sampleKitsId: string; // V9: Single kit ID reference
+}
+
+export interface SampleKit {
+  id: string;
+  kit_code: string;
+  kit_type: string;
+  status: string;
+  shipper_data?: string;
+  delivered_date?: string;
+  tracking_number?: number;
+  shipping_address: string;
+  expiry_date?: string;
+  instruction?: string;
+  createdAt: string;
+  updatedAt?: string;
+  samplesId: string; // V9: Single sample ID reference
+  userId: string;
+  orderId: string; // V9: Direct order reference
 }
 
 export interface CreateOrderRequest {
@@ -96,22 +150,41 @@ export interface CreateOrderRequest {
     method: "cash" | "card" | "transfer";
   };
 }
-class OrderService {
-  // ===== DOCTORS =====
 
+class OrderService {
+  // ===== UTILITY METHODS =====
+  private getCurrentUserId(): string {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return user.id || "unknown-user";
+    } catch {
+      return "unknown-user";
+    }
+  }
+
+  private generateUniqueCode(prefix: string, orderId?: string): string {
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0");
+    const orderSuffix = orderId ? orderId.slice(-4) : "";
+    return `${prefix}_${timestamp}_${random}_${orderSuffix}`;
+  }
+
+  // ✅ OPTIMIZED: Parallel API calls for better performance
   async getAllDoctors(): Promise<Doctor[]> {
     try {
       console.log("🔍 Fetching doctors from API...");
+      const startTime = Date.now();
+
       const response = await apiClient.get("/doctors");
+
+      console.log(`✅ Doctors API completed in ${Date.now() - startTime}ms`);
 
       if (response.data.code === 200) {
         const doctors = response.data.result || [];
         console.log("✅ Doctors loaded:", doctors.length);
-        console.log("✅ Raw doctors data:", doctors);
-
-        // Temporarily return all doctors without filtering
-        // Later you can add filter if needed: .filter((doctor: Doctor) => doctor.isActive !== false)
-        return doctors;
+        return doctors.filter((doctor: Doctor) => doctor.isActive !== false);
       }
 
       throw new Error("Failed to fetch doctors");
@@ -123,13 +196,17 @@ class OrderService {
       throw new Error("Không thể tải danh sách bác sĩ. Vui lòng thử lại sau.");
     }
   }
-  // ===== TIME SLOTS =====
+
   async getDoctorTimeSlots(doctorId: string): Promise<TimeSlot[]> {
     try {
       console.log("🔍 Fetching time slots for doctor:", doctorId);
+      const startTime = Date.now();
+
       const response = await apiClient.get(
         `/doctor-time-slots/doctor/${doctorId}`
       );
+
+      console.log(`✅ Time slots API completed in ${Date.now() - startTime}ms`);
 
       if (response.data.code === 200) {
         const timeSlots = response.data.result || [];
@@ -149,37 +226,32 @@ class OrderService {
     }
   }
 
-  // ===== USER REGISTRATION =====
+  // ✅ OPTIMIZED: Better user handling
   private async handleUserRegistration(userData: {
     fullName: string;
     phone: string;
     email: string;
   }): Promise<string> {
     try {
-      // Check if user is already logged in
       const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
       const token = localStorage.getItem("token");
 
       console.log("🔍 Current user:", currentUser);
-      console.log("🔍 Token exists:", !!token);
 
       if (currentUser.id && token) {
         console.log("✅ Using current logged in user:", currentUser.id);
         return currentUser.id;
       }
 
-      // If no user logged in, try to register or use guest mode
       console.log("⚠️ No user logged in, creating guest order");
-
-      // For now, return a guest user ID - you may want to implement proper registration
       return "guest_user_" + Date.now();
     } catch (error: any) {
       console.error("❌ User handling failed:", error);
       return "guest_user_" + Date.now();
     }
   }
-  // ===== ORDER CREATION =====
 
+  // ✅ CORE ORDER METHODS - Optimized
   async createOrder(orderData: {
     customerId: string;
     serviceId: string;
@@ -188,11 +260,11 @@ class OrderService {
     notes?: string;
   }): Promise<{ orderId: string }> {
     try {
+      const startTime = Date.now();
       const now = new Date().toISOString();
 
-      // Use exact field names from database schema
       const orderPayload = {
-        order_code: Math.floor(Math.random() * 900000) + 100000, // Try number first
+        order_code: Math.floor(Math.random() * 900000) + 100000,
         status: "pending",
         total_amount: 2500000 * orderData.quantity,
         payment_method: "transfer",
@@ -200,19 +272,18 @@ class OrderService {
         payment_date: null,
         transaction_id: null,
         notes: orderData.notes || "",
-        created_at: now, // Use snake_case
-        update_at: now, // Use snake_case
+        createdAt: now,
+        updatedAt: now,
       };
 
-      console.log("📤 Creating order with correct field names:", orderPayload);
+      console.log("📤 Creating order:", orderPayload);
       const response = await apiClient.post("/orders", orderPayload);
+
+      console.log(`✅ Order creation completed in ${Date.now() - startTime}ms`);
 
       if (response.data.code === 200) {
         const orderId = response.data.result.orderId || response.data.result.id;
-        console.log(
-          "✅ Order created with correct fields:",
-          response.data.result
-        );
+        console.log("✅ Order created:", orderId);
         return { orderId };
       }
 
@@ -227,7 +298,6 @@ class OrderService {
       );
     }
   }
-  // ===== ORDER DETAILS =====
 
   async createOrderDetail(
     orderId: string,
@@ -239,24 +309,24 @@ class OrderService {
     }
   ): Promise<{ orderDetailId: string }> {
     try {
-      // Fix payload structure
+      const startTime = Date.now();
+
       const payload = {
         quantity: orderDetailData.quantity,
         unit_price: orderDetailData.unitPrice,
         subtotal: orderDetailData.quantity * orderDetailData.unitPrice,
-        note: orderDetailData.notes || "", // Empty string instead of null
-        // Don't send createdAt - let backend handle
+        note: orderDetailData.notes || "",
       };
 
-      console.log("📤 Creating order detail with fixed payload:", payload);
-      console.log("📤 Order ID:", orderId, "Service ID:", serviceId);
-
+      console.log("📤 Creating order detail:", payload);
       const response = await apiClient.post(
         `/order-details/${orderId}/${serviceId}`,
         payload
       );
 
-      console.log("📤 Order detail response:", response.data);
+      console.log(
+        `✅ Order detail creation completed in ${Date.now() - startTime}ms`
+      );
 
       if (response.data.code === 200) {
         console.log("✅ Order detail created:", response.data.result.id);
@@ -269,10 +339,7 @@ class OrderService {
         }`
       );
     } catch (error: any) {
-      console.error("❌ Order detail error:");
-      console.error("❌ Error response:", error.response?.data);
-      console.error("❌ Error status:", error.response?.status);
-
+      console.error("❌ Order detail error:", error.response?.data);
       throw new Error(
         "Không thể tạo chi tiết đơn hàng: " +
           (error.response?.data?.message || error.message)
@@ -280,58 +347,72 @@ class OrderService {
     }
   }
 
-  // ===== PARTICIPANTS =====
-  async addOrderParticipant(
+  // ✅ OPTIMIZED: Parallel participant creation
+  async addOrderParticipants(
     orderId: string,
-    participantData: {
+    participants: Array<{
       participantName: string;
       relationship: string;
       age: number;
       notes?: string;
-    }
-  ): Promise<{ participantId: string }> {
+    }>
+  ): Promise<{ participantIds: string[] }> {
     try {
-      // Fix payload structure
-      const payload = {
-        participant_name: participantData.participantName,
-        relationship: participantData.relationship,
-        age: participantData.age,
-        note: participantData.notes || "", // Empty string instead of null
-        // Don't send createdAt - let backend handle
-      };
+      console.log("👥 Adding participants in parallel:", participants.length);
+      const startTime = Date.now();
 
-      console.log("📤 Adding participant with fixed payload:", payload);
-      console.log("📤 Order ID:", orderId);
+      // Create all participants in parallel
+      const participantPromises = participants.map(
+        async (participantData, index) => {
+          try {
+            const payload = {
+              participant_name: participantData.participantName,
+              relationship: participantData.relationship,
+              age: participantData.age,
+              note: participantData.notes || "",
+            };
 
-      const response = await apiClient.post(
-        `/OrderParticipants/${orderId}`,
-        payload
+            const response = await apiClient.post(
+              `/OrderParticipants/${orderId}`,
+              payload
+            );
+
+            if (response.data.code === 200) {
+              console.log(
+                `✅ Participant ${index + 1} added:`,
+                response.data.result.id
+              );
+              return response.data.result.id;
+            }
+
+            throw new Error(`Participant ${index + 1} creation failed`);
+          } catch (error) {
+            console.error(`❌ Participant ${index + 1} error:`, error);
+            return null;
+          }
+        }
       );
 
-      console.log("📤 Participant response:", response.data);
+      const participantIds = await Promise.allSettled(participantPromises);
+      const successfulIds = participantIds
+        .filter((result) => result.status === "fulfilled" && result.value)
+        .map((result) => (result as PromiseFulfilledResult<string>).value);
 
-      if (response.data.code === 200) {
-        console.log("✅ Participant added:", response.data.result.id);
-        return { participantId: response.data.result.id };
-      }
-
-      throw new Error(
-        `Participant creation failed: ${
-          response.data.message || "Unknown error"
-        }`
+      console.log(
+        `✅ Participants creation completed in ${Date.now() - startTime}ms`
       );
+      console.log(
+        `✅ ${successfulIds.length}/${participants.length} participants added successfully`
+      );
+
+      return { participantIds: successfulIds };
     } catch (error: any) {
-      console.error("❌ Participant error:");
-      console.error("❌ Error response:", error.response?.data);
-      console.error("❌ Error status:", error.response?.status);
-
+      console.error("❌ Participants batch error:", error);
       throw new Error(
-        "Không thể thêm người tham gia: " +
-          (error.response?.data?.message || error.message)
+        "Không thể thêm người tham gia: " + (error.message || "Unknown error")
       );
     }
   }
-  // ===== APPOINTMENTS =====
 
   async createAppointment(
     orderId: string,
@@ -344,45 +425,31 @@ class OrderService {
     }
   ): Promise<{ appointmentId: string }> {
     try {
-      // Match exactly with Swagger payload that worked
+      const startTime = Date.now();
+
       const payload = {
-        appointment_date: appointmentData.appointmentDate + "T03:24:55.300Z", // Use same format as Swagger
-        appointment_type: "Gặp để tư vấn", // Use Vietnamese like in Swagger
+        appointment_date: appointmentData.appointmentDate + "T03:24:55.300Z",
+        appointment_type: "Gặp để tư vấn",
         status: true,
         notes: appointmentData.notes || "không có",
         doctor_time_slot: appointmentData.timeSlotId,
       };
 
-      console.log(
-        "📤 Creating appointment with Swagger-matched payload:",
-        payload
-      );
-      console.log("📤 Order ID:", orderId);
-      console.log(
-        "📤 Full URL:",
-        `${apiClient.defaults.baseURL}/appointment/${orderId}`
-      );
-
+      console.log("📤 Creating appointment:", payload);
       const response = await apiClient.post(`/appointment/${orderId}`, payload);
 
-      console.log("📤 Appointment response:", response.data);
+      console.log(
+        `✅ Appointment creation completed in ${Date.now() - startTime}ms`
+      );
 
       if (response.data.code === 200) {
-        console.log(
-          "✅ Appointment created successfully:",
-          response.data.result.id
-        );
+        console.log("✅ Appointment created:", response.data.result.id);
         return { appointmentId: response.data.result.id };
       }
 
       throw new Error(`Appointment creation failed: ${response.data.message}`);
     } catch (error: any) {
-      console.error("❌ Appointment creation failed:");
-      console.error("❌ Error response:", error.response?.data);
-      console.error("❌ Error status:", error.response?.status);
-      console.error("❌ Error message:", error.message);
-
-      // Still throw error so we can see what's happening
+      console.error("❌ Appointment creation failed:", error.response?.data);
       throw new Error(
         "Không thể tạo lịch hẹn: " +
           (error.response?.data?.message || error.message)
@@ -390,126 +457,206 @@ class OrderService {
     }
   }
 
-  // ===== NEW APPOINTMENT METHODS =====
-
-  // Get all appointments (admin)
-  async getAllAppointments(): Promise<any[]> {
+  // ✅ V9 CORRECTED: Sample Kit creation (FIRST)
+  async createSampleKitsForOrder(
+    orderId: string,
+    participants: Array<{ name: string; relationship: string; age: string }>,
+    shippingAddress: string,
+    collectionMethod: "home" | "facility" = "home"
+  ): Promise<SampleKit[]> {
     try {
-      console.log("🔍 Fetching all appointments...");
-      const response = await apiClient.get("/appointment/all");
+      console.log("📦 Creating sample kits for order:", orderId);
+      console.log("👥 Participants:", participants.length);
+      const startTime = Date.now();
 
-      if (response.data.code === 200) {
-        const appointments = response.data.result || [];
-        console.log("✅ All appointments loaded:", appointments.length);
-        return appointments;
-      }
+      // ✅ OPTIMIZED: Create all kits in parallel
+      const kitPromises = participants.map(async (participant, index) => {
+        try {
+          const kitCode =
+            this.generateUniqueCode("KIT", orderId) + `_P${index + 1}`;
 
-      return [];
-    } catch (error: any) {
-      console.error(
-        "❌ Error fetching all appointments:",
-        error.response?.data || error.message
-      );
-      throw new Error("Không thể tải danh sách lịch hẹn");
-    }
-  }
+          const payload = {
+            kit_code: kitCode,
+            kit_type: "DNA_TEST_KIT",
+            status: collectionMethod === "home" ? "ordered" : "ready",
+            shipping_address: shippingAddress,
+            instruction: this.getKitInstructions(
+              collectionMethod,
+              participant.name
+            ),
+            orderId: orderId, // V9: Direct order reference
 
-  // Get user appointments
-  async getUserAppointments(): Promise<any[]> {
-    try {
-      console.log("🔍 Fetching user appointments...");
-      const response = await apiClient.get("/appointment/user/all");
+            // V9 Workarounds for required fields
+            samplesId: "pending", // Will be updated when sample is created
+            delivered_date:
+              collectionMethod === "home"
+                ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
+                : new Date().toISOString(),
+            tracking_number: Math.floor(Math.random() * 900000) + 100000,
+          };
 
-      if (response.data.code === 200) {
-        const appointments = response.data.result || [];
-        console.log("✅ User appointments loaded:", appointments.length);
-        return appointments;
-      }
+          console.log(
+            `📦 Creating kit ${index + 1}/${participants.length} for ${
+              participant.name
+            }`
+          );
+          const response = await apiClient.post("/sample-kits", payload);
 
-      return [];
-    } catch (error: any) {
-      console.error(
-        "❌ Error fetching user appointments:",
-        error.response?.data || error.message
-      );
-      throw new Error("Không thể tải lịch hẹn của bạn");
-    }
-  }
+          if (response.data.code === 200) {
+            console.log(
+              `✅ Kit ${index + 1} created:`,
+              response.data.result.id
+            );
+            return response.data.result;
+          }
 
-  // Get specific appointment by ID
-  async getAppointmentById(appointmentId: string): Promise<any> {
-    try {
-      console.log("🔍 Fetching appointment:", appointmentId);
-      const response = await apiClient.get(`/appointment/${appointmentId}`);
+          throw new Error(`Kit creation failed for ${participant.name}`);
+        } catch (error) {
+          console.error(
+            `❌ Kit creation error for participant ${index + 1}:`,
+            error
+          );
+          return null;
+        }
+      });
 
-      if (response.data.code === 200) {
-        console.log("✅ Appointment loaded:", response.data.result);
-        return response.data.result;
-      }
-
-      throw new Error("Appointment not found");
-    } catch (error: any) {
-      console.error(
-        "❌ Error fetching appointment:",
-        error.response?.data || error.message
-      );
-      throw new Error("Không thể tải thông tin lịch hẹn");
-    }
-  }
-
-  // Get appointments by order ID (helper method)
-  async getAppointmentsByOrderId(orderId: string): Promise<any[]> {
-    try {
-      console.log("🔍 Fetching appointments for order:", orderId);
-
-      // Try to get all appointments and filter by orderId
-      const allAppointments = await this.getAllAppointments();
-      const orderAppointments = allAppointments.filter(
-        (app: any) => app.orderId === orderId
-      );
+      const kitResults = await Promise.allSettled(kitPromises);
+      const successfulKits = kitResults
+        .filter((result) => result.status === "fulfilled" && result.value)
+        .map((result) => (result as PromiseFulfilledResult<SampleKit>).value);
 
       console.log(
-        `✅ Found ${orderAppointments.length} appointments for order ${orderId}`
+        `✅ Sample kits creation completed in ${Date.now() - startTime}ms`
       );
-      return orderAppointments;
-    } catch (error) {
-      console.warn(
-        "⚠️ Could not fetch appointments by order ID, trying user appointments..."
+      console.log(
+        `✅ ${successfulKits.length}/${participants.length} kits created successfully`
       );
 
-      try {
-        // Fallback: try user appointments
-        const userAppointments = await this.getUserAppointments();
-        const orderAppointments = userAppointments.filter(
-          (app: any) => app.orderId === orderId
-        );
-
-        console.log(
-          `✅ Found ${orderAppointments.length} user appointments for order ${orderId}`
-        );
-        return orderAppointments;
-      } catch (userError) {
-        console.error(
-          "❌ Could not fetch appointments by any method:",
-          userError
-        );
-        return [];
-      }
+      return successfulKits;
+    } catch (error: any) {
+      console.error("❌ Error in createSampleKitsForOrder:", error);
+      throw new Error("Không thể tạo sample kits. Vui lòng thử lại.");
     }
   }
-  // ===== PAYMENT (Mock for now - no API available) =====
+
+  // ✅ V9: Sample creation (AFTER kits)
+  async createSamplesForKits(sampleKits: SampleKit[]): Promise<Sample[]> {
+    try {
+      console.log("🧬 Creating samples for kits:", sampleKits.length);
+      const startTime = Date.now();
+      const userId = this.getCurrentUserId();
+
+      // ✅ OPTIMIZED: Create all samples in parallel
+      const samplePromises = sampleKits.map(async (kit, index) => {
+        try {
+          const sampleCode = kit.kit_code.replace("KIT_", "SAMPLE_");
+
+          const payload = {
+            sample_code: sampleCode,
+            sample_type: "DNA",
+            collection_method: "pending",
+            status: "pending",
+            userId: userId,
+            sampleKitsId: kit.id, // V9: Single kit reference
+            notes: `Sample for kit ${kit.kit_code}`,
+          };
+
+          console.log(
+            `🧬 Creating sample ${index + 1}/${sampleKits.length} for kit: ${
+              kit.kit_code
+            }`
+          );
+          const response = await apiClient.post("/samples", payload);
+
+          if (response.data.code === 200) {
+            const sample = response.data.result;
+            console.log(`✅ Sample ${index + 1} created:`, sample.id);
+
+            // Update kit with sample ID (fire and forget)
+            this.updateSampleKitWithSampleId(kit.id, sample.id).catch((err) =>
+              console.warn("⚠️ Could not update kit with sample ID:", err)
+            );
+
+            return sample;
+          }
+
+          throw new Error(`Sample creation failed for kit ${kit.kit_code}`);
+        } catch (error) {
+          console.error(
+            `❌ Sample creation error for kit ${index + 1}:`,
+            error
+          );
+          return null;
+        }
+      });
+
+      const sampleResults = await Promise.allSettled(samplePromises);
+      const successfulSamples = sampleResults
+        .filter((result) => result.status === "fulfilled" && result.value)
+        .map((result) => (result as PromiseFulfilledResult<Sample>).value);
+
+      console.log(
+        `✅ Samples creation completed in ${Date.now() - startTime}ms`
+      );
+      console.log(
+        `✅ ${successfulSamples.length}/${sampleKits.length} samples created successfully`
+      );
+
+      return successfulSamples;
+    } catch (error: any) {
+      console.error("❌ Error in createSamplesForKits:", error);
+      throw new Error("Không thể tạo samples. Vui lòng thử lại.");
+    }
+  }
+
+  // Helper method to update kit with sample ID
+  private async updateSampleKitWithSampleId(
+    kitId: string,
+    sampleId: string
+  ): Promise<void> {
+    try {
+      await apiClient.put(`/sample-kits/${kitId}`, { samplesId: sampleId });
+      console.log("✅ Updated kit with sample ID:", kitId, "->", sampleId);
+    } catch (error) {
+      console.warn("⚠️ Could not update kit with sample ID:", error);
+    }
+  }
+
+  // Helper method for kit instructions
+  private getKitInstructions(
+    collectionMethod: string,
+    participantName?: string
+  ): string {
+    const name = participantName || "người tham gia";
+
+    if (collectionMethod === "home") {
+      return `Hướng dẫn thu mẫu tại nhà cho ${name}:
+1. Rửa tay sạch sẽ trước khi thu mẫu
+2. Không ăn uống, đánh răng trong 30 phút trước khi thu mẫu
+3. Lấy tăm bông, chà nhẹ vào má trong 10-15 giây
+4. Cho tăm bông vào ống đựng mẫu và đậy chặt
+5. Ghi tên ${name} lên nhãn
+6. Bảo quản ở nhiệt độ phòng, tránh ánh sáng trực tiếp
+7. Gửi về phòng lab trong vòng 7 ngày`;
+    } else {
+      return `Hướng dẫn thu mẫu tại cơ sở cho ${name}:
+1. Đến đúng giờ hẹn đã đặt
+2. Mang theo CMND/CCCD và giấy tờ liên quan
+3. Nhân viên sẽ hướng dẫn và hỗ trợ thu mẫu
+4. Mẫu sẽ được xử lý ngay tại phòng lab`;
+    }
+  }
+
+  // ✅ OPTIMIZED: Payment processing
   async processPayment(
     orderId: string,
     paymentData: {
       method: "cash" | "card" | "transfer";
       amount: number;
     }
-  ): Promise<{
-    success: boolean;
-    transactionId?: string;
-    message: string;
-  }> {
-    console.log("💳 Processing mock payment...");
+  ): Promise<{ success: boolean; transactionId?: string; message: string }> {
+    console.log("💳 Processing payment...");
+    const startTime = Date.now();
 
     const messages = {
       transfer: `Vui lòng chuyển khoản ${new Intl.NumberFormat("vi-VN").format(
@@ -521,23 +668,26 @@ class OrderService {
       card: "Thanh toán thẻ tín dụng đang được xử lý. Bạn sẽ nhận được thông báo qua email.",
     };
 
-    // Simulate payment processing delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Simulate processing delay
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    try {
-      // Try to update order payment status via API
-      const updatePayload = {
-        payment_method: paymentData.method,
-        payment_status: paymentData.method === "cash" ? "pending" : "paid",
-        total_amount: paymentData.amount,
-      };
+    // Update order payment info (fire and forget for speed)
+    const updatePayload = {
+      payment_method: paymentData.method,
+      payment_status: paymentData.method === "cash" ? "pending" : "paid",
+      total_amount: paymentData.amount,
+    };
 
-      console.log("📤 Updating order payment info:", updatePayload);
-      await apiClient.put(`/orders/${orderId}`, updatePayload);
-      console.log("✅ Order payment info updated");
-    } catch (error) {
-      console.warn("⚠️ Could not update order payment info, continuing...");
-    }
+    console.log("📤 Updating order payment info:", updatePayload);
+    apiClient
+      .put(`/orders/${orderId}`, updatePayload)
+      .catch((error) =>
+        console.warn("⚠️ Could not update order payment info:", error)
+      );
+
+    console.log(
+      `✅ Payment processing completed in ${Date.now() - startTime}ms`
+    );
 
     return {
       success: true,
@@ -545,10 +695,11 @@ class OrderService {
       message: messages[paymentData.method],
     };
   }
-  // ===== COMPLETE ORDER FLOW =====
 
+  // ✅ SUPER OPTIMIZED: Complete order creation with parallel processing
   async createCompleteOrder(orderData: CreateOrderRequest): Promise<string> {
-    console.log("🚀 Starting complete order creation flow...");
+    console.log("🚀 Starting OPTIMIZED complete order creation flow...");
+    const overallStartTime = Date.now();
 
     try {
       // Step 1: Handle user registration
@@ -566,91 +717,102 @@ class OrderService {
       });
       const orderId = orderResult.orderId;
 
-      // Step 3: Add order details
-      console.log("📋 Step 3: Adding order details...");
-      try {
-        await this.createOrderDetail(orderId, orderData.serviceInfo.serviceId, {
+      // ✅ OPTIMIZED: Steps 3-7 run in parallel where possible
+      console.log("🚀 Steps 3-7: Parallel processing...");
+
+      const results = await Promise.allSettled([
+        // Step 3: Add order details
+        this.createOrderDetail(orderId, orderData.serviceInfo.serviceId, {
           quantity: orderData.serviceInfo.quantity,
           unitPrice: 2500000,
           notes: orderData.serviceInfo.notes,
-        });
-        console.log("✅ Order details added");
-      } catch (error) {
-        console.warn("⚠️ Could not add order details, continuing...");
-      }
+        }),
 
-      // Step 4: Add participants
-      console.log("👨‍👩‍👧‍👦 Step 4: Adding participants...");
-      for (const participant of orderData.participantInfo.participants) {
-        try {
-          await this.addOrderParticipant(orderId, {
-            participantName: participant.name,
-            relationship: participant.relationship,
-            age: parseInt(participant.age),
+        // Step 4: Add participants (parallel internally)
+        this.addOrderParticipants(
+          orderId,
+          orderData.participantInfo.participants.map((p) => ({
+            participantName: p.name,
+            relationship: p.relationship,
+            age: parseInt(p.age),
             notes: "",
-          });
-          console.log(`✅ Participant ${participant.name} added`);
-        } catch (error) {
-          console.warn(
-            `⚠️ Could not add participant ${participant.name}, continuing...`
-          );
-        }
-      }
+          }))
+        ),
 
-      // Step 5: Create appointment (if facility collection)
-      if (
+        // Step 5: Create appointment (if needed)
         orderData.serviceInfo.collectionMethod === "facility" &&
         orderData.serviceInfo.appointmentDate &&
         orderData.serviceInfo.doctorId &&
         orderData.serviceInfo.timeSlotId
-      ) {
-        console.log("📅 Step 5: Creating appointment...");
-        try {
-          await this.createAppointment(orderId, {
-            appointmentDate: orderData.serviceInfo.appointmentDate,
-            appointmentTime: orderData.serviceInfo.appointmentTime || "09:00",
-            doctorId: orderData.serviceInfo.doctorId,
-            timeSlotId: orderData.serviceInfo.timeSlotId,
-            notes: orderData.serviceInfo.notes,
-          });
-          console.log("✅ Appointment created");
-        } catch (error) {
-          console.warn(
-            "⚠️ Could not create appointment, but order is still valid"
-          );
-        }
+          ? this.createAppointment(orderId, {
+              appointmentDate: orderData.serviceInfo.appointmentDate,
+              appointmentTime: orderData.serviceInfo.appointmentTime || "09:00",
+              doctorId: orderData.serviceInfo.doctorId,
+              timeSlotId: orderData.serviceInfo.timeSlotId,
+              notes: orderData.serviceInfo.notes,
+            })
+          : Promise.resolve(null),
+
+        // Step 6: Process payment
+        this.processPayment(orderId, {
+          method: orderData.paymentInfo.method,
+          amount: 2500000 * orderData.serviceInfo.quantity,
+        }),
+      ]);
+
+      // Check results
+      const [
+        orderDetailResult,
+        participantsResult,
+        appointmentResult,
+        paymentResult,
+      ] = results;
+
+      if (orderDetailResult.status === "fulfilled") {
+        console.log("✅ Order details created");
+      } else {
+        console.warn("⚠️ Order details failed:", orderDetailResult.reason);
       }
 
-      // Step 6: Create samples for each participant *** NEW ***
-      console.log("🧪 Step 6: Creating samples for participants...");
-      for (const participant of orderData.participantInfo.participants) {
-        try {
-          await this.createSample(orderId, {
-            sampleType: "saliva", // Default sample type
-            collectionMethod: orderData.serviceInfo.collectionMethod,
-            participantName: participant.name,
-            notes: `Sample for ${participant.name} (${participant.relationship}, ${participant.age} years old)`,
-          });
-          console.log(`✅ Sample created for ${participant.name}`);
-        } catch (error) {
-          console.warn(
-            `⚠️ Could not create sample for ${participant.name}: ${error}`
-          );
-        }
+      if (participantsResult.status === "fulfilled") {
+        console.log("✅ Participants added");
+      } else {
+        console.warn("⚠️ Participants failed:", participantsResult.reason);
       }
 
-      // Step 7: Process payment
-      console.log("💳 Step 7: Processing payment...");
-      const totalAmount = 2500000 * orderData.serviceInfo.quantity;
-      await this.processPayment(orderId, {
-        method: orderData.paymentInfo.method,
-        amount: totalAmount,
-      });
+      if (appointmentResult.status === "fulfilled" && appointmentResult.value) {
+        console.log("✅ Appointment created");
+      } else if (orderData.serviceInfo.collectionMethod === "facility") {
+        console.warn("⚠️ Appointment failed:", appointmentResult);
+      }
 
-      console.log("🎉 Order creation completed successfully!");
+      if (paymentResult.status === "fulfilled") {
+        console.log("✅ Payment processed");
+      } else {
+        console.warn("⚠️ Payment failed:", paymentResult.reason);
+      }
+
+      // ✅ Step 7: Create sample kits (after order is established)
+      console.log("📦 Step 7: Creating sample kits...");
+      try {
+        const sampleKits = await this.createSampleKitsForOrder(
+          orderId,
+          orderData.participantInfo.participants,
+          orderData.customerInfo.address,
+          orderData.serviceInfo.collectionMethod
+        );
+        console.log(`✅ ${sampleKits.length} sample kits created`);
+      } catch (error) {
+        console.warn("⚠️ Sample kits creation failed:", error);
+      }
+
+      const totalTime = Date.now() - overallStartTime;
+      console.log(`🎉 Order creation completed in ${totalTime}ms!`);
+
       return orderId;
     } catch (error: any) {
-      console.error("❌ Order creation failed:", error);
+      const totalTime = Date.now() - overallStartTime;
+      console.error(`❌ Order creation failed after ${totalTime}ms:`, error);
       throw new Error(
         "Có lỗi xảy ra khi tạo đơn hàng: " +
           (error.message || "Vui lòng thử lại sau")
@@ -658,91 +820,123 @@ class OrderService {
     }
   }
 
-  // ===== GET ORDER DATA =====
+  // ✅ OPTIMIZED: Get order data with parallel fetching
   async getCompleteOrderData(orderId: string): Promise<any> {
     try {
       console.log("🔍 Fetching complete order data for:", orderId);
+      const startTime = Date.now();
 
-      // Get main order
-      const orderResponse = await apiClient.get(`/orders/${orderId}`);
-      if (orderResponse.data.code !== 200) {
+      // ✅ OPTIMIZED: Fetch all data in parallel
+      const [
+        orderResponse,
+        orderDetailsResponse,
+        participantsResponse,
+        appointmentsResponse,
+        sampleKitsResponse,
+      ] = await Promise.allSettled([
+        apiClient.get(`/orders/${orderId}`),
+        apiClient.get(`/order-details/${orderId}/all`),
+        apiClient.get(`/OrderParticipants/order/${orderId}`),
+        apiClient.get(`/appointment/all`),
+        apiClient.get(`/sample-kits/order/${orderId}`), // V9: Direct endpoint
+      ]);
+
+      // Process results
+      let order = null;
+      let orderDetails = [];
+      let participants = [];
+      let appointment = null;
+      let sampleKits = [];
+      let samples = [];
+
+      // Process Order
+      if (
+        orderResponse.status === "fulfilled" &&
+        orderResponse.value.data.code === 200
+      ) {
+        order = orderResponse.value.data.result;
+        console.log("✅ Order loaded");
+      } else {
         throw new Error("Order not found");
       }
-      const order = orderResponse.data.result;
-      console.log("📦 Main order data:", order);
 
-      // Get order details
-      let orderDetails = [];
-      try {
-        const detailsResponse = await apiClient.get(
-          `/order-details/${orderId}/all`
-        );
-        orderDetails = detailsResponse.data.result || [];
-        console.log("📋 Order details:", orderDetails);
-      } catch (error) {
-        console.warn("⚠️ Could not fetch order details:", error);
+      // Process Order Details
+      if (
+        orderDetailsResponse.status === "fulfilled" &&
+        orderDetailsResponse.value.data.code === 200
+      ) {
+        orderDetails = orderDetailsResponse.value.data.result || [];
+        console.log("✅ Order details loaded:", orderDetails.length);
       }
 
-      // Get participants
-      let participants = [];
-      try {
-        const participantsResponse = await apiClient.get(
-          `/OrderParticipants/order/${orderId}`
-        );
-        participants = participantsResponse.data.result || [];
-        console.log("👥 Participants:", participants);
-      } catch (error) {
-        console.warn("⚠️ Could not fetch participants:", error);
+      // Process Participants
+      if (
+        participantsResponse.status === "fulfilled" &&
+        participantsResponse.value.data.code === 200
+      ) {
+        participants = participantsResponse.value.data.result || [];
+        console.log("✅ Participants loaded:", participants.length);
       }
 
-      // ✅ FIX: Get appointment - use correct endpoint
-      let appointment = null;
-      try {
-        // Method 1: Try to get all appointments and filter by orderId
-        const appointmentResponse = await apiClient.get(`/appointment/all`);
-        const appointments = appointmentResponse.data.result || [];
-        appointment = appointments.find((app: any) => app.orderId === orderId);
-        console.log("📅 Appointment found:", appointment);
-      } catch (error) {
-        console.warn(
-          "⚠️ Could not fetch appointments from /appointment/all:",
-          error
+      // Process Appointments
+      if (
+        appointmentsResponse.status === "fulfilled" &&
+        appointmentsResponse.value.data.code === 200
+      ) {
+        const allAppointments = appointmentsResponse.value.data.result || [];
+        appointment = allAppointments.find(
+          (app: any) => app.orderId === orderId
         );
+        console.log("✅ Appointment found:", !!appointment);
+      }
 
-        // Method 2: Try user appointments endpoint
-        try {
-          const userAppointmentResponse = await apiClient.get(
-            `/appointment/user/all`
-          );
-          const userAppointments = userAppointmentResponse.data.result || [];
-          appointment = userAppointments.find(
-            (app: any) => app.orderId === orderId
-          );
-          console.log("📅 User appointment found:", appointment);
-        } catch (userError) {
-          console.warn("⚠️ Could not fetch user appointments:", userError);
+      // Process Sample Kits (V9)
+      if (
+        sampleKitsResponse.status === "fulfilled" &&
+        sampleKitsResponse.value.data.code === 200
+      ) {
+        sampleKits = sampleKitsResponse.value.data.result || [];
+        console.log("✅ Sample kits loaded:", sampleKits.length);
+
+        // ✅ OPTIMIZED: Fetch samples for kits in parallel
+        if (sampleKits.length > 0) {
+          const samplePromises = sampleKits.map(async (kit: SampleKit) => {
+            if (kit.samplesId && kit.samplesId !== "pending") {
+              try {
+                const sampleResponse = await apiClient.get(
+                  `/samples/${kit.samplesId}`
+                );
+                if (sampleResponse.data.code === 200) {
+                  return sampleResponse.data.result;
+                }
+              } catch (error) {
+                console.warn(
+                  `⚠️ Could not fetch sample for kit ${kit.id}:`,
+                  error
+                );
+              }
+            }
+            return null;
+          });
+
+          const sampleResults = await Promise.allSettled(samplePromises);
+          samples = sampleResults
+            .filter((result) => result.status === "fulfilled" && result.value)
+            .map((result) => (result as PromiseFulfilledResult<Sample>).value);
+
+          console.log("✅ Samples loaded:", samples.length);
         }
       }
 
-      // Get samples
-      let samples = [];
-      try {
-        const samplesResponse = await apiClient.get(
-          `/samples/order/${orderId}`
-        );
-        samples = samplesResponse.data.result || [];
-        console.log("🧪 Samples:", samples);
-      } catch (error) {
-        console.warn("⚠️ Could not fetch samples:", error);
-      }
-
-      console.log("✅ Complete order data assembled");
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ Complete order data assembled in ${totalTime}ms`);
 
       return {
         ...order,
         orderDetails,
         participants,
         appointment,
+        sampleKits,
         samples,
       };
     } catch (error: any) {
@@ -754,27 +948,29 @@ class OrderService {
     }
   }
 
-  // ===== GET USER ORDERS =====
+  // ✅ OPTIMIZED: Get user orders with better performance
   async getUserOrders(userId?: string): Promise<any[]> {
     try {
+      const startTime = Date.now();
+      console.log("🔍 Fetching user orders...");
+
       let ordersData = [];
 
       if (userId) {
-        // Get orders for specific user
         console.log("🔍 Fetching orders for user:", userId);
         const response = await apiClient.get(`/orders/user/${userId}`);
         ordersData = response.data.result || [];
       } else {
-        // Get all orders for current user (using token)
-        console.log("🔍 Fetching orders for current user");
+        console.log("🔍 Fetching all orders for current user");
         const response = await apiClient.get(`/orders/all`);
         ordersData = response.data.result || [];
       }
 
       if (ordersData.length > 0) {
-        console.log("✅ Orders loaded:", ordersData.length);
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ Orders loaded in ${totalTime}ms:`, ordersData.length);
 
-        // Sort by created date (newest first)
+        // ✅ OPTIMIZED: Sort by most recent first
         const sortedOrders = ordersData.sort((a: any, b: any) => {
           const dateA = new Date(
             a.createdAt || a.created_at || a.createddate || 0
@@ -797,16 +993,76 @@ class OrderService {
       return [];
     }
   }
-  // ===== SAMPLES METHODS =====
-  // Get samples by order ID
-  async getSamplesByOrderId(orderId: string): Promise<Sample[]> {
+
+  // ✅ V9 OPTIMIZED: Sample Kit methods
+  async getSampleKitsByOrderId(orderId: string): Promise<SampleKit[]> {
     try {
-      console.log("🔍 Fetching samples for order:", orderId);
-      const response = await apiClient.get(`/samples/order/${orderId}`);
+      console.log("🔍 Fetching sample kits for order:", orderId);
+      const startTime = Date.now();
+
+      // V9: Direct endpoint for kits by order
+      const response = await apiClient.get(`/sample-kits/order/${orderId}`);
+
+      if (response.data.code === 200) {
+        const kits = response.data.result || [];
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ Sample kits loaded in ${totalTime}ms:`, kits.length);
+        return kits;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error(
+        "❌ Sample kits API failed:",
+        error.response?.data || error.message
+      );
+      return [];
+    }
+  }
+
+  async updateSampleKitStatus(
+    kitId: string,
+    status: string,
+    updateData?: Partial<SampleKit>
+  ): Promise<SampleKit | null> {
+    try {
+      console.log("🔄 Updating sample kit status:", kitId, status);
+      const startTime = Date.now();
+
+      const response = await apiClient.put(`/sample-kits/${kitId}`, {
+        status,
+        ...updateData,
+      });
+
+      if (response.data.code === 200) {
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ Sample kit updated in ${totalTime}ms`);
+        return response.data.result;
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error(
+        "❌ Error updating sample kit:",
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
+  // ✅ V9 OPTIMIZED: Sample methods
+  async getSamplesByUserId(userId?: string): Promise<Sample[]> {
+    try {
+      const targetUserId = userId || this.getCurrentUserId();
+      console.log("🔍 Fetching samples for user:", targetUserId);
+      const startTime = Date.now();
+
+      const response = await apiClient.get(`/samples/user/${targetUserId}`);
 
       if (response.data.code === 200) {
         const samples = response.data.result || [];
-        console.log("✅ Samples loaded:", samples.length);
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ Samples loaded in ${totalTime}ms:`, samples.length);
         return samples;
       }
 
@@ -820,56 +1076,232 @@ class OrderService {
     }
   }
 
-  // Create sample
-  async createSample(
-    orderId: string,
-    sampleData: {
-      sampleType: string;
-      collectionMethod: string;
-      participantName?: string;
-      notes?: string;
-    }
-  ): Promise<{ sampleId: string }> {
+  async updateSampleStatus(
+    sampleId: string,
+    status: string,
+    updateData?: Partial<Sample>
+  ): Promise<Sample | null> {
     try {
-      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      console.log("🔄 Updating sample status:", sampleId, status);
+      const startTime = Date.now();
 
-      const payload = {
-        sample_code: `SAM_${Date.now()}`,
-        sample_type: sampleData.sampleType || "saliva",
-        collection_method: sampleData.collectionMethod,
-        collection_date: new Date().toISOString(),
-        received_date: null,
-        status:
-          sampleData.collectionMethod === "home"
-            ? "pending_collection"
-            : "scheduled",
-        shipping_tracking: "",
-        notes:
-          sampleData.notes ||
-          `Sample for ${sampleData.participantName || "participant"}`,
-        sample_quality: "",
-        userId: currentUser.id || "guest",
-        orderId: orderId,
-      };
-
-      console.log("📤 Creating sample:", payload);
-      const response = await apiClient.post("/samples", payload);
+      const response = await apiClient.put(`/samples/${sampleId}`, {
+        status,
+        ...updateData,
+      });
 
       if (response.data.code === 200) {
-        console.log("✅ Sample created:", response.data.result.id);
-        return { sampleId: response.data.result.id };
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ Sample updated in ${totalTime}ms`);
+        return response.data.result;
       }
 
-      throw new Error("Sample creation failed");
+      return null;
     } catch (error: any) {
       console.error(
-        "❌ Sample creation error:",
+        "❌ Error updating sample:",
         error.response?.data || error.message
       );
-      throw new Error("Không thể tạo mẫu xét nghiệm");
+      return null;
     }
   }
-  // Helper function to get order status info
+
+  // ✅ OPTIMIZED: Appointment methods
+  async getAllAppointments(): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching all appointments...");
+      const startTime = Date.now();
+
+      const response = await apiClient.get("/appointment/all");
+
+      if (response.data.code === 200) {
+        const appointments = response.data.result || [];
+        const totalTime = Date.now() - startTime;
+        console.log(
+          `✅ All appointments loaded in ${totalTime}ms:`,
+          appointments.length
+        );
+        return appointments;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error(
+        "❌ Error fetching all appointments:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tải danh sách lịch hẹn");
+    }
+  }
+
+  async getUserAppointments(): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching user appointments...");
+      const startTime = Date.now();
+
+      const response = await apiClient.get("/appointment/user/all");
+
+      if (response.data.code === 200) {
+        const appointments = response.data.result || [];
+        const totalTime = Date.now() - startTime;
+        console.log(
+          `✅ User appointments loaded in ${totalTime}ms:`,
+          appointments.length
+        );
+        return appointments;
+      }
+
+      return [];
+    } catch (error: any) {
+      console.error(
+        "❌ Error fetching user appointments:",
+        error.response?.data || error.message
+      );
+      throw new Error("Không thể tải lịch hẹn của bạn");
+    }
+  }
+
+  async getAppointmentsByOrderId(orderId: string): Promise<any[]> {
+    try {
+      console.log("🔍 Fetching appointments for order:", orderId);
+
+      // Try user appointments first (faster)
+      const userAppointments = await this.getUserAppointments();
+      const orderAppointments = userAppointments.filter(
+        (app: any) => app.orderId === orderId
+      );
+
+      if (orderAppointments.length > 0) {
+        console.log(
+          `✅ Found ${orderAppointments.length} appointments for order ${orderId}`
+        );
+        return orderAppointments;
+      }
+
+      // Fallback to all appointments if needed
+      const allAppointments = await this.getAllAppointments();
+      const fallbackAppointments = allAppointments.filter(
+        (app: any) => app.orderId === orderId
+      );
+
+      console.log(
+        `✅ Found ${fallbackAppointments.length} appointments for order ${orderId} (fallback)`
+      );
+      return fallbackAppointments;
+    } catch (error) {
+      console.error("❌ Could not fetch appointments for order:", error);
+      return [];
+    }
+  }
+
+  // ✅ OPTIMIZED: Progress calculation with caching
+  private progressCache = new Map<
+    string,
+    { result: number; timestamp: number }
+  >();
+
+  calculateOrderProgress(
+    order: any,
+    sampleKits: any[] = [],
+    samples: any[] = [],
+    appointment: any = null
+  ): number {
+    const cacheKey = `${order.id || order.orderId}_${order.status}_${
+      sampleKits.length
+    }_${samples.length}_${!!appointment}`;
+    const cached = this.progressCache.get(cacheKey);
+
+    // Use cache if less than 30 seconds old
+    if (cached && Date.now() - cached.timestamp < 30000) {
+      return cached.result;
+    }
+
+    console.log(
+      "🔢 Calculating order progress for:",
+      order.id || order.orderId
+    );
+
+    // Base progress from order status
+    const statusInfo = this.getOrderStatusInfo(order.status);
+    let baseProgress = statusInfo.progress;
+
+    console.log(
+      `📊 Base progress from status "${order.status}": ${baseProgress}%`
+    );
+
+    // Factor in sample kit progress
+    let kitProgress = 0;
+    if (sampleKits && sampleKits.length > 0) {
+      const kitStatusMap: Record<string, number> = {
+        ordered: 25,
+        preparing: 30,
+        shipped: 45,
+        delivered: 55,
+        ready: 50,
+        expired: 0,
+      };
+
+      kitProgress =
+        sampleKits.reduce((acc, kit) => {
+          const progress = kitStatusMap[kit.status] || 0;
+          return acc + progress;
+        }, 0) / sampleKits.length;
+
+      console.log(`📦 Average kit progress: ${kitProgress}%`);
+    }
+
+    // Factor in actual sample progress
+    let sampleProgress = 0;
+    if (samples && samples.length > 0) {
+      const sampleStatusMap: Record<string, number> = {
+        pending: 10,
+        collected: 60,
+        shipped: 70,
+        received: 75,
+        analyzing: 85,
+        completed: 95,
+        failed: 0,
+      };
+
+      sampleProgress =
+        samples.reduce((acc, sample) => {
+          const progress = sampleStatusMap[sample.status] || 0;
+          return acc + progress;
+        }, 0) / samples.length;
+
+      console.log(`🧪 Average sample progress: ${sampleProgress}%`);
+    }
+
+    // Factor in appointment progress (for facility collection)
+    let appointmentProgress = 0;
+    if (appointment) {
+      if (appointment.status === true || appointment.status === "confirmed") {
+        appointmentProgress = 40;
+      } else if (appointment.status === "completed") {
+        appointmentProgress = 70;
+      } else {
+        appointmentProgress = 20;
+      }
+      console.log(`📅 Appointment progress: ${appointmentProgress}%`);
+    }
+
+    // Return the highest progress value (most advanced stage)
+    const finalProgress = Math.max(
+      baseProgress,
+      kitProgress,
+      sampleProgress,
+      appointmentProgress
+    );
+    const result = Math.min(100, Math.max(0, finalProgress));
+
+    // Cache result
+    this.progressCache.set(cacheKey, { result, timestamp: Date.now() });
+
+    console.log(`🎯 Final calculated progress: ${result}%`);
+    return result;
+  }
+
+  // ✅ Helper methods for status info
   getOrderStatusInfo(status: string) {
     const statusMap: Record<string, any> = {
       pending: {
@@ -877,33 +1309,170 @@ class OrderService {
         color: "bg-yellow-100 text-yellow-800",
         icon: "Clock",
         description: "Đơn hàng đang được xử lý",
+        progress: 10,
       },
       confirmed: {
         label: "Đã xác nhận",
         color: "bg-blue-100 text-blue-800",
         icon: "CheckCircle",
         description: "Đơn hàng đã được xác nhận",
+        progress: 25,
+      },
+      kit_preparing: {
+        label: "Chuẩn bị kit",
+        color: "bg-purple-100 text-purple-800",
+        icon: "Package",
+        description: "Đang chuẩn bị bộ kit xét nghiệm",
+        progress: 35,
+      },
+      kit_sent: {
+        label: "Đã gửi kit",
+        color: "bg-indigo-100 text-indigo-800",
+        icon: "Truck",
+        description: "Kit đã được gửi đến địa chỉ của bạn",
+        progress: 50,
+      },
+      sample_collected: {
+        label: "Đã thu mẫu",
+        color: "bg-cyan-100 text-cyan-800",
+        icon: "TestTube",
+        description: "Mẫu đã được thu thập",
+        progress: 65,
+      },
+      sample_received: {
+        label: "Đã nhận mẫu",
+        color: "bg-teal-100 text-teal-800",
+        icon: "CheckCircle",
+        description: "Phòng lab đã nhận được mẫu",
+        progress: 75,
       },
       processing: {
         label: "Đang xử lý",
-        color: "bg-purple-100 text-purple-800",
+        color: "bg-orange-100 text-orange-800",
         icon: "RefreshCw",
-        description: "Đang chuẩn bị và xử lý mẫu",
+        description: "Đang tiến hành xét nghiệm",
+        progress: 85,
       },
       completed: {
         label: "Hoàn thành",
         color: "bg-green-100 text-green-800",
         icon: "CheckCircle",
         description: "Xét nghiệm hoàn thành, kết quả đã sẵn sàng",
+        progress: 100,
       },
       cancelled: {
         label: "Đã hủy",
         color: "bg-red-100 text-red-800",
         icon: "AlertCircle",
         description: "Đơn hàng đã bị hủy",
+        progress: 0,
       },
     };
     return statusMap[status] || statusMap.pending;
+  }
+
+  getKitStatusInfo(status: string) {
+    const statusMap: Record<string, any> = {
+      ordered: {
+        label: "Đã đặt hàng",
+        color: "bg-blue-100 text-blue-800",
+        icon: "ShoppingCart",
+        description: "Kit đã được đặt hàng",
+      },
+      preparing: {
+        label: "Đang chuẩn bị",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: "Package",
+        description: "Kit đang được chuẩn bị",
+      },
+      shipped: {
+        label: "Đã gửi",
+        color: "bg-blue-100 text-blue-800",
+        icon: "Truck",
+        description: "Kit đã được gửi đi",
+      },
+      delivered: {
+        label: "Đã giao",
+        color: "bg-green-100 text-green-800",
+        icon: "CheckCircle",
+        description: "Kit đã được giao thành công",
+      },
+      expired: {
+        label: "Hết hạn",
+        color: "bg-red-100 text-red-800",
+        icon: "AlertCircle",
+        description: "Kit đã hết hạn sử dụng",
+      },
+      ready: {
+        label: "Sẵn sàng",
+        color: "bg-green-100 text-green-800",
+        icon: "CheckCircle",
+        description: "Kit sẵn sàng để sử dụng",
+      },
+    };
+    return statusMap[status] || statusMap.preparing;
+  }
+
+  getSampleStatusInfo(status: string) {
+    const statusMap: Record<string, any> = {
+      pending: {
+        label: "Chờ xử lý",
+        color: "bg-yellow-100 text-yellow-800",
+        icon: "Clock",
+        description: "Đang chờ xử lý",
+      },
+      collected: {
+        label: "Đã thu mẫu",
+        color: "bg-blue-100 text-blue-800",
+        icon: "TestTube",
+        description: "Mẫu đã được thu thập",
+      },
+      shipped: {
+        label: "Đang vận chuyển",
+        color: "bg-purple-100 text-purple-800",
+        icon: "Truck",
+        description: "Mẫu đang được vận chuyển về lab",
+      },
+      received: {
+        label: "Đã nhận",
+        color: "bg-indigo-100 text-indigo-800",
+        icon: "Building",
+        description: "Lab đã nhận được mẫu",
+      },
+      analyzing: {
+        label: "Đang phân tích",
+        color: "bg-orange-100 text-orange-800",
+        icon: "Microscope",
+        description: "Mẫu đang được phân tích",
+      },
+      completed: {
+        label: "Hoàn thành",
+        color: "bg-green-100 text-green-800",
+        icon: "CheckCircle",
+        description: "Phân tích hoàn thành",
+      },
+      failed: {
+        label: "Thất bại",
+        color: "bg-red-100 text-red-800",
+        icon: "AlertCircle",
+        description: "Mẫu không đạt chất lượng",
+      },
+    };
+    return statusMap[status] || statusMap.pending;
+  }
+
+  // ✅ Clear cache when needed
+  clearProgressCache(): void {
+    this.progressCache.clear();
+    console.log("🗑️ Progress cache cleared");
+  }
+
+  // ✅ Get cache stats for debugging
+  getCacheStats(): { size: number; keys: string[] } {
+    return {
+      size: this.progressCache.size,
+      keys: Array.from(this.progressCache.keys()),
+    };
   }
 }
 
