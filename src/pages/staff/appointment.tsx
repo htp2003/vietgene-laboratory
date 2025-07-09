@@ -10,13 +10,16 @@ import {
   LogOut,
   User,
   ChevronDown,
+  
 } from "lucide-react";
 import AppointmentCard from "../../components/appointment/AppointmentCard";
 import AppointmentModal from "../../components/appointment/AppointmentModal";
+import SampleCreationModal from "../../components/appointment/SampleCreationModal"; // ✅ Import new modal
 import TestResultModal from "./TestResultModal";
 import { AppointmentService } from "../../services/staffService/staffAppointmentService";
-
+import { NotificationService } from "../../services/staffService/notificationService";
 import { StatusUtils } from "../../utils/status";
+import NotificationBell from "../../components/appointment/NotificationBell";
 import {
   Appointment,
   TestResult,
@@ -34,6 +37,8 @@ const StaffAppointments: React.FC = () => {
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
   const [testResultAppointment, setTestResultAppointment] =
+    useState<Appointment | null>(null);
+  const [sampleCreationAppointment, setSampleCreationAppointment] = // ✅ New state for sample creation
     useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -112,13 +117,11 @@ const StaffAppointments: React.FC = () => {
 
       console.log("📅 Loading appointments with simplified doctor info...");
 
-      // ✅ Using new AppointmentService
       const serviceAppointments = await AppointmentService.getAllAppointments();
 
       setAppointments(serviceAppointments);
       console.log("✅ Loaded appointments:", serviceAppointments.length);
 
-      // ✅ Updated to use new doctorInfo structure
       const withDoctors = serviceAppointments.filter((a) => a.doctorInfo);
       const facilityBased = serviceAppointments.filter(
         (a) => a.locationType === "Cơ sở y tế"
@@ -154,7 +157,6 @@ const StaffAppointments: React.FC = () => {
     }
   };
 
-  // ✅ Updated filter logic for new doctorInfo structure
   const filteredAppointments = useMemo(() => {
     return appointments.filter((a) => {
       const matchesLocation =
@@ -209,7 +211,6 @@ const StaffAppointments: React.FC = () => {
     itemsPerPage,
   ]);
 
-  // ✅ Updated stats calculation for new doctorInfo structure
   const stats = {
     total: appointments.length,
     pending: appointments.filter((a) => a.status === "Pending").length,
@@ -220,7 +221,7 @@ const StaffAppointments: React.FC = () => {
       .length,
   };
 
-  // ✅ Updated service method calls
+  // ✅ Updated with notification integration
   const handleConfirm = async (appointment: Appointment) => {
     try {
       console.log("✅ Confirming appointment:", appointment.id);
@@ -234,6 +235,7 @@ const StaffAppointments: React.FC = () => {
           appointment.locationType === "Tại nhà"
             ? "DeliveringKit"
             : "Confirmed";
+        
         setAppointments((prev) =>
           prev.map((a) =>
             a.id === appointment.id
@@ -247,8 +249,13 @@ const StaffAppointments: React.FC = () => {
           )
         );
 
-        // ✅ Note: You'll need to implement notification service if needed
-        // await NotificationService.sendNotification(userId, notificationData);
+        // ✅ Send notification to all staff about status change
+        await NotificationService.notifyStaffAboutStatusChange(
+          appointment.customerName,
+          appointment.id,
+          newStatus
+        );
+
       } else {
         setError("Không thể xác nhận lịch hẹn");
       }
@@ -284,8 +291,13 @@ const StaffAppointments: React.FC = () => {
           )
         );
 
-        // ✅ Note: You'll need to implement notification service if needed
-        // await NotificationService.sendNotification(userId, notificationData);
+        // ✅ Send notification to all staff about cancellation
+        await NotificationService.notifyStaffAboutStatusChange(
+          appointment.customerName,
+          appointmentId,
+          "Cancelled"
+        );
+
       } else {
         setError("Không thể hủy lịch hẹn");
       }
@@ -295,7 +307,37 @@ const StaffAppointments: React.FC = () => {
     }
   };
 
-  // ✅ Updated with new service structure
+  const handleCreateSamples = (appointment: Appointment) => {
+    console.log("🧪 Opening sample creation modal for appointment:", appointment.id);
+    setSampleCreationAppointment(appointment);
+  };
+
+  const handleSamplesCreated = async (appointmentId: string) => {
+    try {
+      console.log("✅ Samples created successfully for appointment:", appointmentId);
+
+      const appointment = appointments.find(a => a.id === appointmentId);
+      if (!appointment) return;
+
+      setSampleCreationAppointment(null);
+      await updateAppointmentStatus(appointmentId, "SampleReceived");
+
+      // ✅ Send notification to all staff about sample received
+      await NotificationService.notifyStaffAboutStatusChange(
+        appointment.customerName,
+        appointmentId,
+        "SampleReceived"
+      );
+
+      console.log("🎉 Appointment status updated to SampleReceived");
+
+    } catch (error: any) {
+      console.error("❌ Error handling samples creation:", error);
+      setError("Có lỗi xảy ra sau khi tạo mẫu xét nghiệm");
+    }
+  };
+
+  // ✅ Updated with notification integration
   const updateAppointmentStatus = async (
     appointmentId: string,
     newStatus: Appointment["status"]
@@ -311,17 +353,11 @@ const StaffAppointments: React.FC = () => {
         return;
       }
 
-      // ✅ Use StatusUtils directly for persistence
       StatusUtils.saveAppointmentStatus(
         appointmentId,
         newStatus,
         StatusUtils.getStepFromStatus(newStatus)
       );
-
-      // ✅ You may need to implement task update service separately
-      // if (appointment.tasks && appointment.tasks.length > 0) {
-      //   // Handle task updates...
-      // }
 
       setAppointments((prev) =>
         prev.map((a) => {
@@ -339,35 +375,27 @@ const StaffAppointments: React.FC = () => {
         })
       );
 
-      // ✅ Note: You'll need to implement notification service if needed
-      // if (['SampleReceived', 'Testing'].includes(newStatus)) {
-      //   await NotificationService.sendNotification(userId, notificationData);
-      // }
+      // ✅ Send notification to all staff about status change (except SampleReceived which is handled separately)
+      if (newStatus !== "SampleReceived") {
+        await NotificationService.notifyStaffAboutStatusChange(
+          appointment.customerName,
+          appointmentId,
+          newStatus
+        );
+      }
+
     } catch (error: any) {
       console.error("❌ Error updating appointment status:", error);
       setError("Có lỗi xảy ra khi cập nhật trạng thái lịch hẹn");
     }
   };
 
-  // ✅ Note: You'll need to implement these services separately
   const handleSaveTestResult = async (result: TestResult) => {
     try {
       console.log("💾 Saving test result:", result);
 
       if (!testResultAppointment) return;
 
-      // ✅ You'll need to implement medical record and notification services
-      // const medicalData: MedicalRecordData = {
-      //   record_code: Date.now(),
-      //   medical_history: result.resultDetails,
-      //   allergies: '',
-      //   medications: '',
-      //   health_conditions: result.conclusion,
-      //   emergency_contact_phone: testResultAppointment.phone || '',
-      //   emergency_contact_name: testResultAppointment.customerName
-      // };
-
-      // For now, just update the appointment status
       setAppointments((prev) =>
         prev.map((a) => {
           if (a.id === result.appointmentId) {
@@ -382,6 +410,13 @@ const StaffAppointments: React.FC = () => {
           }
           return a;
         })
+      );
+
+      // ✅ Send notification to all staff about completion
+      await NotificationService.notifyStaffAboutStatusChange(
+        testResultAppointment.customerName,
+        result.appointmentId,
+        "Completed"
       );
 
       setTestResultAppointment(null);
@@ -471,7 +506,7 @@ const StaffAppointments: React.FC = () => {
   }
 
   return (
-    <div className="h-screen max-w-screen bg-gray-50 flex flex-col ">
+    <div className="h-screen w-full bg-gray-50 flex flex-col">
       <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-6">
         {/* Header */}
         <div className="mb-6 flex justify-between items-center">
@@ -488,6 +523,9 @@ const StaffAppointments: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* ✅ Notification Bell */}
+            <NotificationBell />
+
             {/* Refresh Button */}
             <button
               onClick={handleRefresh}
@@ -552,7 +590,6 @@ const StaffAppointments: React.FC = () => {
                     <button
                       onClick={() => {
                         setShowUserMenu(false);
-                        // Add profile management logic here if needed
                         console.log("Profile clicked");
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
@@ -735,10 +772,10 @@ const StaffAppointments: React.FC = () => {
         </div>
 
         {/* Appointments List - Fixed Height Container */}
-        <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6 overflow-hidden">
-          <div className="h-full flex flex-col">
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-6 overflow-hidden ">
+          <div className="h-full flex flex-col ">
             {currentAppointments.length > 0 ? (
-              <div className="space-y-4 flex-1 overflow-y-auto">
+              <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
                 {currentAppointments.map((appointment) => (
                   <AppointmentCard
                     key={appointment.id}
@@ -747,6 +784,7 @@ const StaffAppointments: React.FC = () => {
                     onConfirm={handleConfirm}
                     onCancel={handleCancel}
                     onUpdateStatus={updateAppointmentStatus}
+                    onCreateSamples={handleCreateSamples}
                   />
                 ))}
               </div>
@@ -817,6 +855,14 @@ const StaffAppointments: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Sample Creation Modal */}
+        <SampleCreationModal
+          appointment={sampleCreationAppointment}
+          isOpen={!!sampleCreationAppointment}
+          onClose={() => setSampleCreationAppointment(null)}
+          onSamplesCreated={handleSamplesCreated}
+        />
 
         {/* Test Result Modal */}
         <TestResultModal
