@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import Header from "../../components/admin/Header";
-import { FaBars, FaCalendarAlt, FaClipboardList, FaUserMd, FaCog } from 'react-icons/fa';
+import { FaBars, FaCalendarAlt, FaClipboardList, FaUserMd, FaCog, FaUserCircle } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 
 
@@ -16,6 +16,7 @@ interface DoctorMenuItem {
 
 const doctorMenuItems: DoctorMenuItem[] = [
     { title: 'Dashboard', path: '/doctor', icon: <FaCalendarAlt size={20} /> },
+    { title: 'Hồ sơ', path: '/doctor/profile', icon: <FaUserCircle size={20} /> },
     { title: 'Lịch hẹn  ', path: '/doctor/schedule', icon: <FaClipboardList size={20} /> },
     { title: 'Chứng chỉ', path: '/doctor/certificates', icon: <FaUserMd size={20} /> },
     { title: 'Cài đặt', path: '/doctor/settings', icon: <FaCog size={20} /> }

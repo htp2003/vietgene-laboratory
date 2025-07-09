@@ -26,16 +26,17 @@ import NewsDetail from "./pages/news/NewsDetail";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 
-import DoctorDashboard from "./pages/Doctor/DoctorDashboard";
 import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
-import DoctorCertificates from "./pages/Doctor/DoctorCertificates";
-import DoctorSchedule from "./pages/Doctor/DoctorSchedule";
 import Unauthorized from "./pages/Unauthorized";
 import StaffAppointments from "./pages/staff/appointment";
 import StaffMedicalRecord from "./pages/staff/StaffMedicalRecord";
 
 
 import StaffMedicalRecordPage from "./pages/staff/StaffMedicalRecord";
+import DoctorProfile from "./pages/Doctor/DoctorProfile";
+import DoctorScheduleWrapper from "./components/doctor/DoctorScheduleWrapper";
+import DoctorCertificatesWrapper from "./components/doctor/DoctorCertificatesWrapper";
+import DoctorDashboard from "./pages/Doctor/DoctorDashboard";
 
 export default function useRouteElements() {
   const routeElemets = useRoutes([
@@ -287,27 +288,37 @@ export default function useRouteElements() {
       element: (
         <ProtectedRoute roles={["ROLE_DOCTOR"]}>
           <DoctorLayout>
-            <DoctorCertificates />
+            <DoctorDashboard />
           </DoctorLayout>
         </ProtectedRoute>
       ),
     },
-    // {
-    //   path: "/doctor/schedule",
-    //   element: (
-    //     <ProtectedRoute roles={["ROLE_DOCTOR"]}>
-    //       <DoctorLayout>
-    //         <DoctorSchedule doctorId={doctorId} doctorName={doctorName} />
-    //       </DoctorLayout>
-    //     </ProtectedRoute>
-    //   ),
-    // },
+    {
+      path: "/doctor/profile",
+      element: (
+        <ProtectedRoute roles={["ROLE_DOCTOR"]}>
+          <DoctorLayout>
+            <DoctorProfile />
+          </DoctorLayout>
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: "/doctor/schedule",
+      element: (
+        <ProtectedRoute roles={["ROLE_DOCTOR"]}>
+          <DoctorLayout>
+            <DoctorScheduleWrapper  />
+          </DoctorLayout>
+        </ProtectedRoute>
+      ),
+    },
     {
       path: "/doctor/certificates",
       element: (
         <ProtectedRoute roles={["ROLE_DOCTOR"]}>
           <DoctorLayout>
-            <DoctorCertificates />
+            <DoctorCertificatesWrapper />
           </DoctorLayout>
         </ProtectedRoute>
       ),

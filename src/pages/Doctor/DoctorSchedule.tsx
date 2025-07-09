@@ -19,9 +19,8 @@ import { TimeSlotRequest, DAY_OPTIONS } from '../../services/doctorTimeSlotServi
 
 interface DoctorScheduleProps {
   doctorId: string;
-  doctorName: string;
 }
-const DoctorSchedule: React.FC<DoctorScheduleProps> = ({ doctorId, doctorName }) => {
+export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   const {
     timeSlots,
     loading,
@@ -231,7 +230,7 @@ const DoctorSchedule: React.FC<DoctorScheduleProps> = ({ doctorId, doctorName })
                   Lịch làm việc của tôi
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  Xin chào, Dr. {doctorName}! Quản lý lịch làm việc cá nhân của bạn
+                  Quản lý lịch làm việc cá nhân của bạn
                 </p>
               </div>
             </div>
@@ -695,5 +694,5 @@ const DoctorSchedule: React.FC<DoctorScheduleProps> = ({ doctorId, doctorName })
   );
 };
 
-export default DoctorSchedule;
+
 
