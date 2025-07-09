@@ -24,12 +24,18 @@ import { Users } from 'lucide-react';
 import { OrderParticipantsService, OrderParticipant } from '../../services/staffService/orderParticipantService';
 import { useState, useEffect } from 'react';
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({
+// ✅ Updated interface to include sample creation handler
+interface UpdatedAppointmentCardProps extends AppointmentCardProps {
+  onCreateSamples: (appointment: Appointment) => void;
+}
+
+const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
   appointment,
   onViewDetails,
   onConfirm,
   onCancel,
-  onUpdateStatus
+  onUpdateStatus,
+  onCreateSamples  // ✅ New prop for sample creation
 }) => {
 
   const [participants, setParticipants] = useState<OrderParticipant[]>([]);
@@ -223,7 +229,18 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
   return status;
 };
 
-
+  // ✅ Updated handler for step progression
+  const handleStepProgression = (appointment: Appointment, nextStatus: string) => {
+    // ✅ Special handling for SampleReceived step - trigger sample creation
+    if (nextStatus === 'SampleReceived') {
+      console.log('🧪 Triggering sample creation for appointment:', appointment.id);
+      onCreateSamples(appointment);
+      return;
+    }
+    
+    // For other statuses, proceed normally
+    onUpdateStatus(appointment.id, nextStatus as Appointment['status']);
+  };
 
   // ✅ Get appropriate step configuration based on location type
   const steps = getStepsConfig(appointment.locationType);
@@ -476,19 +493,6 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
         </div>
       )}
 
-      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-  <p className="text-xs font-bold text-yellow-800 mb-2">🔍 DEBUG INFO:</p>
-  <div className="text-xs text-yellow-700 space-y-1">
-    <p><strong>Status:</strong> {appointment.status}</p>
-    <p><strong>Location Type:</strong> {appointment.locationType}</p>
-    <p><strong>Next Status:</strong> {nextStatus || 'null'}</p>
-    <p><strong>Current Step Index:</strong> {currentStepIndex}</p>
-    <p><strong>Is Pending:</strong> {String(appointment.status === 'Pending')}</p>
-    <p><strong>Is Cancelled:</strong> {String(appointment.status === 'Cancelled')}</p>
-    <p><strong>Is Completed:</strong> {String(appointment.status === 'Completed')}</p>
-  </div>
-</div>
-
       {/* Actions */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
         <button
@@ -522,7 +526,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
             'DeliveringKit': 'Giao kit',
             'Confirmed': 'Check-in',
             'KitDelivered': 'Đã giao kit', 
-            'SampleReceived': 'Nhận mẫu',
+            'SampleReceived': 'Nhận mẫu',  // ✅ This will trigger sample creation
             'Testing': 'Bắt đầu XN',
             'Completed': 'Hoàn thành'
           };
@@ -531,7 +535,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
 
         return (
           <button
-            onClick={() => onUpdateStatus(appointment.id, nextStatus as Appointment['status'])}
+            onClick={() => handleStepProgression(appointment, nextStatus)}  // ✅ Use new handler
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
           >
             <ArrowRight className="w-4 h-4" />
