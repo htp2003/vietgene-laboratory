@@ -274,9 +274,8 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
     console.log("📦 Total kits received:", sampleKits.length);
     console.log("🧬 Total samples received:", samples.length);
 
-    // Filter kits for current user
+    // ✅ NEW STRATEGY: Filter kits by userId (these should belong to customer)
     const userKits = sampleKits.filter((kit) => {
-      // Check multiple possible user ID fields
       const kitUserId =
         kit.userId || (kit as any).user_id || (kit as any).customerId;
       const belongs = kitUserId === currentUserId;
@@ -290,33 +289,44 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
       return belongs;
     });
 
-    // Filter samples for current user
-    const userSamples = samples.filter((sample) => {
-      const sampleUserId =
-        sample.userId || (sample as any).user_id || (sample as any).customerId;
-      const belongs = sampleUserId === currentUserId;
+    console.log("✅ Filtered kits for current user:", userKits.length);
 
-      if (!belongs) {
+    // ✅ NEW STRATEGY: Instead of filtering samples by userId,
+    // find samples that belong to customer's kits
+    const customerSamples: Sample[] = [];
+
+    // Get all kit IDs that belong to this customer
+    const customerKitIds = userKits.map((kit) => kit.id);
+    console.log("🔗 Customer kit IDs:", customerKitIds);
+
+    // Find samples that reference these kits (regardless of sample.userId)
+    samples.forEach((sample) => {
+      // Check if sample belongs to any of customer's kits
+      const belongsToCustomerKit = customerKitIds.includes(sample.sampleKitsId);
+
+      if (belongsToCustomerKit) {
+        customerSamples.push(sample);
         console.log(
-          `🧬 Sample ${sample.sample_code} belongs to user ${sampleUserId}, not current user ${currentUserId}`
+          `✅ Sample ${sample.sample_code} belongs to customer kit ${sample.sampleKitsId}`
+        );
+      } else {
+        console.log(
+          `❌ Sample ${sample.sample_code} (kit: ${sample.sampleKitsId}) doesn't belong to customer`
         );
       }
-
-      return belongs;
     });
 
-    console.log("✅ Filtered kits for current user:", userKits.length);
-    console.log("✅ Filtered samples for current user:", userSamples.length);
+    console.log("✅ Found customer samples:", customerSamples.length);
 
     setFilteredKits(userKits);
-    setFilteredSamples(userSamples);
+    setFilteredSamples(customerSamples); // ✅ Use kit-based filtering instead of userId
 
-    // ✅ Create kit-sample pairs based on V9 relationships
+    // ✅ Create kit-sample pairs based on kit ownership
     const pairs: Array<{ kit: SampleKit; sample?: Sample }> = [];
 
     userKits.forEach((kit) => {
-      // V9: Find sample by kit's samplesId OR find sample that references this kit
-      let associatedSample = userSamples.find(
+      // Find sample that belongs to this kit
+      let associatedSample = customerSamples.find(
         (sample) =>
           sample.id === kit.samplesId || sample.sampleKitsId === kit.id
       );
