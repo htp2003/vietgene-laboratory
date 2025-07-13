@@ -24,12 +24,18 @@ import { Users } from 'lucide-react';
 import { OrderParticipantsService, OrderParticipant } from '../../services/staffService/orderParticipantService';
 import { useState, useEffect } from 'react';
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({
+// ✅ Updated interface to include sample creation handler
+interface UpdatedAppointmentCardProps extends AppointmentCardProps {
+  onCreateSamples: (appointment: Appointment) => void;
+}
+
+const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
   appointment,
   onViewDetails,
   onConfirm,
   onCancel,
-  onUpdateStatus
+  onUpdateStatus,
+  onCreateSamples  // ✅ New prop for sample creation
 }) => {
 
   const [participants, setParticipants] = useState<OrderParticipant[]>([]);
@@ -182,24 +188,58 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   // Get next possible status for progression based on location type
   const getNextStatus = (currentStatus: string, locationType: string): string | null => {
-    if (locationType === 'Tại nhà') {
-      const homeStatusFlow = {
-        'Pending': 'DeliveringKit',
-        'DeliveringKit': 'KitDelivered',
-        'KitDelivered': 'SampleReceived',
-        'SampleReceived': 'Testing',
-        'Testing': 'Completed'
-      };
-      return homeStatusFlow[currentStatus] || null;
-    } else {
-      const facilityStatusFlow = {
-        'Pending': 'Confirmed',
-        'Confirmed': 'SampleReceived',
-        'SampleReceived': 'Testing',
-        'Testing': 'Completed'
-      };
-      return facilityStatusFlow[currentStatus] || null;
+  if (locationType === 'Tại nhà') {
+    const homeStatusFlow = {
+      'Pending': 'DeliveringKit',
+      'DeliveringKit': 'KitDelivered', 
+      'KitDelivered': 'SampleReceived',
+      'SampleReceived': 'Testing',
+      'Testing': 'Completed',
+      // ✅ Add fallback for "Confirmed" status in home service
+      'Confirmed': 'DeliveringKit'  // If somehow confirmed for home service, go to delivering kit
+    };
+    return homeStatusFlow[currentStatus] || null;
+  } else {
+    const facilityStatusFlow = {
+      'Pending': 'Confirmed',
+      'Confirmed': 'SampleReceived', 
+      'SampleReceived': 'Testing',
+      'Testing': 'Completed',
+      // ✅ Add fallback for home service statuses in facility service
+      'DeliveringKit': 'SampleReceived',  // If somehow in delivering kit for facility, skip to sample received
+      'KitDelivered': 'SampleReceived'    // If somehow kit delivered for facility, go to sample received
+    };
+    return facilityStatusFlow[currentStatus] || null;
+  }
+};
+
+const normalizeStatusForLocationType = (status: string, locationType: string): string => {
+  // If it's a home service but has "Confirmed" status, treat it as DeliveringKit
+  if (locationType === 'Tại nhà' && status === 'Confirmed') {
+    return 'DeliveringKit';
+  }
+  
+  // If it's a facility service but has home-specific statuses, normalize them
+  if (locationType === 'Cơ sở y tế') {
+    if (status === 'DeliveringKit' || status === 'KitDelivered') {
+      return 'Confirmed';
     }
+  }
+  
+  return status;
+};
+
+  // ✅ Updated handler for step progression
+  const handleStepProgression = (appointment: Appointment, nextStatus: string) => {
+    // ✅ Special handling for SampleReceived step - trigger sample creation
+    if (nextStatus === 'SampleReceived') {
+      console.log('🧪 Triggering sample creation for appointment:', appointment.id);
+      onCreateSamples(appointment);
+      return;
+    }
+    
+    // For other statuses, proceed normally
+    onUpdateStatus(appointment.id, nextStatus as Appointment['status']);
   };
 
   // ✅ Get appropriate step configuration based on location type
@@ -211,7 +251,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
   const statusConfig = getStatusConfig(appointment.status);
   const StatusIcon = statusConfig.icon;
-  const nextStatus = getNextStatus(appointment.status, appointment.locationType);
+  const normalizedStatus = normalizeStatusForLocationType(appointment.status, appointment.locationType);
+  const nextStatus = getNextStatus(normalizedStatus, appointment.locationType );
   const currentStepIndex = getCurrentStepIndex();
   
 
@@ -464,33 +505,69 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
 
         <div className="flex items-center gap-2">
           {/* Status progression button */}
-          {nextStatus && appointment.status !== 'Cancelled' && appointment.status !== 'Completed' && (
-            <button
-              onClick={() => onUpdateStatus(appointment.id, nextStatus as Appointment['status'])}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium"
-            >
-              <ArrowRight className="w-4 h-4" />
-              <span>
-                {nextStatus === 'DeliveringKit' && 'Giao kit'}
-                {nextStatus === 'Confirmed' && 'Xác nhận'}
-                {nextStatus === 'KitDelivered' && 'Đã giao kit'}
-                {nextStatus === 'SampleReceived' && 'Đã nhận mẫu'}
-                {nextStatus === 'Testing' && 'Bắt đầu XN'}
-                {nextStatus === 'Completed' && 'Hoàn thành'}
-              </span>
-            </button>
-          )}
+          {(() => {
+      // For Pending status - show Confirm button
+      if (appointment.status === 'Pending') {
+        return (
+          <button
+            onClick={() => onConfirm(appointment)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
+          >
+            <CheckCircle className="w-4 h-4" />
+            <span>Xác nhận</span>
+          </button>
+        );
+      }
+      
+      // For other statuses with next step - show progression button
+      if (nextStatus && appointment.status !== 'Cancelled' && appointment.status !== 'Completed') {
+        const getNextStepLabel = (status: string) => {
+          const labels = {
+            'DeliveringKit': 'Giao kit',
+            'Confirmed': 'Check-in',
+            'KitDelivered': 'Đã giao kit', 
+            'SampleReceived': 'Nhận mẫu',  // ✅ This will trigger sample creation
+            'Testing': 'Bắt đầu XN',
+            'Completed': 'Hoàn thành'
+          };
+          return labels[status] || 'Tiếp theo';
+        };
 
-          {/* Confirm button - only for pending appointments */}
-          {appointment.status === 'Pending' && (
-            <button
-              onClick={() => onConfirm(appointment)}
-              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-sm font-medium"
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>Xác nhận</span>
-            </button>
-          )}
+        return (
+          <button
+            onClick={() => handleStepProgression(appointment, nextStatus)}  // ✅ Use new handler
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span>{getNextStepLabel(nextStatus)}</span>
+          </button>
+        );
+      }
+
+      // For completed status - show completion indicator
+      if (appointment.status === 'Completed') {
+        return (
+          <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+            <CheckCircle className="w-4 h-4" />
+            <span>Đã hoàn thành</span>
+          </div>
+        );
+      }
+
+      // For cancelled status - show cancellation indicator  
+      if (appointment.status === 'Cancelled') {
+        return (
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+            <XCircle className="w-4 h-4" />
+            <span>Đã hủy</span>
+          </div>
+        );
+      }
+
+      return null;
+    })()}
+
+          
 
           {/* Cancel button - for non-completed appointments */}
           {appointment.status !== 'Cancelled' && appointment.status !== 'Completed' && (
