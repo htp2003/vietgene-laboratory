@@ -1068,24 +1068,29 @@ class OrderService {
     }
   }
 
+  // ✅ Replace this method in orderService.ts
   async getSamplesByUserId(userId?: string): Promise<Sample[]> {
     try {
       const targetUserId = userId || this.getCurrentUserId();
-      console.log("🔍 Fetching samples for user:", targetUserId);
-      const response = await apiClient.get(`/samples/user/${targetUserId}`);
 
-      if (response.data.code === 200) {
-        const samples = response.data.result || [];
-        console.log(`✅ User samples loaded:`, samples.length);
-        return samples;
+      // ✅ NEW: Get via orders instead of direct user samples
+      const userOrders = await this.getUserOrders(targetUserId);
+      const allSamples: Sample[] = [];
+
+      for (const order of userOrders) {
+        const kits = await this.getSampleKitsByOrderId(
+          order.orderId || order.id
+        );
+        for (const kit of kits) {
+          const samples = await this.getSamplesByKitId(kit.id);
+          allSamples.push(...samples);
+        }
       }
 
-      return [];
-    } catch (error: any) {
-      console.error(
-        "❌ User samples API failed:",
-        error.response?.data || error.message
-      );
+      console.log(`✅ Found ${allSamples.length} samples via order/kit method`);
+      return allSamples;
+    } catch (error) {
+      console.error("❌ Error getting samples:", error);
       return [];
     }
   }
