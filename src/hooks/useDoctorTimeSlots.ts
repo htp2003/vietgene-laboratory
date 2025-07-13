@@ -79,6 +79,7 @@ export const useDoctorTimeSlots = (doctorId: string) => {
 
   // Update time slot
   const updateTimeSlot = useCallback(async (timeSlotId: string, timeSlotData: Partial<TimeSlotRequest>) => {
+    console.log('Updating time slot:', { timeSlotId, timeSlotData });
     try {
       setError(null);
       
@@ -213,16 +214,24 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     const slotsOnSameDay = timeSlots.filter(slot => 
       slot.dayOfWeek === dayOfWeek && slot.id !== excludeId
     );
+
+    // Chuyển đổi thời gian sang phút để so sánh chính xác hơn
+  const toMinutes = (timeStr: string) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
     
-    const newStart = new Date(`1970-01-01T${startTime}:00`);
-    const newEnd = new Date(`1970-01-01T${endTime}:00`);
+    const newStart = toMinutes(startTime);
+    const newEnd = toMinutes(endTime);
     
+
+    // Kiểm tra xung đột với các khung giờ khác
     return slotsOnSameDay.some(slot => {
-      const existingStart = new Date(`1970-01-01T${slot.startTime}:00`);
-      const existingEnd = new Date(`1970-01-01T${slot.endTime}:00`);
+      const existingStart = toMinutes(slot.startTime);
+      const existingEnd = toMinutes(slot.endTime);
       
-      // Check for overlap
-      return (newStart < existingEnd && newEnd > existingStart);
+     // Kiểm tra xem có xung đột không
+      return newStart < existingEnd && newEnd > existingStart;
     });
   }, [timeSlots]);
 

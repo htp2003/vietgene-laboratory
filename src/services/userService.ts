@@ -305,6 +305,8 @@ export const userService = {
           message: "ID người dùng không hợp lệ"
         };
       }
+
+      
       
       // Prepare API request data - only send fields that have values
       const apiData: UserUpdateRequest = {};
@@ -320,6 +322,10 @@ export const userService = {
       if (userData.full_name && userData.full_name.trim()) {
         apiData.full_name = userData.full_name.trim();
       }
+
+      if (userData.password && userData.password.trim()) {
+        apiData.password = userData.password.trim();
+      }
       
       if (userData.dob && userData.dob.trim()) {
         // Ensure date format is correct (YYYY-MM-DD)
@@ -333,11 +339,6 @@ export const userService = {
       
       if (userData.roles && userData.roles.length > 0) {
         apiData.roles = userData.roles;
-      }
-      
-      // Don't send password unless specifically provided
-      if (userData.password && userData.password.trim()) {
-        apiData.password = userData.password.trim();
       }
       
       console.log('📤 Final API data being sent:', JSON.stringify(apiData, null, 2));
