@@ -44,6 +44,7 @@ const OrderBooking: React.FC = () => {
     getDayName,
     validateStep,
     calculateTotal,
+    getStepSpecificError,
     handleSubmit,
   } = useOrderBooking();
 
