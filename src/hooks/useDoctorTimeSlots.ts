@@ -82,8 +82,23 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     console.log('Updating time slot:', { timeSlotId, timeSlotData });
     try {
       setError(null);
+
+      // Lấy thông tin khung giờ cũ
+      const oldTimeSlot = timeSlots.find(slot => slot.id === timeSlotId);
+      if (!oldTimeSlot) {
+        return { success: false, message: "Không tìm thấy khung giờ" };
+      }
+
+      const updateData = {
+        ...timeSlotData,
+        startTime: timeSlotData.startTime || oldTimeSlot.startTime,
+        endTime: timeSlotData.endTime || oldTimeSlot.endTime,
+        dayOfWeek: timeSlotData.dayOfWeek ?? oldTimeSlot.dayOfWeek,
+        isAvailable: timeSlotData.isAvailable ?? oldTimeSlot.isAvailable,
+        doctorId: timeSlotData.doctorId || oldTimeSlot.doctorId,
+      }
       
-      const response = await doctorTimeSlotService.updateTimeSlot(timeSlotId, timeSlotData);
+      const response = await doctorTimeSlotService.updateTimeSlot(timeSlotId, updateData);
       
       if (response.success && response.data) {
         setTimeSlots(prev => {
