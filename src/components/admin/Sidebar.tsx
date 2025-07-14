@@ -24,8 +24,6 @@ const menuItems: MenuItem[] = [
   { title: 'Doctors', path: '/admin/doctors', icon: <FaUsers size={20} /> },
   { title: 'Services', path: '/admin/services', icon: <FaVial size={20} /> },
   { title: 'Blog', path: '/admin/blog', icon: <FaBlog size={20} /> },
-  { title: 'Appointments', path: '/admin/appointments', icon: <FaCalendarAlt size={20} /> },
-  { title: 'Reports', path: '/admin/reports', icon: <FaChartBar size={20} /> },
   { title: 'Settings', path: '/admin/settings', icon: <FaCog size={20} /> }
 ]
 
