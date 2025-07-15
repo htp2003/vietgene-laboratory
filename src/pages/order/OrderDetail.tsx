@@ -12,6 +12,7 @@ import {
   Mail,
   Download,
   RefreshCw,
+  FileText, // Added for test results tab
 } from "lucide-react";
 
 // Hook - using the fixed version
@@ -19,6 +20,7 @@ import { useOrderDetail } from "../../hooks/useOrderDetail";
 
 // Enhanced Components
 import { EnhancedSamplesTab } from "../../components/customer/orderDetail/EnhancedSamplesTab";
+import TestResultsSection from "../../components/customer/orderDetail/TestResultsSection"; // New import
 
 // Mock other components for now - you can replace with actual imports
 const OrderHeader: React.FC<any> = ({
@@ -79,11 +81,13 @@ const OrderHeader: React.FC<any> = ({
   </div>
 );
 
+// ✅ Updated TabNavigation with Test Results tab
 const TabNavigation: React.FC<any> = ({
   activeTab,
   onTabChange,
   samplesCount,
   kitsCount,
+  testResultsCount, // New prop
 }) => {
   const tabs = [
     { id: "progress", label: "Tiến độ", icon: TrendingUp },
@@ -93,6 +97,11 @@ const TabNavigation: React.FC<any> = ({
       id: "samples",
       label: `Kit & Mẫu (${kitsCount + samplesCount})`,
       icon: TestTube,
+    },
+    {
+      id: "results", // New tab
+      label: `Kết quả (${testResultsCount})`,
+      icon: FileText,
     },
   ];
 
@@ -296,6 +305,32 @@ const OrderDetail: React.FC = () => {
     handleTrackKit,
   } = useOrderDetail();
 
+  // ✅ Get current user ID for test results
+  const getCurrentUserId = (): string => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      return user.id || "";
+    } catch {
+      return "";
+    }
+  };
+
+  // ✅ Get sample IDs from order for test results filtering
+  const getSampleIds = (): string[] => {
+    if (!order?.samples) return [];
+    return order.samples.map((sample: any) => sample.id);
+  };
+
+  // ✅ Mock test results count (replace with actual count from service)
+  const getTestResultsCount = (): number => {
+    // In real implementation, this would come from testResultService
+    // For now, return a mock count based on completed samples
+    const completedSamples =
+      order?.samples?.filter((sample: any) => sample.status === "completed") ||
+      [];
+    return completedSamples.length;
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -350,6 +385,16 @@ const OrderDetail: React.FC = () => {
           />
         );
 
+      case "results": // ✅ New tab content
+        return (
+          <TestResultsSection
+            sampleIds={getSampleIds()}
+            userId={getCurrentUserId()}
+            showSummary={true}
+            className="test-results-tab"
+          />
+        );
+
       default:
         return <ProgressTab trackingSteps={trackingSteps} />;
     }
@@ -365,7 +410,6 @@ const OrderDetail: React.FC = () => {
           overallProgress={overallProgress}
         />
 
-        {/* Debug Info (remove in production) */}
         {/* Debug Info (remove in production) */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
           <details>
@@ -390,7 +434,13 @@ const OrderDetail: React.FC = () => {
                 <strong>Samples:</strong> {order.samples?.length || 0}
               </p>
               <p>
+                <strong>Test Results Expected:</strong> {getTestResultsCount()}
+              </p>
+              <p>
                 <strong>Overall Progress:</strong> {overallProgress}%
+              </p>
+              <p>
+                <strong>Sample IDs:</strong> {getSampleIds().join(", ")}
               </p>
             </div>
           </details>
@@ -403,6 +453,7 @@ const OrderDetail: React.FC = () => {
             onTabChange={handleTabChange}
             samplesCount={order.samples?.length || 0}
             kitsCount={order.sampleKits?.length || 0}
+            testResultsCount={getTestResultsCount()} // ✅ New prop
           />
 
           <div className="p-8">{renderTabContent()}</div>
@@ -439,6 +490,33 @@ const OrderDetail: React.FC = () => {
             </a>
           </div>
         </div>
+
+        {/* ✅ Test Results Quick Access (when results are available) */}
+        {getTestResultsCount() > 0 && activeTab !== "results" && (
+          <div className="mt-6 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-8 h-8 text-green-600" />
+                <div>
+                  <h4 className="font-medium text-green-800">
+                    Kết quả xét nghiệm đã sẵn sàng! 🎉
+                  </h4>
+                  <p className="text-sm text-green-600">
+                    {getTestResultsCount()} kết quả đã hoàn thành và sẵn sàng
+                    xem
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleTabChange("results")}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Xem kết quả
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
