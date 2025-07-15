@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
+import userService, { UserCreationRequest } from "../../services/userService";
 
 interface RegisterFormData {
   fullName: string;
@@ -21,6 +22,7 @@ interface RegisterFormData {
   password: string;
   confirmPassword: string;
   agreeTerms: boolean;
+  dob: string;
 }
 
 interface RegisterFormProps {
@@ -49,40 +51,22 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
     const loadingToast = toast.loading("Đang tạo tài khoản...");
 
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Mock email/username check
-      const existingUsers = [
-        "admin@vietgene.vn",
-        "test@gmail.com",
-        "admin",
-        "testuser",
-      ];
-
-      if (
-        existingUsers.includes(data.email) ||
-        existingUsers.includes(data.username)
-      ) {
-        toast.error("Email hoặc tên đăng nhập đã tồn tại!", {
-          id: loadingToast,
-          duration: 4000,
-        });
-        return;
+      const apiData: UserCreationRequest = {
+        username: data.username.trim(),
+        password: data.password.trim(),
+        email: data.email.trim(),
+        full_name: data.fullName.trim(),
+        dob: data.dob || new Date().toISOString().split('T')[0],
       }
+      
+      const result = await userService.createUser(apiData);
+      if (result.success && result.data) {
+        localStorage.setItem("user", JSON.stringify(result.data));
 
-      // Success case
-      const newUser = {
-        id: Date.now(),
-        email: data.email,
-        username: data.username,
-        fullName: data.fullName,
-        phone: data.phone,
-        role: "customer",
-      };
-
-      localStorage.setItem("user", JSON.stringify(newUser));
-
+        if (onSubmit) {
+          onSubmit(data);
+        }
+      }
       toast.success(
         "Tạo tài khoản thành công! Chào mừng bạn đến với VietGene Lab!",
         {
@@ -91,9 +75,32 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
         }
       );
 
-      setTimeout(() => navigate("/"), 1500);
-    } catch (error) {
-      toast.error("Có lỗi xảy ra, vui lòng thử lại!", {
+      setTimeout(() => navigate("/login"), 1500);
+    } catch (error: any) {
+      console.error("❌ Registration error:", error);
+      
+      let errorMessage = "Có lỗi xảy ra, vui lòng thử lại!";
+      
+      if (error.response) {
+        // Handle specific API errors
+        switch (error.response.status) {
+          case 409:
+            errorMessage = "Email hoặc tên đăng nhập đã tồn tại!";
+            break;
+          case 400:
+            errorMessage = "Thông tin đăng ký không hợp lệ!";
+            break;
+          case 500:
+            errorMessage = "Lỗi server, vui lòng thử lại sau!";
+            break;
+          default:
+            errorMessage = error.response.data?.message || errorMessage;
+        }
+      } else if (error.request) {
+        errorMessage = "Không thể kết nối đến server, vui lòng kiểm tra kết nối mạng!";
+      }
+
+      toast.error(errorMessage, {
         id: loadingToast,
         duration: 4000,
       });
@@ -101,6 +108,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
       setIsLoading(false);
     }
   };
+      
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center py-12 px-4">
@@ -228,6 +236,46 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">
                   {errors.email.message}
+                </p>
+              )}
+            </div>
+
+                        {/* Date of Birth */}
+                        <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ngày sinh
+              </label>
+              <div className="relative">
+                <input
+                  {...register("dob", {
+                    validate: (value) => {
+                      if (!value) return true; // Optional field
+                      
+                      const date = new Date(value);
+                      const today = new Date();
+                      const minDate = new Date();
+                      minDate.setFullYear(today.getFullYear() - 100);
+                      
+                      if (date > today) {
+                        return "Ngày sinh không thể trong tương lai";
+                      }
+                      
+                      if (date < minDate) {
+                        return "Ngày sinh không hợp lệ";
+                      }
+                      
+                      return true;
+                    },
+                  })}
+                  type="date"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors ${
+                    errors.dob ? "border-red-300" : "border-gray-300"
+                  }`}
+                />
+              </div>
+              {errors.dob && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.dob.message}
                 </p>
               )}
             </div>

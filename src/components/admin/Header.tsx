@@ -63,12 +63,6 @@ export default function Header({ children }: HeaderProps) {
     return user.full_name || user.fullName || user.username || "Admin";
   };
 
-  // Helper function để hiển thị email
-  const getUserEmail = () => {
-    if (!user) return "admin@vietgene.com";
-    return user.email || `${user.username}@vietgene.com`;
-  };
-
   // Helper function để hiển thị role
   const getUserRole = () => {
     if (!user) return "Administrator";
@@ -139,7 +133,6 @@ export default function Header({ children }: HeaderProps) {
                     <p className="text-sm font-medium text-gray-900">
                       {getUserDisplayName()}
                     </p>
-                    <p className="text-sm text-gray-500">{getUserEmail()}</p>
                     <p className="text-xs text-blue-600 mt-1">
                       {getUserRole()}
                     </p>
