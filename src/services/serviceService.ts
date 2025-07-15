@@ -222,7 +222,6 @@ export const getServiceTypeName = (type: string | undefined): string => {
   if (!type) return "Chưa xác định";
 
   const types: { [key: string]: string } = {
-    Nhanh: "Nhanh",
     civil: "Dân sự",
     administrative: "Pháp lý",
   };
@@ -326,17 +325,6 @@ export const mapApiServiceToFrontend = (apiService: any): Service => {
       },
     ],
   };
-
-  console.log("=== FINAL MAPPED ===");
-  console.log("mapped.price:", mapped.price, typeof mapped.price);
-  console.log(
-    "mapped.duration_days:",
-    mapped.duration_days,
-    typeof mapped.duration_days
-  );
-  console.log("mapped.service_name:", mapped.service_name);
-  console.log("===================");
-
   return mapped;
 };
 
