@@ -56,7 +56,7 @@ interface DashboardData {
   totalOrders: number;
   paidOrders: number;
   revenueByMonth: MonthlyRevenue[];
-  revenueByPaymentMethod: { method: string; revenue: number; count: number; }[];
+  revenueByPaymentMethod: { method: string; methodDisplay: string; revenue: number; count: number; }[];
   topServices: TopService[];
 }
 
@@ -79,6 +79,40 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, trend })
     </div>
   </div>
 );
+
+const getCustomePaymentMethod = (method: string): string => {
+  const methodLower = method.toLowerCase();
+
+  switch (methodLower) {
+    case 'transfer':
+      return 'Chuyển khoản';
+    case 'cash':
+      return 'Tiền mặt';
+    case 'credit_card':
+    case 'creditcard':
+    case 'credit card':
+      return 'Thẻ tín dụng';
+    case 'debit_card':
+    case 'debitcard':
+    case 'debit card':
+      return 'Thẻ ghi nợ';
+    case 'e_wallet':
+    case 'ewallet':
+    case 'e-wallet':
+      return 'Ví điện tử';
+    case 'bank_transfer':
+    case 'banktransfer':
+      return 'Chuyển khoản ngân hàng';
+    case 'momo':
+      return 'MoMo';
+    case 'zalopay':
+      return 'ZaloPay';
+    case 'vnpay':
+      return 'VNPay';
+    default:
+      return method || 'Không xác định';
+  }
+};
 
 export default function AdminDashboard() {
   const { services, getServiceStats } = useServices();
@@ -119,11 +153,9 @@ export default function AdminDashboard() {
         });
         
         const data = await response.json();
-        console.log('Orders API response:', data); // Debug log
         
         if (data.code === 200 && data.result) {
           setOrders(data.result);
-          console.log('Orders loaded:', data.result); // Debug log
         } else {
           console.error('API Error:', data.message);
         }
@@ -140,15 +172,12 @@ export default function AdminDashboard() {
   // Tính toán các chỉ số dashboard thực từ dữ liệu đơn hàng
   useEffect(() => {
     if (orders.length > 0) { // Chỉ cần orders, không cần đợi services
-      console.log('Calculating dashboard data with orders:', orders); // Debug log
       
       // Tính toán các chỉ số doanh thu thực
       const totalRevenue = orders.reduce((sum, order) => sum + order.total_amount, 0);
       const paidOrders = orders.filter(order => order.payment_status.toLowerCase() === 'paid');
       const paidRevenue = paidOrders.reduce((sum, order) => sum + order.total_amount, 0);
       const averageOrderValue = totalRevenue / orders.length;
-
-      console.log('Revenue calculations:', { totalRevenue, paidRevenue, paidOrders: paidOrders.length }); // Debug log
 
       // Nhóm doanh thu theo tháng (dữ liệu thực)
       const revenueByMonth: MonthlyRevenue[] = orders.reduce((acc: MonthlyRevenue[], order) => {
@@ -170,7 +199,10 @@ export default function AdminDashboard() {
       }, []).sort((a, b) => a.month.localeCompare(b.month));
 
       // Nhóm doanh thu theo phương thức thanh toán
-      const revenueByPaymentMethod = orders.reduce((acc: { method: string; revenue: number; count: number; }[], order) => {
+      const revenueByPaymentMethod = orders.reduce((acc: { method: string; methodDisplay: string; revenue: number; count: number; }[], order) => {
+        const originalMethod = order.payment_method || 'unknown';
+        const vietnameseMethod = getCustomePaymentMethod(originalMethod);
+       
         const existing = acc.find(item => item.method === order.payment_method);
         if (existing) {
           existing.revenue += order.total_amount;
@@ -178,6 +210,7 @@ export default function AdminDashboard() {
         } else {
           acc.push({
             method: order.payment_method || 'Không xác định',
+            methodDisplay: vietnameseMethod,
             revenue: order.total_amount,
             count: 1
           });
@@ -205,7 +238,6 @@ export default function AdminDashboard() {
         topServices
       };
 
-      console.log('New dashboard data:', newDashboardData); // Debug log
       setDashboardData(newDashboardData);
     }
   }, [orders, services]);
@@ -318,7 +350,7 @@ export default function AdminDashboard() {
                   label={(entry: any) => {
                     const total = dashboardData.revenueByPaymentMethod.reduce((sum, item) => sum + item.revenue, 0);
                     const percent = (entry.revenue / total) * 100;
-                    return `${entry.method} ${percent.toFixed(0)}%`;
+                    return `${entry.methodDisplay} ${percent.toFixed(0)}%`;
                   }}
                   outerRadius={80}
                   fill="#8884d8"
@@ -356,7 +388,7 @@ export default function AdminDashboard() {
                   <div>
                     <p className="font-medium text-gray-900">{formatPrice(order.total_amount)}</p>
                     <p className="text-sm text-gray-500">
-                      {order.payment_method} • {order.status}
+                      {getCustomePaymentMethod(order.payment_method)} • {order.status}
                     </p>
                   </div>
                 </div>
