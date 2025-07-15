@@ -399,7 +399,7 @@ export class AppointmentService {
     return {
       id: appointment.id,
       customerName: user?.full_name || user?.username || 'Unknown Customer',
-      phone: 'N/A', // Not available in user schema, might need to get from other source
+      phoneNumber: user?.phoneNumber || 'N/A', // Not available in user schema, might need to get from other source
       email: user?.email || 'N/A',
       date: appointmentDate.toISOString().split('T')[0],
       time: appointmentDate.toTimeString().split(' ')[0].substring(0, 5),
@@ -415,6 +415,8 @@ export class AppointmentService {
       currentStep: StatusUtils.getStepFromStatus(status),
       completedSteps: StatusUtils.getCompletedSteps(StatusUtils.getStepFromStatus(status)),
       lastStatusUpdate: appointment.updatedAt,
+      orderId: appointment.orderId,  // ✅ Map orderId from API
+      userId: appointment.userId,    // ✅ Map userId from API
       rawData: {
         appointment,
         order,
@@ -432,7 +434,7 @@ export class AppointmentService {
     return {
       id: appointment.id,
       customerName: 'Loading...', // Indicator that user data failed to load
-      phone: 'N/A',
+      phoneNumber: 'N/A',
       email: 'N/A',
       date: appointmentDate.toISOString().split('T')[0],
       time: appointmentDate.toTimeString().split(' ')[0].substring(0, 5),

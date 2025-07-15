@@ -3,14 +3,14 @@ import { OrderParticipant } from "../services/staffService/orderParticipantServi
 
 export interface TestResult {
   id: string;
-  appointmentId: string;
+  appointmentId: string; // Main identifier for parent component
+  sampleId?: string; // Optional sample reference
   resultType: 'Positive' | 'Negative' | 'Inconclusive';
   resultPercentage?: number;
   conclusion: string;
   resultDetails: string;
   resultFile?: File;
   testedDate: string;
-  verifiedByStaffId: string;
 }
 
 export interface ApiResponse<T> {
@@ -295,7 +295,7 @@ export interface SampleRequest {
   notes?: string;
   sample_quality?: string;
   userId: string;
-  orderId: string;
+  orderId:string;
   sampleKitsId?: string;
 }
 
@@ -366,7 +366,7 @@ export interface OrderParticipantRequest {
 export interface Appointment {
   id: string;
   customerName: string;
-  phone: string;
+  phoneNumber: string;
   email: string;
   date: string;
   time: string;
@@ -387,6 +387,11 @@ export interface Appointment {
   currentStep?: number;
   completedSteps?: string[];
   lastStatusUpdate?: string;
+  
+  // ✅ Add direct sample ID field for easier access
+  sampleId?: string;
+  orderId?: string;
+  userId?: string;
   // Raw API data for reference
   rawData?: {
     appointment: ApiAppointment;
@@ -397,6 +402,15 @@ export interface Appointment {
     doctor?: ApiDoctor;
     timeSlot?: ApiDoctorTimeSlot;
     participants?: OrderParticipant[];
+    samples?: Array<{
+      id: string;
+      sample_code: string;
+      sample_type: string;
+      collection_date?: string;
+      received_date?: string;
+      status?: string;
+      sample_quality?: string;
+    }>;
   };
 }
 
@@ -426,10 +440,44 @@ export interface AppointmentModalProps {
   onUpdateStatus: (appointmentId: string, status: Appointment['status']) => void;
 }
 
+// ✅ Add API TestResult interfaces to match your API schema
+export interface ApiTestResult {
+  id: string;
+  result_type: string;
+  result_percentage: string;
+  conclusion: string;
+  result_detail: string;
+  result_file: string;
+  tested_date: string;
+  user_id: string;
+  sample_id: string;
+}
+
+export interface TestResultRequest {
+  id?: string;
+  result_type: string;
+  result_percentage?: string;
+  conclusion: string;
+  result_detail: string;
+  result_file?: string;
+  tested_date: string;
+  sample_id: string;
+}
+
+// ✅ Updated TestResultModalProps to be more flexible
 export interface TestResultModalProps {
   appointment: Appointment | null;
   isOpen: boolean;
   onClose: () => void;
   onSaveResult: (result: TestResult) => void;
+}
+
+// ✅ Add sample creation modal props
+export interface SampleCreationModalProps {
+  appointment: Appointment | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSamplesCreated: (appointmentId: string) => Promise<void>;
+  triggerElement?: HTMLElement | null;
 }
 
