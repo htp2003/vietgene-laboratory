@@ -87,35 +87,6 @@ const Header: React.FC = () => {
     return user.full_name || user.fullName || user.username || "User";
   };
 
-  // ✅ Helper function để hiển thị email
-  const getUserEmail = () => {
-    if (!user) return "";
-    return user.email || `${user.username}@example.com`;
-  };
-
-  // ✅ Helper function để hiển thị role
-  const getUserRole = () => {
-    if (!user) return "";
-
-    // Map roles to Vietnamese
-    const roleMap: { [key: string]: string } = {
-      ROLE_ADMIN: "Quản trị viên",
-      administrator: "Quản trị viên",
-      admin: "Quản trị viên",
-      doctor: "Bác sĩ",
-      staff: "Nhân viên",
-      customer: "Khách hàng",
-    };
-
-    // Get role from roles array or fallback to role field
-    let roleName = user.role;
-    if (user.roles && user.roles.length > 0) {
-      roleName = user.roles[0].name;
-    }
-
-    return roleMap[roleName || ""] || roleName || "Người dùng";
-  };
-
   return (
     <header className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4">
@@ -163,7 +134,6 @@ const Header: React.FC = () => {
                     <p className="text-sm font-medium text-gray-900">
                       {getUserDisplayName()}
                     </p>
-                    <p className="text-xs text-gray-500">{getUserRole()}</p>
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
@@ -175,10 +145,6 @@ const Header: React.FC = () => {
                     <div className="px-4 py-3 border-b border-gray-200">
                       <p className="text-sm font-medium text-gray-900">
                         {getUserDisplayName()}
-                      </p>
-                      <p className="text-sm text-gray-500">{getUserEmail()}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        ID: {user.userId}
                       </p>
                     </div>
 
@@ -291,12 +257,6 @@ const Header: React.FC = () => {
                       <div>
                         <p className="font-medium text-gray-900">
                           {getUserDisplayName()}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {getUserEmail()}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {getUserRole()} • ID: {user.userId}
                         </p>
                       </div>
                     </div>
