@@ -10,6 +10,7 @@ export interface SampleRequest {
   shipping_tracking?: string;
   notes?: string;
   sample_quality: string;
+  ordersId: string;
   sampleKitsId: string;
 }
 
@@ -167,11 +168,11 @@ export class SampleService {
   /**
    * Get samples by user ID
    */
-  static async getSamplesByUserId(userId: string): Promise<SampleResponse[]> {
+  static async getSamplesByOrderId(orderId: string): Promise<SampleResponse[]> {
     try {
-      console.log('👤 Getting samples by user ID:', userId);
+      console.log('👤 Getting samples by user ID:', orderId);
 
-      const response = await apiClient.get<{code: number, message: string, result: SampleResponse[]}>(`/samples/user/${userId}`);
+      const response = await apiClient.get<{code: number, message: string, result: SampleResponse[]}>(`/samples/order/${orderId}`);
 
       if (response.data.code === 200) {
         console.log('✅ User samples fetched successfully:', response.data.result.length);

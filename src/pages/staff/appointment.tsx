@@ -20,6 +20,8 @@ import { AppointmentService } from "../../services/staffService/staffAppointment
 import { NotificationService } from "../../services/staffService/notificationService";
 import { StatusUtils } from "../../utils/status";
 import NotificationBell from "../../components/appointment/NotificationBell";
+import { AppointmentSampleIntegration } from "../../services/staffService/appointmentSampleIntegration";
+import { SampleStatusManager } from "../../services/staffService/sampleStatusManager";
 import {
   Appointment,
   TestResult,
@@ -172,7 +174,7 @@ const StaffAppointments: React.FC = () => {
 
       const matchesSearch =
         a.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (a.phone && a.phone.includes(searchTerm)) ||
+        (a.phoneNumber && a.phoneNumber.includes(searchTerm)) ||
         (a.email && a.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (a.doctorInfo?.name &&
           a.doctorInfo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -313,119 +315,181 @@ const StaffAppointments: React.FC = () => {
   };
 
   const handleSamplesCreated = async (appointmentId: string) => {
-    try {
-      console.log("✅ Samples created successfully for appointment:", appointmentId);
+  try {
+    console.log("✅ Samples created successfully for appointment:", appointmentId);
 
-      const appointment = appointments.find(a => a.id === appointmentId);
-      if (!appointment) return;
+    const appointment = appointments.find(a => a.id === appointmentId);
+    if (!appointment) return;
 
-      setSampleCreationAppointment(null);
-      await updateAppointmentStatus(appointmentId, "SampleReceived");
+    setSampleCreationAppointment(null);
+    
+    // Update appointment status - samples sẽ được tự động set status "received"
+    await updateAppointmentStatus(appointmentId, "SampleReceived");
 
-      // ✅ Send notification to all staff about sample received
-      await NotificationService.notifyStaffAboutStatusChange(
-        appointment.customerName,
-        appointmentId,
-        "SampleReceived"
-      );
+    // Send notification
+    await NotificationService.notifyStaffAboutStatusChange(
+      appointment.customerName,
+      appointmentId,
+      "SampleReceived"
+    );
 
-      console.log("🎉 Appointment status updated to SampleReceived");
+    console.log("🎉 Appointment status updated to SampleReceived");
 
-    } catch (error: any) {
-      console.error("❌ Error handling samples creation:", error);
-      setError("Có lỗi xảy ra sau khi tạo mẫu xét nghiệm");
-    }
-  };
-
+  } catch (error: any) {
+    console.error("❌ Error handling samples creation:", error);
+    setError("Có lỗi xảy ra sau khi tạo mẫu xét nghiệm: " + error.message);
+  }
+};
+  const [sampleUpdateNotifications, setSampleUpdateNotifications] = useState<{
+  [appointmentId: string]: {
+    show: boolean;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }
+}>({});
   // ✅ Updated with notification integration
   const updateAppointmentStatus = async (
-    appointmentId: string,
-    newStatus: Appointment["status"]
-  ) => {
-    try {
-      console.log(`🔄 Updating appointment ${appointmentId}: ${newStatus}`);
+  appointmentId: string,
+  newStatus: Appointment["status"]
+) => {
+  try {
+    console.log(`🔄 Updating appointment ${appointmentId}: ${newStatus}`);
 
-      const appointment = appointments.find((a) => a.id === appointmentId);
-      if (!appointment) return;
+    const appointment = appointments.find((a) => a.id === appointmentId);
+    if (!appointment) return;
 
-      if (newStatus === "Completed") {
-        setTestResultAppointment(appointment);
-        return;
-      }
+    if (newStatus === "Completed") {
+      setTestResultAppointment(appointment);
+      return;
+    }
 
-      StatusUtils.saveAppointmentStatus(
-        appointmentId,
-        newStatus,
-        StatusUtils.getStepFromStatus(newStatus)
-      );
+    // ✅ VALIDATE status change with samples
+    const validation = await AppointmentSampleIntegration.validateAppointmentStatusChange(
+      appointment, 
+      newStatus
+    );
 
-      setAppointments((prev) =>
-        prev.map((a) => {
-          if (a.id === appointmentId) {
-            const newStep = StatusUtils.getStepFromStatus(newStatus);
-            return {
-              ...a,
-              status: newStatus,
-              currentStep: newStep,
-              completedSteps: StatusUtils.getCompletedSteps(newStep),
-              lastStatusUpdate: new Date().toISOString(),
-            };
-          }
-          return a;
-        })
-      );
+    if (!validation.canUpdate) {
+      setError(`Không thể cập nhật: ${validation.reason}`);
+      return;
+    }
 
-      // ✅ Send notification to all staff about status change (except SampleReceived which is handled separately)
-      if (newStatus !== "SampleReceived") {
-        await NotificationService.notifyStaffAboutStatusChange(
-          appointment.customerName,
+    // ✅ SỬ DỤNG AppointmentSampleIntegration để update cả appointment và samples
+    const updateResult = await AppointmentSampleIntegration.updateAppointmentWithSamples(
+      appointment,
+      newStatus,
+      async (appointmentId: string, status: Appointment["status"]) => {
+        // Original appointment update logic
+        StatusUtils.saveAppointmentStatus(
           appointmentId,
-          newStatus
+          status,
+          StatusUtils.getStepFromStatus(status)
+        );
+
+        setAppointments((prev) =>
+          prev.map((a) => {
+            if (a.id === appointmentId) {
+              const newStep = StatusUtils.getStepFromStatus(status);
+              return {
+                ...a,
+                status: status,
+                currentStep: newStep,
+                completedSteps: StatusUtils.getCompletedSteps(newStep),
+                lastStatusUpdate: new Date().toISOString(),
+              };
+            }
+            return a;
+          })
         );
       }
+    );
 
-    } catch (error: any) {
-      console.error("❌ Error updating appointment status:", error);
-      setError("Có lỗi xảy ra khi cập nhật trạng thái lịch hẹn");
+    // ✅ HIỂN THỊ notification về sample update
+    if (updateResult.samplesUpdateResult) {
+      const sampleResult = updateResult.samplesUpdateResult;
+      let message = "";
+      let type: 'success' | 'warning' | 'error' = 'success';
+
+      if (sampleResult.success) {
+        message = `✅ Đã cập nhật ${sampleResult.updatedCount} mẫu xét nghiệm`;
+        type = 'success';
+      } else if (sampleResult.updatedCount > 0) {
+        message = `⚠️ Cập nhật ${sampleResult.updatedCount} mẫu thành công, ${sampleResult.errorCount} lỗi`;
+        type = 'warning';
+      } else {
+        message = `❌ Không thể cập nhật mẫu xét nghiệm`;
+        type = 'error';
+      }
+
+      // Show notification
+      setSampleUpdateNotifications(prev => ({
+        ...prev,
+        [appointmentId]: {
+          show: true,
+          message,
+          type
+        }
+      }));
+
+      // Auto hide after 5 seconds
+      setTimeout(() => {
+        setSampleUpdateNotifications(prev => ({
+          ...prev,
+          [appointmentId]: { ...prev[appointmentId], show: false }
+        }));
+      }, 5000);
     }
-  };
+
+    // Send notification to staff about appointment status change
+    await NotificationService.notifyStaffAboutStatusChange(
+      appointment.customerName,
+      appointmentId,
+      newStatus
+    );
+
+  } catch (error: any) {
+    console.error("❌ Error updating appointment status:", error);
+    setError("Có lỗi xảy ra khi cập nhật trạng thái lịch hẹn: " + error.message);
+  }
+};
 
   const handleSaveTestResult = async (result: TestResult) => {
-    try {
-      console.log("💾 Saving test result:", result);
+  try {
+    console.log('💾 Saving test result:', result);
 
-      if (!testResultAppointment) return;
+    if (!testResultAppointment) return;
 
-      setAppointments((prev) =>
-        prev.map((a) => {
-          if (a.id === result.appointmentId) {
-            StatusUtils.saveAppointmentStatus(a.id, "Completed", 6);
-            return {
-              ...a,
-              status: "Completed",
-              currentStep: 6,
-              completedSteps: StatusUtils.getCompletedSteps(6),
-              lastStatusUpdate: new Date().toISOString(),
-            };
-          }
-          return a;
-        })
-      );
+    // ✅ result.appointmentId sẽ match với appointment.id
+    setAppointments((prev) =>
+      prev.map((a) => {
+        if (a.id === result.appointmentId) { // ✅ This will work correctly
+          StatusUtils.saveAppointmentStatus(a.id, "Completed", 6);
+          return {
+            ...a,
+            status: "Completed",
+            currentStep: 6,
+            completedSteps: StatusUtils.getCompletedSteps(6),
+            lastStatusUpdate: new Date().toISOString(),
+          };
+        }
+        return a;
+      })
+    );
 
-      // ✅ Send notification to all staff about completion
-      await NotificationService.notifyStaffAboutStatusChange(
-        testResultAppointment.customerName,
-        result.appointmentId,
-        "Completed"
-      );
+    // Send notification
+    await NotificationService.notifyStaffAboutStatusChange(
+      testResultAppointment.customerName,
+      result.appointmentId,
+      "Completed"
+    );
 
-      setTestResultAppointment(null);
-      console.log("✅ Test result saved and appointment completed");
-    } catch (error: any) {
-      console.error("❌ Error saving test result:", error);
-      setError("Có lỗi xảy ra khi lưu kết quả xét nghiệm");
-    }
-  };
+    setTestResultAppointment(null);
+    console.log("✅ Test result saved and appointment completed");
+  } catch (error: any) {
+    console.error("❌ Error saving test result:", error);
+    setError("Có lỗi xảy ra khi lưu kết quả xét nghiệm");
+  }
+};
 
   const handleViewDetails = (appointment: Appointment) => {
     setSelectedAppointment(appointment);

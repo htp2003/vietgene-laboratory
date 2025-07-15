@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { XCircle, Upload, FileText, Save, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TestResultService } from '../../services/staffService/testResultService';
 
-// ✅ Import shared types
+// ✅ Import types from the types file
 import { Appointment, TestResult, TestResultModalProps } from '../../types/appointment';
 
 const TestResultModal: React.FC<TestResultModalProps> = ({
@@ -10,6 +11,7 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
   onClose,
   onSaveResult
 }) => {
+  // ✅ ALL HOOKS MUST BE AT THE TOP - BEFORE ANY EARLY RETURNS
   const [formData, setFormData] = useState({
     resultType: 'Positive' as 'Positive' | 'Negative' | 'Inconclusive',
     resultPercentage: '',
@@ -21,6 +23,43 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generalError, setGeneralError] = useState<string>('');
+  
+  // ✅ Move these hooks to the top
+  const [currentSampleId, setCurrentSampleId] = useState<string | null>(null);
+  const [loadingSampleId, setLoadingSampleId] = useState(false);
+
+  // ✅ Enhanced getSampleId with orderId support
+  const getSampleId = async (): Promise<string | null> => {
+    try {
+      // Return null if no appointment
+      if (!appointment) return null;
+      
+      // Try direct sampleId first
+      if (appointment.sampleId) {
+        return appointment.sampleId;
+      }
+      
+      // Try rawData samples
+      if (appointment.rawData?.samples && appointment.rawData.samples.length > 0) {
+        return appointment.rawData.samples[0].id;
+      }
+      
+      // ✅ Try orderId approach (NEW)
+      const orderId = appointment.rawData?.order?.orderId || appointment.orderId;
+      if (orderId) {
+        const { SampleService } = await import('../../services/staffService/sampleService');
+        const orderSamples = await SampleService.getSamplesByOrderId(orderId);
+        if (orderSamples.length > 0) {
+          return orderSamples[0].id;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting sample ID:', error);
+      return null;
+    }
+  };
 
   // ✅ Reset form when modal opens/closes to prevent stale data
   useEffect(() => {
@@ -38,8 +77,60 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
     }
   }, [isOpen, appointment]);
 
-  // ✅ Don't render anything if modal is closed or no appointment
+  // ✅ Load sample ID when modal opens
+  useEffect(() => {
+    if (isOpen && appointment) {
+      setLoadingSampleId(true);
+      getSampleId().then(sampleId => {
+        setCurrentSampleId(sampleId);
+        setLoadingSampleId(false);
+      });
+    } else {
+      // Reset when modal closes
+      setCurrentSampleId(null);
+      setLoadingSampleId(false);
+    }
+  }, [isOpen, appointment]);
+
+  // ✅ NOW early returns are safe - all hooks are defined above
   if (!isOpen || !appointment) return null;
+
+  // ✅ Use currentSampleId instead of sync getSampleId()
+  if (!currentSampleId && !loadingSampleId) {
+    return (
+      <div
+        className="fixed inset-0 flex items-center justify-center p-4 z-50 bg-black bg-opacity-50"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl"
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            maxWidth: '448px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
+            <h2 className="text-lg font-bold text-gray-900">Lỗi</h2>
+          </div>
+          <p className="text-gray-700 mb-6">
+            Không tìm thấy mã mẫu xét nghiệm cho cuộc hẹn này. Vui lòng kiểm tra lại thông tin cuộc hẹn.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ✅ Safe input change handler with error handling
   const handleInputChange = (field: string, value: any) => {
@@ -134,7 +225,7 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
     }
   };
 
-  // ✅ Enhanced submit handler with comprehensive error handling
+  // ✅ Enhanced submit handler using TestResultService
   const handleSubmit = async () => {
     try {
       setGeneralError('');
@@ -143,25 +234,38 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
 
       setIsSubmitting(true);
       
-      // ✅ Create result object with error handling
+      // ✅ Use currentSampleId
+      if (!currentSampleId) {
+        throw new Error('Không tìm thấy mã mẫu xét nghiệm cho cuộc hẹn này');
+      }
+      
+      // ✅ Call TestResultService to create result
+      const apiResult = await TestResultService.createTestResultBySample({
+        sampleId: currentSampleId,
+        resultType: formData.resultType,
+        resultPercentage: formData.resultPercentage ? parseFloat(formData.resultPercentage) : undefined,
+        conclusion: formData.conclusion.trim(),
+        resultDetails: formData.resultDetails.trim(),
+        resultFile: formData.resultFile || undefined
+      });
+
+      console.log('✅ Test result created successfully:', apiResult);
+      
+      // ✅ Convert API response to component format
       const result: TestResult = {
-        id: `result-${Date.now()}`,
-        appointmentId: appointment.id,
+        id: apiResult.id,
+        appointmentId: appointment.id, // Use appointment ID as expected by parent
+        sampleId: apiResult.sample_id,
         resultType: formData.resultType,
         resultPercentage: formData.resultPercentage ? parseFloat(formData.resultPercentage) : undefined,
         conclusion: formData.conclusion.trim(),
         resultDetails: formData.resultDetails.trim(),
         resultFile: formData.resultFile || undefined,
-        testedDate: new Date().toISOString(),
-        verifiedByStaffId: 'staff-001' // In real app, get from auth context
+        testedDate: apiResult.tested_date
       };
 
-      console.log('Saving test result:', result);
-      
-      // ✅ Call save function with error handling
-      await onSaveResult(result);
-      
-      console.log('Test result saved successfully');
+      // ✅ Call parent callback with transformed result
+      onSaveResult(result);
       
       // ✅ Reset form only after successful save
       setFormData({
@@ -176,7 +280,7 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
       onClose();
       
     } catch (error: any) {
-      console.error('Error saving test result:', error);
+      console.error('❌ Error saving test result:', error);
       setGeneralError(error.message || 'Có lỗi xảy ra khi lưu kết quả xét nghiệm');
     } finally {
       setIsSubmitting(false);
@@ -215,12 +319,21 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-y-auto"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-y-auto bg-black bg-opacity-50"
       onClick={handleClose}
     >
       <div
-        className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto my-8"
+        className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto my-8 shadow-2xl"
+        style={{
+          backgroundColor: '#ffffff',
+          borderRadius: '12px',
+          maxWidth: '768px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          margin: '32px 0',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
@@ -230,6 +343,9 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
               <h2 className="text-xl font-bold text-gray-900">Nhập Kết Quả Xét Nghiệm</h2>
               <p className="text-sm text-gray-600 mt-1">
                 {appointment.customerName} - {serviceType}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Mã mẫu: {currentSampleId || 'Đang tải...'}
               </p>
               {/* ✅ Show doctor info if available */}
               {appointment.doctorInfo && (

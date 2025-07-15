@@ -83,6 +83,33 @@ export class MedicalRecordService {
     }
   }
 
+  static async createMedicalRecordForUser(
+  userId: string, 
+  recordData: MedicalRecordRequest
+): Promise<ApiMedicalRecord | null> {
+  try {
+    console.log(`🏥 Creating medical record for user: ${userId}`);
+
+    // userId được truyền qua path parameter, recordData vào body
+    const response = await apiClient.post<ApiResponse<ApiMedicalRecord>>(
+      `/medical-records/${userId}`, 
+      recordData
+    );
+
+    if (response.data.code === 200) {
+      console.log("✅ Medical record created successfully for user");
+      return response.data.result;
+    } else {
+      console.error("❌ Failed to create medical record:", response.data.message);
+      return null;
+    }
+
+  } catch (error) {
+    console.error("❌ Error creating medical record for user:", error);
+    return null;
+  }
+}
+
   // ✅ Update medical record
   static async updateMedicalRecord(recordId: string, recordData: Partial<MedicalRecordRequest>): Promise<ApiMedicalRecord | null> {
     try {
