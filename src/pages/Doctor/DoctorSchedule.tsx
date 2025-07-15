@@ -11,8 +11,7 @@ import {
   FaUserMd,
   FaExclamationTriangle,
   FaCheckCircle,
-  FaCalendarCheck,
-  FaBell
+  FaCalendarCheck
 } from 'react-icons/fa';
 import useDoctorTimeSlots from '../../hooks/useDoctorTimeSlots';
 import { TimeSlotRequest, DAY_OPTIONS } from '../../services/doctorTimeSlotService';
@@ -53,7 +52,6 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
 
   // View preferences
   const [selectedWeek, setSelectedWeek] = useState<Date>(new Date());
-  const [quickActionMode, setQuickActionMode] = useState<boolean>(false);
 
   // Get current week dates
   const getCurrentWeekDates = (): Date[] => {
@@ -188,10 +186,35 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     }
   };
 
-  // Quick toggle availability
+  // Quick toggle availability  
   const handleQuickToggle = async (timeSlot: any) => {
+    console.log('Before toggle - timeSlot:', timeSlot);
+    
     try {
-      await toggleAvailability(timeSlot.id);
+      // Chuyển đổi format thời gian từ HH:mm:ss về HH:mm
+      const formatTimeForAPI = (time: string) => {
+        if (time.includes(':')) {
+          const parts = time.split(':');
+          return `${parts[0]}:${parts[1]}`; 
+        }
+        return time;
+      };
+      
+      // Gọi trực tiếp updateTimeSlot với format thời gian đúng
+      const result = await updateTimeSlot(timeSlot.id, {
+        isAvailable: !timeSlot.isAvailable,
+        startTime: formatTimeForAPI(timeSlot.startTime),
+        endTime: formatTimeForAPI(timeSlot.endTime),
+        dayOfWeek: timeSlot.dayOfWeek,
+        doctorId: timeSlot.doctorId
+      });
+        
+      if (result.success) {
+        console.log('Toggle successful!');
+      } else {
+        console.error('Toggle failed:', result.message);
+        alert(`Lỗi: ${result.message}`);
+      }
     } catch (err: any) {
       console.error('Error toggling availability:', err);
       alert('Có lỗi xảy ra khi thay đổi trạng thái');
@@ -235,17 +258,6 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setQuickActionMode(!quickActionMode)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  quickActionMode 
-                    ? 'bg-orange-600 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <FaBell className="inline mr-2" size={14} />
-                {quickActionMode ? 'Thoát chế độ nhanh' : 'Chế độ chỉnh sửa nhanh'}
-              </button>
               <button
                 onClick={() => handleOpenModal()}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -365,11 +377,6 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                 <FaCalendarAlt className="text-blue-600" />
                 Lịch tuần này
               </h2>
-              {quickActionMode && (
-                <div className="text-sm text-orange-600 bg-orange-50 px-3 py-1 rounded-full">
-                  Chế độ chỉnh sửa nhanh: Click để bật/tắt khung giờ
-                </div>
-              )}
             </div>
           </div>
 
@@ -430,8 +437,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                                 slot.isAvailable 
                                   ? 'border-green-500 bg-green-50 hover:bg-green-100' 
                                   : 'border-red-500 bg-red-50 hover:bg-red-100'
-                              } ${quickActionMode ? 'cursor-pointer' : ''}`}
-                              onClick={() => quickActionMode && handleQuickToggle(slot)}
+                              }`}
                             >
                               <div className="flex justify-between items-start">
                                 <div className="flex-1">
@@ -443,35 +449,33 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                                   </div>
                                 </div>
                                 
-                                {!quickActionMode && (
-                                  <div className="flex items-center gap-1 ml-2">
-                                    <button
-                                      onClick={() => handleQuickToggle(slot)}
-                                      className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                                      title={slot.isAvailable ? 'Đặt không có sẵn' : 'Đặt có sẵn'}
-                                    >
-                                      {slot.isAvailable ? (
-                                        <FaToggleOn className="text-green-500" size={16} />
-                                      ) : (
-                                        <FaToggleOff className="text-gray-400" size={16} />
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={() => handleOpenModal(slot)}
-                                      className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-                                      title="Chỉnh sửa"
-                                    >
-                                      <FaEdit size={12} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDelete(slot)}
-                                      className="text-red-600 hover:text-red-800 transition-colors p-1"
-                                      title="Xóa"
-                                    >
-                                      <FaTrash size={12} />
-                                    </button>
-                                  </div>
-                                )}
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => handleQuickToggle(slot)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                    title={slot.isAvailable ? 'Đặt không có sẵn' : 'Đặt có sẵn'}
+                                  >
+                                    {slot.isAvailable ? (
+                                      <FaToggleOn className="text-green-500" size={16} />
+                                    ) : (
+                                      <FaToggleOff className="text-gray-400" size={16} />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleOpenModal(slot)}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+                                    title="Chỉnh sửa"
+                                  >
+                                    <FaEdit size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(slot)}
+                                    className="text-red-600 hover:text-red-800 transition-colors p-1"
+                                    title="Xóa"
+                                  >
+                                    <FaTrash size={12} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -637,7 +641,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                         Mẹo sử dụng
                       </h4>
                       <p className="text-sm text-blue-700">
-                        Bạn có thể nhanh chóng bật/tắt khung giờ bằng chế độ chỉnh sửa nhanh. 
+                        Bạn có thể nhanh chóng bật/tắt khung giờ bằng nút toggle. 
                         Khung giờ "Không có sẵn" vẫn hiển thị nhưng bệnh nhân không thể đặt lịch.
                       </p>
                     </div>
@@ -693,6 +697,3 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     </div>
   );
 };
-
-
-

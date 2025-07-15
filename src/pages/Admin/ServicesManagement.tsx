@@ -24,23 +24,53 @@ export default function ServicesManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
+
+  const getCategoryDisplayText = (category: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'basic': 'Cơ bản',
+      'paternity': 'Cha con',
+      'maternity': 'Mẹ con',
+      'sibling': 'Anh chị em',
+      'ancestry': 'Huyết thống',
+      'Cơ bản': 'Cơ bản',
+      'Cha con': 'Cha con',
+      'Mẹ con': 'Mẹ con',
+      'Anh chị em': 'Anh chị em',
+      'Huyết thống': 'Huyết thống',
+    };
+
+    return categoryMap[category] || category;
+  };
+
+  const getServiceTypeDisplayText = (type: string) => {
+    const typeMap: { [key: string]: string } = {
+      'civil': 'Dân sự',
+      'administrative': 'Pháp lý',
+      'legal': 'Pháp lý',
+      'Dân sự': 'Dân sự',
+      'Pháp lý': 'Pháp lý',
+    };
+
+    return typeMap[type] || type;
+  };
+
   // Get filtered services
   const getFilteredServices = () => {
     let filtered = searchServices(searchTerm);
-    
+
     if (categoryFilter !== 'all') {
       filtered = filtered.filter(service => service.test_category === categoryFilter);
     }
-    
+
     if (typeFilter !== 'all') {
       filtered = filtered.filter(service => service.service_type === typeFilter);
     }
-    
+
     return filtered;
   };
 
@@ -76,10 +106,10 @@ export default function ServicesManagement() {
 
   const handleSaveService = async (serviceData: Partial<Service>) => {
     setSubmitting(true);
-    
+
     try {
       let result;
-      
+
       if (editingService) {
         result = await updateService(editingService.id, serviceData);
       } else {
@@ -88,7 +118,7 @@ export default function ServicesManagement() {
           id: Date.now().toString(), // Temporary ID, will be replaced by API
         });
       }
-      
+
       if (result.success) {
         alert(result.message);
         setIsModalOpen(false);
@@ -133,7 +163,7 @@ export default function ServicesManagement() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-green-100 text-green-600">
@@ -145,7 +175,7 @@ export default function ServicesManagement() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-purple-100 text-purple-600">
@@ -157,7 +187,7 @@ export default function ServicesManagement() {
             </div>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
@@ -188,7 +218,7 @@ export default function ServicesManagement() {
             >
               <option value="all">Tất cả danh mục</option>
               {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
+                <option key={category} value={category}>{getCategoryDisplayText(category)}</option>
               ))}
             </select>
           </div>
@@ -200,7 +230,7 @@ export default function ServicesManagement() {
             >
               <option value="all">Tất cả loại</option>
               {types.map(type => (
-                <option key={type} value={type}>{type}</option>
+                <option key={type} value={type}>{getServiceTypeDisplayText(type)}</option>
               ))}
             </select>
           </div>
@@ -227,8 +257,8 @@ export default function ServicesManagement() {
             <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow text-center max-w-md">
               <h3 className="font-semibold text-lg mb-2">Có lỗi xảy ra</h3>
               <p className="mb-4">{error.message}</p>
-              <button 
-                onClick={() => window.location.reload()} 
+              <button
+                onClick={() => window.location.reload()}
                 className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
               >
                 Thử lại
@@ -246,13 +276,13 @@ export default function ServicesManagement() {
               Danh sách dịch vụ ({filteredServices.length})
             </h2>
           </div>
-          
+
           <ServiceList
             services={filteredServices}
             onEdit={handleEditService}
             onDelete={handleDeleteService}
           />
-          
+
           {/* Empty State */}
           {filteredServices.length === 0 && (
             <div className="text-center py-12">
@@ -260,8 +290,8 @@ export default function ServicesManagement() {
                 <FaChartBar size={48} className="mx-auto" />
               </div>
               <h3 className="text-lg font-medium text-gray-700 mb-2">
-                {searchTerm || categoryFilter !== 'all' || typeFilter !== 'all' 
-                  ? 'Không có dịch vụ phù hợp' 
+                {searchTerm || categoryFilter !== 'all' || typeFilter !== 'all'
+                  ? 'Không có dịch vụ phù hợp'
                   : 'Chưa có dịch vụ nào'
                 }
               </h3>

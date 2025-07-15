@@ -179,10 +179,8 @@ const ServiceModal: React.FC<ServiceModalProps> = ({
                   disabled={submitting}
                 >
                   <option value="">Chọn loại dịch vụ</option>
-                  <option value="Nhanh">Nhanh</option>
-                  <option value="Tiêu chuẩn">Tiêu chuẩn</option>
-                  <option value="Cao cấp">Cao cấp</option>
-                  <option value="Pháp lý">Pháp lý</option>
+                  <option value="civil">Dân sự</option>
+                  <option value="administrative">Pháp lý</option>
                 </select>
               </div>
 
@@ -276,9 +274,9 @@ const ServiceModal: React.FC<ServiceModalProps> = ({
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                 disabled={submitting}
               >
-                <option value="facility_collect">Lấy mẫu tại cơ sở</option>
-                <option value="self_collect">Tự lấy mẫu</option>
-                <option value="self_collect,facility_collect">Cả hai phương thức</option>
+                <option value="">Chọn phương thức lấy mẫu</option>
+                <option value="facility_collect">Lấy mẫu tại cơ sở y tế</option>
+                <option value="self_collect">Tự lấy mẫu tại nhà</option>
               </select>
             </div>
 

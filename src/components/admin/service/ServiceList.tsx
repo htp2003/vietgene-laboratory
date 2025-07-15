@@ -10,16 +10,42 @@ interface ServiceListProps {
 
 const ServiceList: React.FC<ServiceListProps> = ({ services, onEdit, onDelete }) => {
   const getCollectionMethodText = (methods: string) => {
-    if (!methods) return 'Tại cơ sở';
+    if (!methods) return 'Tự lấy mẫu';
     
     if (methods.includes('self_collect') && methods.includes('facility_collect')) {
       return 'Cả hai';
     } else if (methods.includes('self_collect')) {
       return 'Tự lấy mẫu';
     } else {
-      return 'Tại cơ sở';
+      return 'Lấy mẫu tại cơ sở';
     }
   };
+
+  const getServiceTypeDisplayText = (type: string) => {
+    const typeMap: { [key: string]: string } = {
+      'civil': 'Dân sự',
+      'administrative': 'Pháp lý',
+      'legal': 'Pháp lý',
+      'Dân sự': 'Dân sự',
+      'Pháp lý': 'Pháp lý',
+    };
+    
+    return typeMap[type] || type;
+};
+
+const getCategoryDisplayText = (category: string) => {
+  const categoryMap: { [key: string]: string } = {
+    'Cơ bản': 'Cơ bản',
+    'Cha con': 'Cha con',
+    'Mẹ con': 'Mẹ con',
+    'Anh chị em': 'Anh chị em',
+    'Huyết thống': 'Huyết thống',
+    'Dân sự': 'Dân sự',
+    'Pháp lý': 'Pháp lý',
+  };
+  
+  return categoryMap[category] || category;
+};
 
   const getCategoryBadge = (category: string) => {
     const badges: { [key: string]: string } = {
@@ -35,9 +61,7 @@ const ServiceList: React.FC<ServiceListProps> = ({ services, onEdit, onDelete })
 
   const getTypeBadge = (type: string) => {
     const badges: { [key: string]: string } = {
-      'Nhanh': 'bg-red-100 text-red-800',
-      'Tiêu chuẩn': 'bg-blue-100 text-blue-800',
-      'Cao cấp': 'bg-purple-100 text-purple-800',
+      'Dân sự': 'bg-red-100 text-red-800',
       'Pháp lý': 'bg-orange-100 text-orange-800',
     };
     
@@ -103,11 +127,11 @@ const ServiceList: React.FC<ServiceListProps> = ({ services, onEdit, onDelete })
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="space-y-1">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeBadge(service.service_type)}`}>
-                    {service.service_type}
+                    {getServiceTypeDisplayText(service.service_type)}
                   </span>
                   <br />
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryBadge(service.test_category)}`}>
-                    {service.test_category}
+                  {getCategoryDisplayText(service.test_category)}
                   </span>
                 </div>
               </td>
