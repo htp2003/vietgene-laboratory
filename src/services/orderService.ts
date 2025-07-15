@@ -1,4 +1,5 @@
 import axios from "axios";
+import { paymentService, PaymentUtils } from "./paymentService";
 
 const API_BASE_URL = "https://dna-service-se1857.onrender.com/dna_service";
 
@@ -132,6 +133,8 @@ export interface CreateOrderRequest {
   serviceInfo: {
     serviceId: string;
     quantity: number;
+    unitPrice: number;
+    totalAmount?: number;
     collectionMethod: "home" | "facility";
     appointmentDate?: string;
     appointmentTime?: string;
@@ -148,6 +151,21 @@ export interface CreateOrderRequest {
   };
   paymentInfo: {
     method: "cash" | "card" | "transfer";
+  };
+}
+
+export interface PaymentResult {
+  success: boolean;
+  transactionId?: string;
+  qrCode?: string;
+  qrDataURL?: string;
+  message: string;
+  bankInfo?: {
+    accountNo: string;
+    accountName: string;
+    bankCode: string;
+    amount: string;
+    content: string;
   };
 }
 
@@ -236,6 +254,8 @@ class OrderService {
     customerId: string;
     serviceId: string;
     quantity: number;
+    unitPrice: number;
+    totalAmount?: number;
     collectionMethod: "home" | "facility";
     notes?: string;
   }): Promise<{ orderId: string }> {
@@ -246,7 +266,8 @@ class OrderService {
       const orderPayload = {
         order_code: Math.floor(Math.random() * 900000) + 100000,
         status: "pending",
-        total_amount: 2500000 * orderData.quantity,
+        total_amount:
+          orderData.totalAmount || orderData.unitPrice * orderData.quantity,
         collection_method: orderData.collectionMethod,
         payment_method: "transfer",
         payment_status: "pending",
@@ -382,6 +403,9 @@ class OrderService {
   }
 
   // ✅ SIMPLIFIED SAMPLE KIT CREATION - SINGLE STRATEGY
+  // ✅ THAY THẾ HÀM createSampleKitsForOrder TRONG orderService.ts
+  // Giữ nguyên tên và signature, chỉ thay đổi implementation
+
   async createSampleKitsForOrder(
     orderId: string,
     participantIds: string[],
@@ -389,8 +413,200 @@ class OrderService {
     shippingAddress: string,
     collectionMethod: "home" | "facility" = "home"
   ): Promise<SampleKit[]> {
-    console.log("📦 Creating sample kits (simplified strategy)...");
+    console.log("📦 Creating sample kits (COMPLETELY NEW APPROACH)...");
     const createdKits: SampleKit[] = [];
+
+    if (participantIds.length === 0) {
+      console.log("⚠️ No participants provided");
+      return [];
+    }
+
+    // ✅ STEP 1: Debug order và participant trước
+    console.log("🔍 Step 1: Debugging order and participants...");
+    try {
+      const orderResponse = await apiClient.get(`/orders/${orderId}`);
+      console.log("✅ Order exists:", {
+        id: orderResponse.data.result?.orderId || orderResponse.data.result?.id,
+        status: orderResponse.data.result?.status,
+        collection_method: orderResponse.data.result?.collection_method,
+      });
+    } catch (error: any) {
+      console.error("❌ Order not found:", error.response?.data);
+      return [];
+    }
+
+    // Check first participant
+    try {
+      const participantResponse = await apiClient.get(
+        `/OrderParticipants/${participantIds[0]}`
+      );
+      console.log("✅ First participant exists:", {
+        id: participantResponse.data.result?.id,
+        name: participantResponse.data.result?.participant_name,
+      });
+    } catch (error: any) {
+      console.error("❌ First participant not found:", error.response?.data);
+      return [];
+    }
+
+    // ✅ STEP 2: Test different payload strategies để tìm cái nào work
+    console.log("🧪 Step 2: Testing payload strategies...");
+
+    const testStrategies = [
+      {
+        name: "Minimal Strategy",
+        createPayload: (
+          participantId: string,
+          participantName: string,
+          index: number
+        ) => ({
+          kit_code: `KIT_MIN_${Date.now()}_${index}`,
+          kit_type: "Hair",
+          status: "ordered",
+          shipping_address: shippingAddress,
+          order_participants_id: participantId,
+          orderId: orderId,
+        }),
+      },
+      {
+        name: "Full Strategy",
+        createPayload: (
+          participantId: string,
+          participantName: string,
+          index: number
+        ) => ({
+          kit_code: `KIT_FULL_${Date.now()}_${index}`,
+          kit_type: "Hair",
+          status: "ordered",
+          shipper_data:
+            collectionMethod === "home"
+              ? "Giao hàng tận nơi"
+              : "Nhận tại cơ sở",
+          delivered_date: null,
+          tracking_number: 0,
+          shipping_address: shippingAddress,
+          expiry_date: null,
+          instruction: this.getKitInstructions(
+            collectionMethod,
+            participantName
+          ),
+          order_participants_id: participantId,
+          samplesId: "",
+          orderId: orderId,
+        }),
+      },
+      {
+        name: "Swagger Strategy",
+        createPayload: (
+          participantId: string,
+          participantName: string,
+          index: number
+        ) => ({
+          kit_code: `KIT_SWAG_${Date.now()}_${index}`,
+          kit_type: "Hair",
+          status: "string", // Như swagger
+          shipper_data:
+            collectionMethod === "home"
+              ? "Giao hàng tận nơi"
+              : "Nhận tại cơ sở",
+          delivered_date: "2025-07-15T15:18:26.404Z", // Như swagger
+          tracking_number: 0,
+          shipping_address: shippingAddress,
+          expiry_date: "2025-07-15T15:18:26.404Z", // Như swagger
+          instruction: this.getKitInstructions(
+            collectionMethod,
+            participantName
+          ),
+          order_participants_id: participantId,
+          orderId: orderId,
+          // Không có samplesId như swagger
+        }),
+      },
+      {
+        name: "Dates Strategy",
+        createPayload: (
+          participantId: string,
+          participantName: string,
+          index: number
+        ) => ({
+          kit_code: `KIT_DATE_${Date.now()}_${index}`,
+          kit_type: "Hair",
+          status: "ordered",
+          shipper_data:
+            collectionMethod === "home"
+              ? "Giao hàng tận nơi"
+              : "Nhận tại cơ sở",
+          delivered_date: new Date(
+            Date.now() + 3 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          tracking_number: 0,
+          shipping_address: shippingAddress,
+          expiry_date: new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+          instruction: this.getKitInstructions(
+            collectionMethod,
+            participantName
+          ),
+          order_participants_id: participantId,
+          samplesId: "",
+          orderId: orderId,
+        }),
+      },
+    ];
+
+    // Test với participant đầu tiên để tìm strategy work
+    let workingStrategy = null;
+    const testParticipant = participants[0];
+    const testParticipantId = participantIds[0];
+
+    for (const strategy of testStrategies) {
+      try {
+        console.log(`🧪 Testing: ${strategy.name}`);
+        const testPayload = strategy.createPayload(
+          testParticipantId,
+          testParticipant.name,
+          999
+        );
+
+        console.log(
+          `📤 Test payload (${strategy.name}):`,
+          JSON.stringify(testPayload, null, 2)
+        );
+
+        const response = await apiClient.post("/sample-kits", testPayload);
+
+        if (response.data?.code === 200) {
+          console.log(`✅ ${strategy.name} SUCCESS! Found working strategy.`);
+          workingStrategy = strategy;
+
+          // Xóa test kit vừa tạo (optional)
+          try {
+            await apiClient.delete(`/sample-kits/${response.data.result.id}`);
+            console.log("🗑️ Deleted test kit");
+          } catch (e) {
+            console.log("⚠️ Could not delete test kit, continuing...");
+          }
+
+          break;
+        } else {
+          console.log(`⚠️ ${strategy.name} failed:`, response.data?.message);
+        }
+      } catch (error: any) {
+        console.log(
+          `❌ ${strategy.name} error:`,
+          error.response?.data?.message || error.message
+        );
+      }
+    }
+
+    if (!workingStrategy) {
+      console.error("❌ All strategies failed! Cannot create sample kits.");
+      return [];
+    }
+
+    // ✅ STEP 3: Tạo kits cho tất cả participants bằng working strategy
+    console.log(`📦 Step 3: Creating kits using ${workingStrategy.name}...`);
 
     for (let i = 0; i < participantIds.length; i++) {
       const participantId = participantIds[i];
@@ -403,49 +619,63 @@ class OrderService {
           }`
         );
 
-        // ✅ SIMPLE, RELIABLE PAYLOAD
-        const payload = {
-          kit_code: `KIT_${participant.name.replace(
-            /\s+/g,
-            "_"
-          )}_${Date.now()}_${i}`,
-          kit_type: "Hair",
-          status: "ordered",
-          shipping_address: shippingAddress,
-          instruction: this.getKitInstructions(
-            collectionMethod,
-            participant.name
-          ),
-          order_participants_id: participantId,
-          orderId: orderId,
-          // ✅ NO samplesId - staff will create samples later
-        };
+        // Thêm delay giữa requests
+        if (i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
 
-        console.log(`📤 Kit ${i + 1} payload:`, payload);
+        const payload = workingStrategy.createPayload(
+          participantId,
+          participant.name,
+          i
+        );
+
+        console.log(
+          `📤 Kit ${i + 1} payload:`,
+          JSON.stringify(payload, null, 2)
+        );
 
         const response = await apiClient.post("/sample-kits", payload);
 
-        if (response.data.code === 200) {
+        if (response.data?.code === 200) {
           console.log(
             `✅ Kit ${i + 1} created successfully:`,
             response.data.result.id
           );
           createdKits.push(response.data.result);
         } else {
-          console.warn(`⚠️ Kit ${i + 1} failed: ${response.data.message}`);
+          console.warn(`⚠️ Kit ${i + 1} failed: ${response.data?.message}`);
+          console.warn("Response data:", response.data);
         }
       } catch (error: any) {
         console.error(
           `❌ Kit ${i + 1} error:`,
           error.response?.data || error.message
         );
-        // ✅ CONTINUE WITH OTHERS - don't fail entire order
+        console.error("Full error details:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          headers: error.response?.headers,
+        });
+        // Continue với kit tiếp theo
       }
     }
 
+    console.log(`📊 Sample Kit Creation Summary:`);
     console.log(
-      `✅ Created ${createdKits.length}/${participantIds.length} sample kits`
+      `✅ Successfully created: ${createdKits.length}/${participantIds.length} kits`
     );
+    console.log(`🎯 Working strategy: ${workingStrategy.name}`);
+
+    if (createdKits.length < participantIds.length) {
+      console.log(
+        `⚠️ ${
+          participantIds.length - createdKits.length
+        } kits failed - staff can create manually`
+      );
+    }
+
     return createdKits;
   }
 
@@ -516,43 +746,122 @@ class OrderService {
     paymentData: {
       method: "cash" | "card" | "transfer";
       amount: number;
+      orderCode?: string;
+      customerName?: string;
     }
-  ): Promise<{ success: boolean; transactionId?: string; message: string }> {
+  ): Promise<PaymentResult> {
     console.log("💳 Processing payment...");
 
-    const messages = {
-      transfer: `Vui lòng chuyển khoản ${new Intl.NumberFormat("vi-VN").format(
-        paymentData.amount
-      )}đ vào:\n\n🏦 Ngân hàng: Vietcombank\n💳 STK: 1234567890\n👤 Chủ TK: VIET GENE LAB\n📝 Nội dung: ORDER${orderId.slice(
-        -6
-      )}`,
-      cash: "Thanh toán tiền mặt khi nhận dịch vụ. Nhân viên sẽ liên hệ xác nhận thời gian.",
-      card: "Thanh toán thẻ tín dụng đang được xử lý. Bạn sẽ nhận được thông báo qua email.",
-    };
+    try {
+      // Generate order code if not provided
+      const orderCode = paymentData.orderCode || `ORDER${orderId.slice(-6)}`;
 
-    // Simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      // Update order payment info first
+      const updatePayload = {
+        payment_method: paymentData.method,
+        payment_status: paymentData.method === "cash" ? "pending" : "paid",
+        total_amount: paymentData.amount,
+      };
 
-    // Update order payment info
-    const updatePayload = {
-      payment_method: paymentData.method,
-      payment_status: paymentData.method === "cash" ? "pending" : "paid",
-      total_amount: paymentData.amount,
-    };
+      // Try to update order (non-blocking)
+      apiClient
+        .put(`/orders/${orderId}`, updatePayload)
+        .catch((error) =>
+          console.warn("⚠️ Could not update order payment info:", error)
+        );
 
-    apiClient
-      .put(`/orders/${orderId}`, updatePayload)
-      .catch((error) =>
-        console.warn("⚠️ Could not update order payment info:", error)
-      );
+      // Handle different payment methods
+      if (paymentData.method === "transfer") {
+        // Generate QR code for bank transfer
+        const qrResult = await paymentService.generateQRCode(
+          paymentData.amount,
+          orderCode,
+          paymentData.customerName
+        );
 
-    return {
-      success: true,
-      transactionId: "TXN_" + Date.now(),
-      message: messages[paymentData.method],
-    };
+        if (qrResult.success) {
+          return {
+            success: true,
+            transactionId: "TXN_" + Date.now(),
+            qrCode: qrResult.qrCode,
+            qrDataURL: qrResult.qrDataURL,
+            message: `Vui lòng chuyển khoản ${PaymentUtils.formatPrice(
+              paymentData.amount
+            )} theo thông tin bên dưới hoặc quét mã QR`,
+            bankInfo: qrResult.bankInfo,
+          };
+        } else {
+          // QR failed but still provide bank info
+          return {
+            success: true,
+            transactionId: "TXN_" + Date.now(),
+            message: qrResult.message || "Vui lòng chuyển khoản thủ công",
+            bankInfo: qrResult.bankInfo,
+          };
+        }
+      } else if (paymentData.method === "cash") {
+        return {
+          success: true,
+          transactionId: "CASH_" + Date.now(),
+          message: `Thanh toán tiền mặt ${PaymentUtils.formatPrice(
+            paymentData.amount
+          )} khi nhận dịch vụ. Nhân viên sẽ liên hệ xác nhận thời gian.`,
+        };
+      } else if (paymentData.method === "card") {
+        return {
+          success: true,
+          transactionId: "CARD_" + Date.now(),
+          message: `Thanh toán thẻ tín dụng ${PaymentUtils.formatPrice(
+            paymentData.amount
+          )} đang được xử lý. Bạn sẽ nhận được thông báo qua email.`,
+        };
+      }
+
+      throw new Error("Phương thức thanh toán không được hỗ trợ");
+    } catch (error: any) {
+      console.error("❌ Payment processing failed:", error);
+      return {
+        success: false,
+        message: "Có lỗi xảy ra khi xử lý thanh toán: " + error.message,
+      };
+    }
   }
 
+  async generatePaymentQR(
+    orderId: string,
+    amount: number,
+    customerName?: string
+  ): Promise<{
+    success: boolean;
+    qrDataURL?: string;
+    bankInfo?: any;
+    message: string;
+  }> {
+    try {
+      const orderCode = `ORDER${orderId.slice(-6)}`;
+      const result = await paymentService.generateQRCode(
+        amount,
+        orderCode,
+        customerName
+      );
+
+      return {
+        success: result.success,
+        qrDataURL: result.qrDataURL,
+        bankInfo: result.bankInfo,
+        message:
+          result.message ||
+          (result.success ? "QR code tạo thành công" : "Không thể tạo QR code"),
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: "Lỗi tạo QR code: " + error.message,
+      };
+    }
+  }
+
+  // ===== 🎯 MAIN COMPLETE ORDER FLOW - FIXED & SIMPLIFIED =====
   // ===== 🎯 MAIN COMPLETE ORDER FLOW - FIXED & SIMPLIFIED =====
   async createCompleteOrder(orderData: CreateOrderRequest): Promise<string> {
     console.log("🚀 Starting complete order creation flow...");
@@ -560,6 +869,36 @@ class OrderService {
     let orderId: string | null = null;
 
     try {
+      // ✅ STEP 0: Get service data first
+      console.log("📋 Step 0: Fetching service data...");
+      let serviceData: any = null;
+      let unitPrice = 2500000; // fallback price
+
+      try {
+        // Import ServiceService nếu chưa có
+        const { ServiceService } = await import("./serviceService");
+        serviceData = await ServiceService.getServiceById(
+          orderData.serviceInfo.serviceId
+        );
+
+        // Lấy giá từ service data
+        unitPrice =
+          serviceData?.test_price ||
+          serviceData?.testPrice ||
+          serviceData?.price ||
+          2500000;
+        console.log("✅ Service data loaded, price:", unitPrice);
+      } catch (error) {
+        console.warn(
+          "⚠️ Could not fetch service data, using fallback price:",
+          error
+        );
+        // Sử dụng giá từ orderData hoặc fallback
+        unitPrice = orderData.serviceInfo.unitPrice || 2500000;
+      }
+
+      const totalAmount = unitPrice * orderData.serviceInfo.quantity;
+
       // ✅ STEP 1: Handle user (CRITICAL - must succeed)
       console.log("👤 Step 1: Handling user...");
       const userId = await this.handleUserRegistration(orderData.customerInfo);
@@ -570,6 +909,8 @@ class OrderService {
         customerId: userId,
         serviceId: orderData.serviceInfo.serviceId,
         quantity: orderData.serviceInfo.quantity,
+        unitPrice: unitPrice,
+        totalAmount: totalAmount,
         collectionMethod: orderData.serviceInfo.collectionMethod,
         notes: orderData.serviceInfo.notes,
       });
@@ -582,7 +923,7 @@ class OrderService {
         // Step 3: Add order details
         this.createOrderDetail(orderId, orderData.serviceInfo.serviceId, {
           quantity: orderData.serviceInfo.quantity,
-          unitPrice: 2500000,
+          unitPrice: unitPrice, // Sử dụng unitPrice đã fetch được
           notes: orderData.serviceInfo.notes,
         }),
 
@@ -600,7 +941,8 @@ class OrderService {
         // Step 5: Process payment
         this.processPayment(orderId, {
           method: orderData.paymentInfo.method,
-          amount: 2500000 * orderData.serviceInfo.quantity,
+          amount: totalAmount, // Sử dụng totalAmount đã tính
+          customerName: orderData.customerInfo.fullName,
         }),
       ];
 
