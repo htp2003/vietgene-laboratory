@@ -3,9 +3,9 @@ import { User } from '../../../services/userService'
 import { FaEdit, FaTrash, FaUser, FaUserShield, FaUserTie } from 'react-icons/fa'
 
 interface UserListProps {
-    users: User[]
-    onEdit: (user: User) => void
-    onDelete: (id: string) => void
+  users: User[]
+  onEdit: (user: User) => void
+  onDelete: (id: string) => void
 }
 
 export default function UserList({ users, onEdit, onDelete }: UserListProps) {
@@ -15,6 +15,8 @@ export default function UserList({ users, onEdit, onDelete }: UserListProps) {
         return <FaUserShield className="text-red-500" size={16} />;
       case 'staff':
         return <FaUserTie className="text-yellow-500" size={16} />;
+      case 'doctor':
+        return <FaUserTie className="text-blue-500" size={16} />;
       default:
         return <FaUser className="text-green-500" size={16} />;
     }
@@ -26,6 +28,8 @@ export default function UserList({ users, onEdit, onDelete }: UserListProps) {
         return <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">Quản trị viên</span>;
       case 'staff':
         return <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full">Nhân viên</span>;
+      case 'doctor':
+        return <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">Bác sĩ</span>;
       default:
         return <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">Khách hàng</span>;
     }
@@ -51,82 +55,82 @@ export default function UserList({ users, onEdit, onDelete }: UserListProps) {
 
   return (
     <div className='overflow-x-auto'>
-        <table className='min-w-full bg-white'>
-            <thead className="bg-gray-50">
-                <tr>
-                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                        Tên đăng nhập
-                    </th>
-                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                        Email
-                    </th>
-                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                        Họ tên
-                    </th>
-                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                        Ngày sinh
-                    </th>
-                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                        Vai trò
-                    </th>
-                    <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
-                        Thao tác
-                    </th>
-                </tr>
-            </thead>
-            <tbody className='divide-y divide-gray-200'>
-                {users.map(user => (
-                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                        <td className='px-6 py-4 whitespace-nowrap'>
-                            <div className='flex items-center'>
-                                {getRoleIcon(user.role || 'customer')}
-                                <div className='ml-3'>
-                                    <div className='text-sm font-medium text-gray-900'>
-                                        {user.username}
-                                    </div>
-                                </div>
-                            </div>
-                        </td>    
-                        <td className='px-6 py-4 whitespace-nowrap'>
-                            <div className='text-sm text-gray-900'>
-                                {user.email}
-                            </div>
-                        </td>
-                        <td className='px-6 py-4 whitespace-nowrap'>
-                            <div className='text-sm font-medium text-gray-900'>
-                                {user.fullName || user.full_name || 'N/A'}
-                            </div>
-                        </td>
-                        <td className='px-6 py-4 whitespace-nowrap'>
-                            <div className='text-sm text-gray-900'>
-                                {formatDate(user.dob)}
-                            </div>
-                        </td>
-                        <td className='px-6 py-4 whitespace-nowrap'>
-                            {getRoleBadge(user.role || 'customer')}
-                        </td>
-                        <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => onEdit(user)}
-                                    className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-full hover:bg-blue-50"
-                                    title="Chỉnh sửa"
-                                >
-                                    <FaEdit size={18} />
-                                </button>
-                                <button
-                                    onClick={() => onDelete(user.id)}
-                                    className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-full hover:bg-red-50"
-                                    title="Xóa"
-                                >
-                                    <FaTrash size={18} />
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
+      <table className='min-w-full bg-white'>
+        <thead className="bg-gray-50">
+          <tr>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+              Tên đăng nhập
+            </th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+              Email
+            </th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+              Họ tên
+            </th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+              Ngày sinh
+            </th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+              Vai trò
+            </th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider'>
+              Thao tác
+            </th>
+          </tr>
+        </thead>
+        <tbody className='divide-y divide-gray-200'>
+          {users.map(user => (
+            <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+              <td className='px-6 py-4 whitespace-nowrap'>
+                <div className='flex items-center'>
+                  {getRoleIcon(user.role || 'customer')}
+                  <div className='ml-3'>
+                    <div className='text-sm font-medium text-gray-900'>
+                      {user.username}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td className='px-6 py-4 whitespace-nowrap'>
+                <div className='text-sm text-gray-900'>
+                  {user.email}
+                </div>
+              </td>
+              <td className='px-6 py-4 whitespace-nowrap'>
+                <div className='text-sm font-medium text-gray-900'>
+                  {user.fullName || user.full_name || 'N/A'}
+                </div>
+              </td>
+              <td className='px-6 py-4 whitespace-nowrap'>
+                <div className='text-sm text-gray-900'>
+                  {formatDate(user.dob)}
+                </div>
+              </td>
+              <td className='px-6 py-4 whitespace-nowrap'>
+                {getRoleBadge(user.role || 'customer')}
+              </td>
+              <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium'>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => onEdit(user)}
+                    className="text-blue-600 hover:text-blue-900 transition-colors p-2 rounded-full hover:bg-blue-50"
+                    title="Chỉnh sửa"
+                  >
+                    <FaEdit size={18} />
+                  </button>
+                  <button
+                    onClick={() => onDelete(user.id)}
+                    className="text-red-600 hover:text-red-900 transition-colors p-2 rounded-full hover:bg-red-50"
+                    title="Xóa"
+                  >
+                    <FaTrash size={18} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

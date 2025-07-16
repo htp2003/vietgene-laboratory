@@ -16,9 +16,9 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
         email: '',
         fullName: '', // Frontend field name
         dob: '',
-        role: 'customer' as 'customer' | 'staff' | 'admin'
+        role: 'customer' as 'customer' | 'staff' | 'admin' | 'doctor'
     })
-    
+
     const [errors, setErrors] = React.useState<Record<string, string>>({})
     const [isSubmitting, setIsSubmitting] = React.useState(false)
 
@@ -45,7 +45,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
 
     const validateForm = () => {
         const newErrors: Record<string, string> = {}
-        
+
         if (!formData.username.trim()) {
             newErrors.username = 'Tên đăng nhập không được để trống'
         } else if (formData.username.length < 3) {
@@ -53,17 +53,17 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
         } else if (formData.username.length > 16) {
             newErrors.username = 'Tên đăng nhập không được quá 16 ký tự'
         }
-        
+
         if (!formData.email.trim()) {
             newErrors.email = 'Email không được để trống'
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
             newErrors.email = 'Email không hợp lệ'
         }
-        
+
         if (!formData.fullName.trim()) {
             newErrors.fullName = 'Họ tên không được để trống'
         }
-        
+
         if (!formData.dob) {
             newErrors.dob = 'Ngày sinh không được để trống'
         } else {
@@ -71,27 +71,27 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
             const dobDate = new Date(formData.dob)
             const now = new Date()
             const minDate = new Date('1900-01-01')
-            
+
             if (dobDate > now) {
                 newErrors.dob = 'Ngày sinh không thể trong tương lai'
             } else if (dobDate < minDate) {
                 newErrors.dob = 'Ngày sinh không hợp lệ'
             }
         }
-        
+
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        
+
         if (!validateForm()) {
             return
         }
-        
+
         setIsSubmitting(true)
-        
+
         try {
             // FIXED: Create proper data structure for API
             const submitData: Partial<User> = {
@@ -101,11 +101,11 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                 dob: formData.dob,
                 role: formData.role
             }
-            
+
             console.log('🚀 UserModal submitting data:', submitData)
-            
+
             await onSave(submitData)
-            
+
             // Reset form after successful save
             setFormData({
                 username: '',
@@ -115,7 +115,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                 role: 'customer'
             })
             setErrors({})
-            
+
         } catch (error) {
             console.error('❌ Error saving user in modal:', error)
             // Don't close modal on error, let user try again
@@ -156,7 +156,7 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         <FaUser className="text-blue-500" />
                         {user ? 'Chỉnh sửa thông tin người dùng' : 'Thêm người dùng mới'}
                     </h2>
-                    <button 
+                    <button
                         onClick={handleClose}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
                         disabled={isSubmitting}
@@ -173,13 +173,12 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 <FaUser size={14} />
                                 Tên đăng nhập <span className="text-red-500">*</span>
                             </label>
-                            <input 
-                                type="text" 
-                                value={formData.username} 
+                            <input
+                                type="text"
+                                value={formData.username}
                                 onChange={(e) => handleInputChange('username', e.target.value)}
-                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${
-                                    errors.username ? 'border-red-500' : 'border-gray-300'
-                                }`}
+                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${errors.username ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 placeholder="Nhập tên đăng nhập"
                                 disabled={isSubmitting}
                                 minLength={3}
@@ -194,13 +193,12 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 <FaEnvelope size={14} />
                                 Email <span className="text-red-500">*</span>
                             </label>
-                            <input 
-                                type="email" 
-                                value={formData.email} 
+                            <input
+                                type="email"
+                                value={formData.email}
                                 onChange={(e) => handleInputChange('email', e.target.value)}
-                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${
-                                    errors.email ? 'border-red-500' : 'border-gray-300'
-                                }`}
+                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${errors.email ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 placeholder="Nhập email"
                                 disabled={isSubmitting}
                             />
@@ -213,13 +211,12 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                         <label className='block text-sm font-medium text-gray-700 mb-2'>
                             Họ tên <span className="text-red-500">*</span>
                         </label>
-                        <input 
-                            type="text" 
-                            value={formData.fullName} 
+                        <input
+                            type="text"
+                            value={formData.fullName}
                             onChange={(e) => handleInputChange('fullName', e.target.value)}
-                            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${
-                                errors.fullName ? 'border-red-500' : 'border-gray-300'
-                            }`}
+                            className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${errors.fullName ? 'border-red-500' : 'border-gray-300'
+                                }`}
                             placeholder="Nhập họ tên"
                             disabled={isSubmitting}
                         />
@@ -233,13 +230,12 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 <FaCalendarAlt size={14} />
                                 Ngày sinh <span className="text-red-500">*</span>
                             </label>
-                            <input 
-                                type="date" 
-                                value={formData.dob} 
+                            <input
+                                type="date"
+                                value={formData.dob}
                                 onChange={(e) => handleInputChange('dob', e.target.value)}
-                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${
-                                    errors.dob ? 'border-red-500' : 'border-gray-300'
-                                }`}
+                                className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors ${errors.dob ? 'border-red-500' : 'border-gray-300'
+                                    }`}
                                 disabled={isSubmitting}
                                 max={new Date().toISOString().split('T')[0]} // Prevent future dates
                                 min="1900-01-01"
@@ -253,8 +249,8 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 <FaUserTag size={14} />
                                 Vai trò <span className="text-red-500">*</span>
                             </label>
-                            <select 
-                                value={formData.role} 
+                            <select
+                                value={formData.role}
                                 onChange={(e) => handleInputChange('role', e.target.value)}
                                 className='w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors'
                                 disabled={isSubmitting}
@@ -262,22 +258,23 @@ export default function UserModal({ isOpen, onClose, onSave, user }: UserModalPr
                                 <option value="customer">Khách hàng</option>
                                 <option value="staff">Nhân viên</option>
                                 <option value="admin">Quản trị viên</option>
+                                <option value="doctor">Bác sĩ</option>
                             </select>
                         </div>
                     </div>
 
                     {/* Submit Buttons */}
                     <div className='flex justify-end gap-4 mt-8 pt-6 border-t border-gray-200'>
-                        <button 
-                            type='button' 
-                            onClick={handleClose} 
+                        <button
+                            type='button'
+                            onClick={handleClose}
                             className='px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium'
                             disabled={isSubmitting}
                         >
                             Hủy
                         </button>
-                        <button 
-                            type='submit' 
+                        <button
+                            type='submit'
                             className='px-6 py-3 text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors font-medium flex items-center gap-2'
                             disabled={isSubmitting}
                         >
