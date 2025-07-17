@@ -34,77 +34,10 @@ interface Order {
   service?: {
     name: string;
     type: string;
-    id?: string;
   };
-  progress?: number;
-  participants?: Array<{
-    id: string;
-    participantName: string;
-    relationship: string;
-    age: number;
-  }>;
-  orderDetails?: Array<{
-    id: string;
-    quantity: number;
-    unitPrice: number;
-    subtotal: number;
-  }>;
-  samples?: Array<{
-    id: string;
-    sampleCode: string;
-    status: string;
-    collectionMethod: string;
-  }>;
-  appointment?: {
-    id: string;
-    appointmentDate: string;
-    appointmentType: string;
-    status: string;
-    notes?: string;
-    doctorTimeSlot?: string;
-  } | null;
+  participantCount?: number;
+  sampleCount?: number;
 }
-
-// Progress Loading Component
-const ProgressLoader: React.FC<{
-  progress: number;
-  message: string;
-  subMessage?: string;
-}> = ({ progress, message, subMessage }) => {
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center max-w-md w-full px-6">
-        {/* Logo or Icon */}
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <Package className="w-8 h-8 text-red-600" />
-        </div>
-
-        {/* Main Message */}
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">{message}</h2>
-
-        {/* Sub Message */}
-        {subMessage && <p className="text-gray-600 mb-6">{subMessage}</p>}
-
-        {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-3 mb-4 overflow-hidden">
-          <div
-            className="bg-gradient-to-r from-red-500 to-red-600 h-3 rounded-full transition-all duration-500 ease-out relative"
-            style={{ width: `${progress}%` }}
-          >
-            {/* Animated shine effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-pulse"></div>
-          </div>
-        </div>
-
-        {/* Progress Percentage */}
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-500">Đang tải dữ liệu...</span>
-          <span className="font-medium text-red-600">{progress}%</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const CustomerDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -112,8 +45,6 @@ const CustomerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [loadingMessage, setLoadingMessage] = useState("Đang khởi tạo...");
   const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -147,32 +78,7 @@ const CustomerDashboard: React.FC = () => {
     },
   ]);
 
-  // Simulate loading progress
-  const simulateProgress = (
-    targetProgress: number,
-    message: string,
-    duration: number = 1000
-  ) => {
-    return new Promise<void>((resolve) => {
-      setLoadingMessage(message);
-      const startProgress = loadingProgress;
-      const progressDiff = targetProgress - startProgress;
-      const stepTime = duration / Math.abs(progressDiff);
-
-      let currentProgress = startProgress;
-      const interval = setInterval(() => {
-        currentProgress += progressDiff > 0 ? 1 : -1;
-        setLoadingProgress(currentProgress);
-
-        if (currentProgress === targetProgress) {
-          clearInterval(interval);
-          resolve();
-        }
-      }, stepTime);
-    });
-  };
-
-  // Load dashboard data with progress simulation
+  // Load dashboard data - SIMPLIFIED
   useEffect(() => {
     loadDashboardData();
   }, [navigate]);
@@ -180,18 +86,15 @@ const CustomerDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      setLoadingProgress(0);
       setError(null);
 
-      // Step 1: Check authentication
-      await simulateProgress(15, "Đang xác thực người dùng...", 300);
+      // Check authentication
       if (!authService.isAuthenticated()) {
         navigate("/login");
         return;
       }
 
-      // Step 2: Get current user
-      await simulateProgress(30, "Đang tải thông tin tài khoản...", 400);
+      // Get current user
       const user = authService.getCurrentUser();
       if (!user) {
         navigate("/login");
@@ -199,12 +102,8 @@ const CustomerDashboard: React.FC = () => {
       }
       setCurrentUser(user);
 
-      // Step 3: Load user orders
-      await simulateProgress(50, "Đang tải danh sách đơn hàng...", 500);
-      await loadUserOrders(user.id);
-
-      // Step 4: Complete
-      await simulateProgress(100, "Hoàn tất!", 300);
+      // Load orders with minimal data - NO DETAILED API CALLS
+      await loadUserOrdersOptimized(user.id);
 
       console.log("✅ Dashboard loaded successfully");
     } catch (err) {
@@ -215,180 +114,60 @@ const CustomerDashboard: React.FC = () => {
           : "Không thể tải dữ liệu dashboard. Vui lòng thử lại sau."
       );
     } finally {
-      // Small delay to show 100% completion
-      setTimeout(() => {
-        setLoading(false);
-      }, 500);
+      setLoading(false);
     }
   };
 
-  const loadUserOrders = async (userId: string) => {
+  // OPTIMIZED: Only load basic order data, no detailed calls
+  const loadUserOrdersOptimized = async (userId: string) => {
     try {
       console.log("🔍 Loading orders for user:", userId);
 
-      // Update progress during order loading
-      setLoadingMessage("Đang tải đơn hàng từ server...");
+      // Only get basic order data - NO getCompleteOrderData calls
       const userOrders = await orderService.getUserOrders(userId);
-
-      await simulateProgress(70, "Đang xử lý dữ liệu đơn hàng...", 300);
       console.log("📦 Raw orders from API:", userOrders);
 
       if (userOrders && userOrders.length > 0) {
-        await simulateProgress(85, "Đang tải chi tiết đơn hàng...", 400);
+        // Transform orders with BASIC data only
+        const basicOrders: Order[] = userOrders.map((apiOrder: any) => {
+          return {
+            id: apiOrder.orderId || apiOrder.id,
+            orderCode:
+              apiOrder.order_code ||
+              apiOrder.orderCode ||
+              `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
+            status: apiOrder.status || "pending",
+            totalAmount: apiOrder.total_amount || apiOrder.totalAmount || 0,
+            paymentStatus:
+              apiOrder.payment_status || apiOrder.paymentStatus || "pending",
+            paymentMethod:
+              apiOrder.payment_method || apiOrder.paymentMethod || "transfer",
+            createdAt:
+              apiOrder.createdAt ||
+              apiOrder.created_at ||
+              new Date().toISOString(),
+            updatedAt:
+              apiOrder.updatedAt ||
+              apiOrder.updated_at ||
+              apiOrder.update_at ||
+              new Date().toISOString(),
+            notes: apiOrder.notes || "",
 
-        // Transform and enhance orders with additional data
-        const enhancedOrders = await Promise.all(
-          userOrders.map(async (apiOrder: any, index: number) => {
-            try {
-              // Update progress for each order
-              const progressStep = Math.floor(5 / userOrders.length);
-              await simulateProgress(
-                85 + (index + 1) * progressStep,
-                `Đang xử lý đơn hàng ${index + 1}/${userOrders.length}...`,
-                200
-              );
+            // Basic service info without additional API calls
+            service: {
+              name: "Xét nghiệm DNA",
+              type: "dna_test",
+            },
 
-              // ✅ FIX: Use the corrected getCompleteOrderData method
-              const completeOrderData = await orderService.getCompleteOrderData(
-                apiOrder.orderId || apiOrder.id
-              );
+            // Placeholder counts - will be loaded on demand
+            participantCount: 0,
+            sampleCount: 0,
+          };
+        });
 
-              console.log(
-                `📋 Complete data for order ${apiOrder.orderId}:`,
-                completeOrderData
-              );
-
-              // Transform API data to component format
-              const transformedOrder: Order = {
-                id: apiOrder.orderId || apiOrder.id,
-                orderCode:
-                  apiOrder.order_code ||
-                  apiOrder.orderCode ||
-                  `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
-                status: apiOrder.status || "pending",
-                totalAmount: apiOrder.total_amount || apiOrder.totalAmount || 0,
-                paymentStatus:
-                  apiOrder.payment_status ||
-                  apiOrder.paymentStatus ||
-                  "pending",
-                paymentMethod:
-                  apiOrder.payment_method ||
-                  apiOrder.paymentMethod ||
-                  "transfer",
-                createdAt:
-                  apiOrder.createdAt ||
-                  apiOrder.created_at ||
-                  new Date().toISOString(),
-                updatedAt:
-                  apiOrder.updatedAt ||
-                  apiOrder.updated_at ||
-                  apiOrder.update_at ||
-                  new Date().toISOString(),
-                notes: apiOrder.notes || "",
-
-                // Service info from order details
-                service: {
-                  name:
-                    getServiceNameFromOrderDetails(
-                      completeOrderData.orderDetails
-                    ) || "Xét nghiệm DNA",
-                  type: "dna_test",
-                  id: completeOrderData.orderDetails?.[0]?.dnaServiceId,
-                },
-
-                // Participants
-                participants:
-                  completeOrderData.participants?.map((p: any) => ({
-                    id: p.id,
-                    participantName:
-                      p.participantName ||
-                      p.participant_name ||
-                      "Không xác định",
-                    relationship: p.relationship || "Không xác định",
-                    age: p.age || 0,
-                  })) || [],
-
-                // Order details
-                orderDetails:
-                  completeOrderData.orderDetails?.map((od: any) => ({
-                    id: od.id,
-                    quantity: od.quantity || 1,
-                    unitPrice: od.unit_price || od.unitPrice || 0,
-                    subtotal: od.subtotal || 0,
-                  })) || [],
-
-                // Samples
-                samples:
-                  completeOrderData.samples?.map((s: any) => ({
-                    id: s.id,
-                    sampleCode: s.sample_code || s.sampleCode || "",
-                    status: s.status || "pending",
-                    collectionMethod:
-                      s.collection_method || s.collectionMethod || "home",
-                  })) || [],
-
-                // ✅ FIX: Handle appointment data properly
-                appointment: completeOrderData.appointment
-                  ? {
-                      id: completeOrderData.appointment.id,
-                      appointmentDate:
-                        completeOrderData.appointment.appointment_date,
-                      appointmentType:
-                        completeOrderData.appointment.appointment_type,
-                      status: completeOrderData.appointment.status,
-                      notes: completeOrderData.appointment.notes,
-                      doctorTimeSlot:
-                        completeOrderData.appointment.doctor_time_slot,
-                    }
-                  : null,
-
-                // Calculate progress based on status and samples
-                progress: calculateOrderProgress(
-                  apiOrder.status,
-                  completeOrderData.samples,
-                  completeOrderData.appointment
-                ),
-              };
-
-              return transformedOrder;
-            } catch (error) {
-              console.warn(
-                `⚠️ Error loading complete data for order ${apiOrder.orderId}:`,
-                error
-              );
-
-              // Fallback to basic order data
-              return {
-                id: apiOrder.orderId || apiOrder.id,
-                orderCode:
-                  apiOrder.order_code ||
-                  `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
-                status: apiOrder.status || "pending",
-                totalAmount: apiOrder.total_amount || 0,
-                paymentStatus: apiOrder.payment_status || "pending",
-                paymentMethod: apiOrder.payment_method || "transfer",
-                createdAt:
-                  apiOrder.createdAt ||
-                  apiOrder.created_at ||
-                  new Date().toISOString(),
-                updatedAt:
-                  apiOrder.updatedAt ||
-                  apiOrder.updated_at ||
-                  new Date().toISOString(),
-                service: {
-                  name: "Xét nghiệm DNA",
-                  type: "dna_test",
-                },
-                participants: [],
-                progress: getStatusInfo(apiOrder.status || "pending").progress,
-              } as Order;
-            }
-          })
-        );
-
-        console.log("✅ Enhanced orders:", enhancedOrders);
-        setOrders(enhancedOrders);
-        setFilteredOrders(enhancedOrders);
+        console.log("✅ Basic orders loaded:", basicOrders);
+        setOrders(basicOrders);
+        setFilteredOrders(basicOrders);
       } else {
         console.log("📭 No orders found for user");
         setOrders([]);
@@ -400,64 +179,18 @@ const CustomerDashboard: React.FC = () => {
     }
   };
 
-  const calculateOrderProgress = (
-    status: string,
-    samples: any[],
-    appointment: any
-  ): number => {
-    const baseProgress = getStatusInfo(status).progress;
-    let appointmentProgress = 0;
-    if (appointment) {
-      appointmentProgress = appointment.status ? 30 : 20;
-    }
-
-    let sampleProgress = 0;
-    if (samples && samples.length > 0) {
-      const sampleProgressMap: Record<string, number> = {
-        pending_collection: 10,
-        scheduled: 20,
-        collected: 40,
-        shipped: 50,
-        received: 60,
-        analyzing: 80,
-        completed: 100,
-      };
-
-      sampleProgress =
-        samples.reduce((acc, sample) => {
-          return acc + (sampleProgressMap[sample.status] || 0);
-        }, 0) / samples.length;
-    }
-
-    return Math.max(baseProgress, appointmentProgress, sampleProgress);
-  };
-
-  const getServiceNameFromOrderDetails = (orderDetails: any[]): string => {
-    if (!orderDetails || orderDetails.length === 0) {
-      return "Xét nghiệm DNA";
-    }
-    return "Xét nghiệm quan hệ huyết thống DNA";
-  };
-
-  // Refresh with progress
+  // Quick refresh without detailed loading
   const handleRefresh = async () => {
     if (!currentUser) return;
 
     try {
       setRefreshing(true);
-      setLoadingProgress(0);
-
-      await simulateProgress(30, "Đang làm mới dữ liệu...", 300);
-      await loadUserOrders(currentUser.id);
-      await simulateProgress(100, "Làm mới hoàn tất!", 200);
+      await loadUserOrdersOptimized(currentUser.id);
     } catch (error) {
       console.error("❌ Error refreshing orders:", error);
       setError("Không thể làm mới dữ liệu");
     } finally {
-      setTimeout(() => {
-        setRefreshing(false);
-        setLoadingProgress(0);
-      }, 300);
+      setRefreshing(false);
     }
   };
 
@@ -577,37 +310,25 @@ const CustomerDashboard: React.FC = () => {
     },
   ];
 
-  // Show progress loader during initial loading
+  // Simple loading spinner
   if (loading) {
     return (
-      <ProgressLoader
-        progress={loadingProgress}
-        message={loadingMessage}
-        subMessage="Vui lòng đợi trong giây lát..."
-      />
-    );
-  }
-
-  // Show mini progress bar during refresh
-  const MiniProgressBar = () => {
-    if (!refreshing) return null;
-
-    return (
-      <div className="fixed top-0 left-0 w-full z-50">
-        <div className="h-1 bg-gray-200">
-          <div
-            className="h-1 bg-red-600 transition-all duration-300"
-            style={{ width: `${loadingProgress}%` }}
-          ></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <RefreshCw className="w-8 h-8 text-red-600 animate-spin" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Đang tải dashboard...
+          </h2>
+          <p className="text-gray-600">Vui lòng đợi trong giây lát</p>
         </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <MiniProgressBar />
-
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Page Title */}
         <div className="mb-8">
@@ -782,7 +503,6 @@ const CustomerDashboard: React.FC = () => {
                         order.paymentStatus
                       );
                       const StatusIcon = statusInfo.icon;
-                      const progress = order.progress || statusInfo.progress;
 
                       return (
                         <div
@@ -807,24 +527,6 @@ const CustomerDashboard: React.FC = () => {
                                 <p className="text-sm text-gray-500 font-mono">
                                   Mã: {order.orderCode}
                                 </p>
-                                {/* Show participants count and samples count */}
-                                <div className="flex items-center gap-4 mt-1">
-                                  {order.participants &&
-                                    order.participants.length > 0 && (
-                                      <p className="text-xs text-gray-400 flex items-center gap-1">
-                                        <User className="w-3 h-3" />
-                                        {order.participants.length} người tham
-                                        gia
-                                      </p>
-                                    )}
-                                  {order.samples &&
-                                    order.samples.length > 0 && (
-                                      <p className="text-xs text-gray-400 flex items-center gap-1">
-                                        <Package className="w-3 h-3" />
-                                        {order.samples.length} mẫu
-                                      </p>
-                                    )}
-                                </div>
                               </div>
                             </div>
                             <div className="text-right">
@@ -834,23 +536,6 @@ const CustomerDashboard: React.FC = () => {
                               <p className={`text-sm ${paymentInfo.color}`}>
                                 {paymentInfo.label}
                               </p>
-                            </div>
-                          </div>
-
-                          {/* Enhanced Progress Bar */}
-                          <div className="mb-4">
-                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                              <span>Tiến độ</span>
-                              <span>{progress}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                              <div
-                                className="bg-gradient-to-r from-red-500 to-red-600 h-3 rounded-full transition-all duration-500 ease-out relative"
-                                style={{ width: `${progress}%` }}
-                              >
-                                {/* Animated shine effect */}
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 animate-pulse"></div>
-                              </div>
                             </div>
                           </div>
 

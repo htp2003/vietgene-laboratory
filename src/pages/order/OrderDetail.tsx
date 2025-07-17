@@ -21,7 +21,7 @@ import { useOrderDetail } from "../../hooks/useOrderDetail";
 
 // Enhanced Components
 import { EnhancedSamplesTab } from "../../components/customer/orderDetail/EnhancedSamplesTab";
-import TestResultsSection from "../../components/customer/orderDetail/TestResultsSection";
+import TestResultsSection from "../../components/customer/orderDetail/TestResultsSection"; // bắt api qua OrderDetail luôn
 
 // Order Header Component
 const OrderHeader: React.FC<any> = ({
