@@ -298,6 +298,7 @@ const SampleCreationModal: React.FC<SampleCreationModalProps> = ({
         sample_quality: form.sample_quality.trim(),
         sampleKitsId: form.sampleKitId,
         ordersId: appointment?.orderId || '',
+
       };
       console.log(`📦 Sample ${index + 1} data:`, sampleData);
       return SampleService.createSample(sampleData);

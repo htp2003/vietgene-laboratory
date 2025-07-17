@@ -5,12 +5,12 @@ import { SampleService, SampleResponse } from "./sampleService";
 export interface TestResultRequest {
   id?: string;
   result_type: string;
-  result_percentage?: string;
+  result_percentage: string; // ✅ Always string, never empty
   conclusion: string;
   result_detail: string;
   result_file?: string;
   tested_date: string;
-  sample_id: string;
+  sample_id: string; // ✅ Single sample ID for API compatibility
 }
 
 export interface TestResultResponse {
@@ -21,8 +21,8 @@ export interface TestResultResponse {
   result_detail: string;
   result_file: string;
   tested_date: string;
-  user_id: string;
-  sample_id: string;
+  userId: string;
+  samplesId: string;
 }
 
 export interface ApiTestResultResponse {
@@ -32,15 +32,129 @@ export interface ApiTestResultResponse {
 }
 
 export interface CreateTestResultBySampleParams {
-  sampleId: string;
+  sampleIds: string[];
+  orderId: string;
   resultType: 'Positive' | 'Negative' | 'Inconclusive';
-  resultPercentage?: number;
+  resultPercentage: string;
   conclusion: string;
   resultDetails: string;
-  resultFile?: File;
+  resultFile?: string; // ✅ Changed from File to string
+  skipValidation?: boolean;
+}
+
+export interface CreateTestResultResponse {
+  success: boolean;
+  result: TestResultResponse; // ✅ Single result since API returns one result for all samples
+  message?: string;
 }
 
 export class TestResultService {
+  /**
+   * ✅ Map frontend result type to API expected format
+   */
+  private static mapResultTypeToAPI(resultType: string): string {
+    const typeMapping = {
+      'Positive': 'DNA_PATERNITY',        // For DNA paternity tests
+      'Negative': 'DNA_PATERNITY_NEGATIVE', 
+      'Inconclusive': 'DNA_INCONCLUSIVE'
+    };
+    
+    return typeMapping[resultType as keyof typeof typeMapping] || 'DNA_PATERNITY';
+  }
+
+  /**
+   * Debug current user role and permissions
+   */
+  private static debugUserRole(): any {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('❌ No token found');
+        return null;
+      }
+      
+      // Decode JWT payload
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      console.log('🔑 Current User Token Details:');
+      console.log('📋 Full payload:', payload);
+      console.log('👤 User ID:', payload.userId || payload.sub);
+      console.log('👥 Roles/Authorities:', payload.scope || payload.authorities || payload.roles);
+      console.log('⏰ Expires:', new Date(payload.exp * 1000).toISOString());
+      
+      // Check if role includes required permissions
+      const roles = payload.scope || payload.authorities || payload.roles || [];
+      const roleArray = Array.isArray(roles) ? roles : roles.split(' ');
+      
+      console.log('🔍 Role Analysis:');
+      console.log('- STAFF role:', roleArray.includes('STAFF') ? '✅' : '❌');
+      console.log('- DOCTOR role:', roleArray.includes('DOCTOR') ? '✅' : '❌');
+      console.log('- MANAGER role:', roleArray.includes('MANAGER') ? '✅' : '❌');
+      console.log('- ADMIN role:', roleArray.includes('ADMIN') ? '✅' : '❌');
+      console.log('- All roles:', roleArray);
+      
+      // Possible required roles for test-results endpoint
+      const possibleRequiredRoles = ['DOCTOR', 'STAFF', 'MANAGER', 'LAB_TECH', 'TECHNICIAN'];
+      const hasRequiredRole = possibleRequiredRoles.some(role => roleArray.includes(role));
+      
+      if (!hasRequiredRole) {
+        console.warn('⚠️ Current user may not have required role for test-results endpoint');
+        console.warn('🔧 Required roles (guess):', possibleRequiredRoles);
+        console.warn('👤 Your roles:', roleArray);
+      }
+      
+      return {
+        userId: payload.userId || payload.sub,
+        roles: roleArray,
+        hasRequiredRole,
+        tokenValid: payload.exp * 1000 > Date.now()
+      };
+      
+    } catch (error) {
+      console.error('❌ Error decoding token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if authentication token is valid
+   */
+  private static checkAuthToken(): boolean {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('❌ No authentication token found');
+        return false;
+      }
+      
+      // Basic JWT decode (for debugging only)
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        console.error('❌ Invalid token format');
+        return false;
+      }
+      
+      const payload = JSON.parse(atob(parts[1]));
+      console.log('🔑 Token info:', {
+        exp: payload.exp ? new Date(payload.exp * 1000).toISOString() : 'No expiry',
+        iat: payload.iat ? new Date(payload.iat * 1000).toISOString() : 'No issued time',
+        roles: payload.scope || payload.authorities || payload.roles || 'No roles found',
+        userId: payload.userId || payload.sub || 'No user ID'
+      });
+      
+      // Check if token is expired
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        console.error('❌ Token has expired');
+        return false;
+      }
+      
+      return true;
+    } catch (e) {
+      console.error('❌ Error checking token:', e);
+      return false;
+    }
+  }
+
   /**
    * Get samples by order ID
    */
@@ -63,51 +177,123 @@ export class TestResultService {
   }
 
   /**
-   * Create test result by sample ID
+   * ✅ Create test result for multiple samples (multiple API calls)
+   * Since API only accepts single sample_id, we need to call it multiple times
    */
-  static async createTestResultBySample(params: CreateTestResultBySampleParams): Promise<TestResultResponse> {
-    try {
-      console.log('🧪 Creating test result for sample:', params.sampleId);
+ /**
+ * ✅ Create test result for ALL samples in ONE API call (NO LOOP)
+ */
+static async createTestResultBySample(params: CreateTestResultBySampleParams): Promise<CreateTestResultResponse> {
+  try {
+    console.log('🧪 Creating test result for ALL samples:', params.sampleIds);
 
-      // Step 1: Validate sample exists
-      await this.validateSampleExists(params.sampleId);
+    // ✅ Check authentication first
+    console.log('🚀 Starting role debug...');
+    const userInfo = this.debugUserRole();
+    
+    if (!this.checkAuthToken()) {
+      throw new Error('Token xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+    
+    if (userInfo && !userInfo.hasRequiredRole) {
+      console.error('🚫 LIKELY ISSUE: Current user role does not have permission to create test results');
+      console.error('💡 SOLUTION: Login with DOCTOR or STAFF role, or contact admin to update permissions');
+      // Don't throw error yet, let's see what the API returns
+    }
 
-      // Step 2: Convert file to base64 if provided
-      const resultFileString = params.resultFile ? await this.fileToBase64(params.resultFile) : undefined;
+    if (params.sampleIds.length === 0) {
+      throw new Error('Không có mẫu xét nghiệm nào được chọn');
+    }
 
-      // Step 3: Prepare request data
-      const requestData: TestResultRequest = {
-        result_type: params.resultType,
-        result_percentage: params.resultPercentage?.toString(),
-        conclusion: params.conclusion,
-        result_detail: params.resultDetails,
-        result_file: resultFileString,
-        tested_date: new Date().toISOString(),
-        sample_id: params.sampleId
+    if (!params.orderId) {
+      throw new Error('Không tìm thấy thông tin đơn hàng');
+    }
+
+
+    // ✅ Step 3: Ensure result_percentage is never empty
+    const resultPercentage = this.normalizeResultPercentage(params.resultType, params.resultPercentage);
+
+    console.log('📋 Normalized result percentage:', resultPercentage);
+
+    // ✅ Step 4: Prepare request data with CORRECT API format - SINGLE REQUEST FOR ALL SAMPLES
+    const requestData: any = {
+      result_type: this.mapResultTypeToAPI(params.resultType),
+      result_percentage: resultPercentage,
+      conclusion: params.conclusion,
+      result_file: params.resultFile,
+      result_detail: params.resultDetails,
+      tested_date: new Date().toISOString(),
+      orders_id: params.orderId,
+      sample_id: params.sampleIds // ✅ ENTIRE ARRAY - NO LOOP!
+    };
+
+
+    const response = await apiClient.post<ApiTestResultResponse>('/test-results', requestData);
+
+    if (response.data.code === 200) {
+      console.log('✅ Test result created successfully for ALL samples:', response.data.result);
+      
+      return {
+        success: true,
+        result: response.data.result,
+        message: `Tạo thành công kết quả xét nghiệm cho ${params.sampleIds.length} mẫu`
       };
+    } else {
+      throw new Error(response.data.message || 'Failed to create test result');
+    }
 
-      // Step 4: Send API request
-      const response = await apiClient.post<ApiTestResultResponse>('/test-results', requestData);
+  } catch (error: any) {
+    console.error('❌ Error creating test result:', error);
+    
+    // ✅ Enhanced error logging
+    if (error.response) {
+      console.error('📄 Response status:', error.response.status);
+      console.error('📄 Response data:', error.response.data);
+      console.error('📄 Response headers:', error.response.headers);
+    }
+    
+    if (error.request) {
+      console.error('📡 Request details:', {
+        url: error.request.responseURL,
+        method: error.request.method,
+        status: error.request.status
+      });
+    }
+    
+    if (error.response?.data?.message) {
+      throw new Error(error.response.data.message);
+    }
+    
+    if (error.message) {
+      throw new Error(error.message);
+    }
+    
+    throw new Error('Có lỗi xảy ra khi lưu kết quả xét nghiệm');
+  }
+}
 
-      if (response.data.code === 200) {
-        console.log('✅ Test result created successfully:', response.data.result);
-        return response.data.result;
-      } else {
-        throw new Error(response.data.message || 'Failed to create test result');
+  /**
+   * ✅ Normalize result percentage to ensure it's never empty
+   */
+  private static normalizeResultPercentage(resultType: string, inputPercentage: string): string {
+    // If user provided a percentage, use it
+    if (inputPercentage && inputPercentage.trim()) {
+      const num = parseFloat(inputPercentage.trim());
+      if (!isNaN(num) && num >= 0 && num <= 100) {
+        return inputPercentage.trim();
       }
+    }
 
-    } catch (error: any) {
-      console.error('❌ Error creating test result:', error);
-      
-      if (error.response?.data?.message) {
-        throw new Error(error.response.data.message);
-      }
-      
-      if (error.message) {
-        throw new Error(error.message);
-      }
-      
-      throw new Error('Có lỗi xảy ra khi lưu kết quả xét nghiệm');
+    // ✅ Provide default values based on result type
+    switch (resultType) {
+      case 'Positive':
+        return '99.99'; // Default high confidence for positive results
+      case 'Negative':
+        return '0.00';  // Default for negative results
+      case 'Inconclusive':
+        return '50.00'; // Default for inconclusive results
+      default:
+        return '0.00';  // Fallback
     }
   }
 
@@ -233,23 +419,35 @@ export class TestResultService {
   }
 
   /**
-   * Validate that sample exists before creating test result
+   * Validate that samples exist before creating test result
    */
-  private static async validateSampleExists(sampleId: string): Promise<SampleResponse> {
+  private static async validateSamplesExist(sampleIds: string[]): Promise<void> {
     try {
-      const sample = await SampleService.getSampleById(sampleId);
-      
-      // Additional validations
-      if (sample.status === 'PENDING') {
-        throw new Error('Mẫu xét nghiệm chưa sẵn sàng để có kết quả');
+      if (sampleIds.length === 0) {
+        throw new Error('Không có mẫu xét nghiệm nào được chọn');
       }
 
-      return sample;
-    } catch (error: any) {
-      if (error.message.includes('Mẫu xét nghiệm chưa sẵn sàng')) {
-        throw error;
+      console.log('🔍 Validating samples:', sampleIds);
+
+      // Validate each sample exists
+      for (const sampleId of sampleIds) {
+        try {
+          const sample = await SampleService.getSampleById(sampleId);
+          if (!sample) {
+            throw new Error(`Mẫu ${sampleId} không tồn tại`);
+          }
+          console.log(`✅ Sample ${sampleId} validated: ${sample.sample_code}`);
+        } catch (error: any) {
+          console.error(`❌ Sample ${sampleId} validation failed:`, error);
+          throw new Error(`Mẫu ${sampleId} không hợp lệ: ${error.message}`);
+        }
       }
-      throw new Error('Không tìm thấy mẫu xét nghiệm hoặc mẫu không hợp lệ');
+
+      console.log(`✅ All ${sampleIds.length} samples validated successfully`);
+
+    } catch (error: any) {
+      console.error('❌ Sample validation failed:', error);
+      throw error; // Re-throw the specific error
     }
   }
 

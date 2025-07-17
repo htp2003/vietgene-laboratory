@@ -6,10 +6,10 @@ export interface TestResult {
   appointmentId: string; // Main identifier for parent component
   sampleId?: string; // Optional sample reference
   resultType: 'Positive' | 'Negative' | 'Inconclusive';
-  resultPercentage?: number;
+  resultPercentage: string;
   conclusion: string;
   resultDetails: string;
-  resultFile?: File;
+  resultFile: string;
   testedDate: string;
 }
 
