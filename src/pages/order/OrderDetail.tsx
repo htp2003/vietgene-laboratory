@@ -12,7 +12,8 @@ import {
   Mail,
   Download,
   RefreshCw,
-  FileText, // Added for test results tab
+  FileText,
+  AlertTriangle,
 } from "lucide-react";
 
 // Hook - using the fixed version
@@ -20,9 +21,9 @@ import { useOrderDetail } from "../../hooks/useOrderDetail";
 
 // Enhanced Components
 import { EnhancedSamplesTab } from "../../components/customer/orderDetail/EnhancedSamplesTab";
-import TestResultsSection from "../../components/customer/orderDetail/TestResultsSection"; // New import
+import TestResultsSection from "../../components/customer/orderDetail/TestResultsSection";
 
-// Mock other components for now - you can replace with actual imports
+// Order Header Component
 const OrderHeader: React.FC<any> = ({
   orderData,
   onBackClick,
@@ -81,13 +82,14 @@ const OrderHeader: React.FC<any> = ({
   </div>
 );
 
-// ✅ Updated TabNavigation with Test Results tab
+// ✅ FIXED: Tab Navigation with proper test results count
 const TabNavigation: React.FC<any> = ({
   activeTab,
   onTabChange,
   samplesCount,
   kitsCount,
-  testResultsCount, // New prop
+  testResultsCount,
+  testResultsLoading,
 }) => {
   const tabs = [
     { id: "progress", label: "Tiến độ", icon: TrendingUp },
@@ -99,9 +101,10 @@ const TabNavigation: React.FC<any> = ({
       icon: TestTube,
     },
     {
-      id: "results", // New tab
+      id: "results",
       label: `Kết quả (${testResultsCount})`,
       icon: FileText,
+      isLoading: testResultsLoading,
     },
   ];
 
@@ -122,6 +125,9 @@ const TabNavigation: React.FC<any> = ({
             >
               <Icon className="w-4 h-4" />
               {tab.label}
+              {tab.isLoading && (
+                <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
+              )}
             </button>
           );
         })}
@@ -130,11 +136,12 @@ const TabNavigation: React.FC<any> = ({
   );
 };
 
+// Simple tab components
 const ProgressTab: React.FC<any> = ({ trackingSteps }) => (
   <div className="space-y-6">
     <h3 className="text-xl font-bold text-gray-900">Tiến độ đơn hàng</h3>
     <div className="space-y-4">
-      {trackingSteps.map((step: any, index: number) => (
+      {trackingSteps.map((step: any) => (
         <div key={step.step} className="flex items-start gap-4">
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -244,8 +251,263 @@ const ParticipantsTab: React.FC<any> = ({ participants }) => (
   </div>
 );
 
+// ✅ FIXED: Test Results Tab - Render directly without TestResultsSection
+const TestResultsTab: React.FC<any> = ({
+  orderId,
+  testResults,
+  testResultsLoading,
+  testResultsError,
+  refreshTestResults,
+}) => {
+  // Show loading state
+  if (testResultsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-gray-900">
+            Kết quả xét nghiệm
+          </h3>
+          <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
+        </div>
+        <div className="bg-gray-50 rounded-lg p-8 text-center">
+          <Loader className="w-12 h-12 text-gray-400 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải kết quả xét nghiệm...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (testResultsError) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-gray-900">
+            Kết quả xét nghiệm
+          </h3>
+          <button
+            onClick={refreshTestResults}
+            className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Thử lại
+          </button>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <h5 className="text-lg font-medium text-red-800 mb-2">
+            Lỗi tải kết quả
+          </h5>
+          <p className="text-red-600 mb-4">{testResultsError}</p>
+          <button
+            onClick={refreshTestResults}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Show empty state if no test results
+  if (!testResults || testResults.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold text-gray-900">
+            Kết quả xét nghiệm
+          </h3>
+          <button
+            onClick={refreshTestResults}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-700 text-sm font-medium"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Làm mới
+          </button>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-8 text-center">
+          <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h5 className="text-lg font-medium text-gray-700 mb-2">
+            Chưa có kết quả xét nghiệm
+          </h5>
+          <p className="text-gray-500 text-sm mb-4">
+            Kết quả sẽ xuất hiện sau khi quá trình phân tích hoàn tất
+          </p>
+          <p className="text-xs text-gray-400">Order ID: {orderId}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Render test results directly
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-bold text-gray-900">
+          Kết quả xét nghiệm ({testResults.length})
+        </h3>
+        <button
+          onClick={refreshTestResults}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-700 text-sm font-medium"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Làm mới
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <FileText className="w-8 h-8 text-blue-600" />
+            <div>
+              <p className="text-2xl font-bold text-blue-700">
+                {testResults.length}
+              </p>
+              <p className="text-sm text-blue-600">Tổng kết quả</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <FileText className="w-8 h-8 text-green-600" />
+            <div>
+              <p className="text-2xl font-bold text-green-700">
+                {testResults.filter((r) => r.conclusion).length}
+              </p>
+              <p className="text-sm text-green-600">Đã hoàn thành</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <FileText className="w-8 h-8 text-yellow-600" />
+            <div>
+              <p className="text-2xl font-bold text-yellow-700">
+                {testResults.filter((r) => !r.conclusion).length}
+              </p>
+              <p className="text-sm text-yellow-600">Đang xử lý</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Test Results List */}
+      <div className="space-y-4">
+        {testResults.map((result: any) => {
+          const percentageValue = parseFloat(result.result_percentage) || 0;
+          const percentageColor =
+            percentageValue >= 95
+              ? "text-green-600"
+              : percentageValue >= 80
+              ? "text-blue-600"
+              : percentageValue >= 60
+              ? "text-yellow-600"
+              : "text-red-600";
+
+          return (
+            <div
+              key={result.id}
+              className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+            >
+              {/* Result Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h5 className="font-semibold text-gray-900 text-lg">
+                      {result.result_type}
+                    </h5>
+                    <p className="text-sm text-gray-500">
+                      {new Date(result.tested_date).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Hoàn thành
+                  </span>
+                </div>
+              </div>
+
+              {/* Percentage */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Độ tin cậy
+                  </span>
+                  <span className={`text-lg font-bold ${percentageColor}`}>
+                    {percentageValue}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div
+                    className="h-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
+                    style={{ width: `${percentageValue}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Conclusion */}
+              {result.conclusion && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <h6 className="font-medium text-gray-900 mb-2">Kết luận:</h6>
+                  <p className="text-gray-800">{result.conclusion}</p>
+                </div>
+              )}
+
+              {/* Details */}
+              {result.result_detail && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h6 className="font-medium text-gray-900 mb-2">Chi tiết:</h6>
+                  <p className="text-gray-800 text-sm whitespace-pre-line">
+                    {result.result_detail}
+                  </p>
+                </div>
+              )}
+
+              {/* Download Button - Fixed for Google Drive links */}
+              {result.result_file && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      // ✅ Handle Google Drive links properly
+                      const fileUrl = result.result_file;
+                      console.log("📁 Opening file:", fileUrl);
+
+                      // Open in new tab
+                      window.open(fileUrl, "_blank", "noopener,noreferrer");
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Xem báo cáo
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Debug Info */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <p className="text-xs text-yellow-700">
+          <strong>Debug:</strong> Đang hiển thị {testResults.length} kết quả cho
+          Order ID: {orderId}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Action Buttons Component
 const ActionButtons: React.FC<any> = ({
-  orderStatus,
+  hasTestResults,
   onContactSupport,
   onDownloadResults,
   onOrderNewService,
@@ -259,7 +521,7 @@ const ActionButtons: React.FC<any> = ({
       Liên hệ hỗ trợ
     </button>
 
-    {orderStatus === "completed" && (
+    {hasTestResults && (
       <button
         onClick={onDownloadResults}
         className="flex items-center justify-center gap-2 bg-red-600 text-white rounded-lg px-6 py-3 hover:bg-red-700 transition-colors"
@@ -279,6 +541,7 @@ const ActionButtons: React.FC<any> = ({
   </div>
 );
 
+// ✅ MAIN: OrderDetail Component
 const OrderDetail: React.FC = () => {
   const {
     // State
@@ -287,14 +550,19 @@ const OrderDetail: React.FC = () => {
     error,
     activeTab,
 
+    // ✅ Test results state
+    testResults,
+    testResultsLoading,
+    testResultsError,
+    testResultsCount,
+
     // Computed data
     orderData,
     trackingSteps,
     kitsAndSamplesSummary,
     overallProgress,
     collectionMethod,
-    hasAppointment,
-    totalParticipants,
+    hasTestResults,
 
     // Actions
     handleTabChange,
@@ -303,33 +571,8 @@ const OrderDetail: React.FC = () => {
     handleDownloadResults,
     handleOrderNewService,
     handleTrackKit,
+    refreshTestResults,
   } = useOrderDetail();
-
-  // ✅ Get current user ID for test results
-  const getCurrentUserId = (): string => {
-    try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      return user.id || "";
-    } catch {
-      return "";
-    }
-  };
-
-  // ✅ Get sample IDs from order for test results filtering
-  const getSampleIds = (): string[] => {
-    if (!order?.samples) return [];
-    return order.samples.map((sample: any) => sample.id);
-  };
-
-  // ✅ Mock test results count (replace with actual count from service)
-  const getTestResultsCount = (): number => {
-    // In real implementation, this would come from testResultService
-    // For now, return a mock count based on completed samples
-    const completedSamples =
-      order?.samples?.filter((sample: any) => sample.status === "completed") ||
-      [];
-    return completedSamples.length;
-  };
 
   // Loading state
   if (loading) {
@@ -363,6 +606,7 @@ const OrderDetail: React.FC = () => {
     );
   }
 
+  // ✅ FIXED: Render tab content with proper orderId
   const renderTabContent = () => {
     switch (activeTab) {
       case "progress":
@@ -385,13 +629,14 @@ const OrderDetail: React.FC = () => {
           />
         );
 
-      case "results": // ✅ New tab content
+      case "results":
         return (
-          <TestResultsSection
-            sampleIds={getSampleIds()}
-            userId={getCurrentUserId()}
-            showSummary={true}
-            className="test-results-tab"
+          <TestResultsTab
+            orderId={order.id} // ✅ Pass the actual order ID
+            testResults={testResults}
+            testResultsLoading={testResultsLoading}
+            testResultsError={testResultsError}
+            refreshTestResults={refreshTestResults}
           />
         );
 
@@ -410,22 +655,30 @@ const OrderDetail: React.FC = () => {
           overallProgress={overallProgress}
         />
 
-        {/* Debug Info (remove in production) */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        {/* ✅ Debug Info - Shows what order ID we're working with */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <details>
-            <summary className="font-medium text-yellow-800 cursor-pointer">
-              🔍 Debug Info (Development Only)
+            <summary className="font-medium text-blue-800 cursor-pointer">
+              🔍 Debug Info - Order & Test Results
             </summary>
             <div className="mt-2 text-sm space-y-1">
               <p>
-                <strong>Collection Method:</strong> {collectionMethod}
+                <strong>Current Order ID:</strong> {order.id}
               </p>
               <p>
-                <strong>Has Appointment:</strong>{" "}
-                {hasAppointment ? "Yes" : "No"}
+                <strong>URL Order ID:</strong>{" "}
+                {window.location.pathname.split("/").pop()}
               </p>
               <p>
-                <strong>Total Participants:</strong> {totalParticipants}
+                <strong>Test Results Count:</strong> {testResultsCount}
+              </p>
+              <p>
+                <strong>Test Results Loading:</strong>{" "}
+                {testResultsLoading ? "Yes" : "No"}
+              </p>
+              <p>
+                <strong>Test Results Error:</strong>{" "}
+                {testResultsError || "None"}
               </p>
               <p>
                 <strong>Sample Kits:</strong> {order.sampleKits?.length || 0}
@@ -434,17 +687,36 @@ const OrderDetail: React.FC = () => {
                 <strong>Samples:</strong> {order.samples?.length || 0}
               </p>
               <p>
-                <strong>Test Results Expected:</strong> {getTestResultsCount()}
-              </p>
-              <p>
                 <strong>Overall Progress:</strong> {overallProgress}%
-              </p>
-              <p>
-                <strong>Sample IDs:</strong> {getSampleIds().join(", ")}
               </p>
             </div>
           </details>
         </div>
+
+        {/* ✅ Test Results Notification */}
+        {hasTestResults && activeTab !== "results" && (
+          <div className="mb-6 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="w-8 h-8 text-green-600" />
+                <div>
+                  <h4 className="font-medium text-green-800">
+                    Kết quả xét nghiệm đã sẵn sàng! 🎉
+                  </h4>
+                  <p className="text-sm text-green-600">
+                    {testResultsCount} kết quả đã hoàn thành
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleTabChange("results")}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Xem kết quả
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tabs Container */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 mb-8">
@@ -453,15 +725,15 @@ const OrderDetail: React.FC = () => {
             onTabChange={handleTabChange}
             samplesCount={order.samples?.length || 0}
             kitsCount={order.sampleKits?.length || 0}
-            testResultsCount={getTestResultsCount()} // ✅ New prop
+            testResultsCount={testResultsCount}
+            testResultsLoading={testResultsLoading}
           />
-
           <div className="p-8">{renderTabContent()}</div>
         </div>
 
         {/* Action Buttons */}
         <ActionButtons
-          orderStatus={orderData.status}
+          hasTestResults={hasTestResults}
           onContactSupport={handleContactSupport}
           onDownloadResults={handleDownloadResults}
           onOrderNewService={handleOrderNewService}
@@ -490,33 +762,6 @@ const OrderDetail: React.FC = () => {
             </a>
           </div>
         </div>
-
-        {/* ✅ Test Results Quick Access (when results are available) */}
-        {getTestResultsCount() > 0 && activeTab !== "results" && (
-          <div className="mt-6 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <FileText className="w-8 h-8 text-green-600" />
-                <div>
-                  <h4 className="font-medium text-green-800">
-                    Kết quả xét nghiệm đã sẵn sàng! 🎉
-                  </h4>
-                  <p className="text-sm text-green-600">
-                    {getTestResultsCount()} kết quả đã hoàn thành và sẵn sàng
-                    xem
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => handleTabChange("results")}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                Xem kết quả
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

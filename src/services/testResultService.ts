@@ -1,4 +1,4 @@
-// testResultService.ts
+// testResultService.ts - API v16
 import axios, { AxiosResponse } from "axios";
 
 // ✅ Base Configuration
@@ -11,7 +11,7 @@ interface ApiResponse<T> {
   result: T;
 }
 
-// ✅ Test Result Interfaces (Based on API v14 schemas)
+// ✅ Test Result Interfaces (API v16)
 export interface TestResultRequest {
   id?: string;
   result_type: string;
@@ -20,7 +20,8 @@ export interface TestResultRequest {
   result_detail: string;
   result_file?: string;
   tested_date: string;
-  sample_id: string;
+  orders_id: string; // ✅ v16: Order ID
+  sample_id: string[]; // ✅ v16: Array of sample IDs
 }
 
 export interface TestResultResponse {
@@ -31,8 +32,9 @@ export interface TestResultResponse {
   result_detail: string;
   result_file?: string;
   tested_date: string;
-  user_id: string;
-  sample_id: string;
+  userId: string; // ✅ v16: User ID
+  orders_id: string; // ✅ v16: Order ID
+  samplesId: string; // ✅ v16: Sample ID (single reference)
 }
 
 // ✅ Helper function to get auth token
@@ -56,7 +58,7 @@ const createAuthenticatedRequest = () => {
       "Content-Type": "application/json",
       ...(token && { Authorization: `Bearer ${token}` }),
     },
-    timeout: 30000, // 30 seconds timeout
+    timeout: 30000,
   });
 };
 
@@ -148,6 +150,35 @@ export class TestResultService {
     }
   }
 
+  // ✅ v16: Get test results by order ID (NEW)
+  async getTestResultsByOrderId(
+    orderId: string
+  ): Promise<TestResultResponse[]> {
+    try {
+      if (!orderId) {
+        throw new Error("Order ID is required");
+      }
+
+      const api = createAuthenticatedRequest();
+      const response: AxiosResponse<ApiResponse<TestResultResponse[]>> =
+        await api.get(`/test-results/order/${orderId}`);
+
+      if (response.data.code === 200) {
+        return response.data.result;
+      } else {
+        throw new Error(
+          response.data.message || "Failed to fetch test results for order"
+        );
+      }
+    } catch (error) {
+      console.error(`Error fetching test results for order ${orderId}:`, error);
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.message || error.message);
+      }
+      throw error;
+    }
+  }
+
   // ✅ Get test results by sample ID
   async getTestResultsBySampleId(
     sampleId: string
@@ -180,13 +211,17 @@ export class TestResultService {
     }
   }
 
-  // ✅ Create new test result
+  // ✅ Create new test result (v16)
   async createTestResult(
     testResultData: TestResultRequest
   ): Promise<TestResultResponse> {
     try {
-      if (!testResultData.result_type || !testResultData.sample_id) {
-        throw new Error("Result type and sample ID are required");
+      if (
+        !testResultData.result_type ||
+        !testResultData.orders_id ||
+        !testResultData.sample_id?.length
+      ) {
+        throw new Error("Result type, order ID, and sample IDs are required");
       }
 
       const api = createAuthenticatedRequest();
@@ -265,6 +300,21 @@ export class TestResultService {
     }
   }
 
+  // ✅ v16: Helper - Create test result for multiple samples
+  async createTestResultForSamples(
+    orderId: string,
+    sampleIds: string[],
+    resultData: Omit<TestResultRequest, "orders_id" | "sample_id">
+  ): Promise<TestResultResponse> {
+    const fullData: TestResultRequest = {
+      ...resultData,
+      orders_id: orderId,
+      sample_id: sampleIds,
+    };
+
+    return await this.createTestResult(fullData);
+  }
+
   // ✅ Utility: Get current user's test results
   async getCurrentUserTestResults(): Promise<TestResultResponse[]> {
     try {
@@ -282,60 +332,23 @@ export class TestResultService {
     }
   }
 
-  // ✅ Utility: Get test results for multiple samples
-  async getTestResultsForSamples(
-    sampleIds: string[]
-  ): Promise<Map<string, TestResultResponse[]>> {
+  // ✅ Utility: Check if test results exist for order
+  async hasTestResultsForOrder(orderId: string): Promise<boolean> {
     try {
-      const resultMap = new Map<string, TestResultResponse[]>();
-
-      // Fetch results for each sample in parallel
-      const promises = sampleIds.map(async (sampleId) => {
-        try {
-          const results = await this.getTestResultsBySampleId(sampleId);
-          return { sampleId, results };
-        } catch (error) {
-          console.warn(
-            `Failed to fetch results for sample ${sampleId}:`,
-            error
-          );
-          return { sampleId, results: [] };
-        }
-      });
-
-      const responses = await Promise.all(promises);
-
-      responses.forEach(({ sampleId, results }) => {
-        resultMap.set(sampleId, results);
-      });
-
-      return resultMap;
-    } catch (error) {
-      console.error("Error fetching test results for multiple samples:", error);
-      throw error;
-    }
-  }
-
-  // ✅ Utility: Check if test results exist for sample
-  async hasTestResults(sampleId: string): Promise<boolean> {
-    try {
-      const results = await this.getTestResultsBySampleId(sampleId);
+      const results = await this.getTestResultsByOrderId(orderId);
       return results.length > 0;
     } catch (error) {
-      console.warn(
-        `Error checking test results for sample ${sampleId}:`,
-        error
-      );
+      console.warn(`Error checking test results for order ${orderId}:`, error);
       return false;
     }
   }
 
-  // ✅ Utility: Get latest test result for sample
-  async getLatestTestResultForSample(
-    sampleId: string
+  // ✅ Utility: Get latest test result for order
+  async getLatestTestResultForOrder(
+    orderId: string
   ): Promise<TestResultResponse | null> {
     try {
-      const results = await this.getTestResultsBySampleId(sampleId);
+      const results = await this.getTestResultsByOrderId(orderId);
 
       if (results.length === 0) {
         return null;
@@ -350,7 +363,7 @@ export class TestResultService {
       return sortedResults[0];
     } catch (error) {
       console.error(
-        `Error getting latest test result for sample ${sampleId}:`,
+        `Error getting latest test result for order ${orderId}:`,
         error
       );
       return null;
@@ -367,6 +380,8 @@ export class TestResultService {
     testedDate: string;
     hasFile: boolean;
     fileName?: string;
+    orderId: string;
+    userId: string;
   } {
     return {
       id: testResult.id,
@@ -377,6 +392,8 @@ export class TestResultService {
       testedDate: new Date(testResult.tested_date).toLocaleDateString("vi-VN"),
       hasFile: !!testResult.result_file,
       fileName: testResult.result_file,
+      orderId: testResult.orders_id,
+      userId: testResult.userId,
     };
   }
 
