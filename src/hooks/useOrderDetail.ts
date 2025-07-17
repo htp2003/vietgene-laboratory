@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { orderService } from "../services/orderService";
-import { testResultService } from "../services/testResultService"; // ✅ New import
+import { testResultService } from "../services/testResultService";
 
 export const useOrderDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,51 +13,75 @@ export const useOrderDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("progress");
 
-  // ✅ New state for test results
+  // ✅ FIXED: Test results state
   const [testResults, setTestResults] = useState<any[]>([]);
   const [testResultsLoading, setTestResultsLoading] = useState(false);
   const [testResultsError, setTestResultsError] = useState<string | null>(null);
 
-  // ✅ Helper function to get current user ID
-  const getCurrentUserId = (): string => {
-    try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      return user.id || "";
-    } catch {
-      return "";
+  // ✅ FIXED: Fetch test results by ORDER ID (not sample IDs)
+  const fetchTestResultsByOrderId = async (orderId: string) => {
+    if (!orderId) {
+      console.warn("❌ Order ID is required to fetch test results");
+      setTestResults([]);
+      return;
     }
-  };
-
-  // ✅ Fetch test results for order samples
-  const fetchTestResults = async (sampleIds: string[]) => {
-    if (sampleIds.length === 0) return;
 
     try {
       setTestResultsLoading(true);
       setTestResultsError(null);
 
-      console.log("🔍 Fetching test results for samples:", sampleIds);
+      console.log("🔍 Fetching test results for ORDER ID:", orderId);
+      console.log("🌐 API endpoint:", `/test-results/order/${orderId}`);
 
-      // Get test results for all samples in parallel
-      const resultsMap = await testResultService.getTestResultsForSamples(
-        sampleIds
-      );
+      // ✅ Use the correct API endpoint: /test-results/order/{orderId}
+      const results = await testResultService.getTestResultsByOrderId(orderId);
 
-      // Flatten the results
-      const allResults: any[] = [];
-      resultsMap.forEach((results, sampleId) => {
-        allResults.push(...results);
+      console.log("✅ Test results API response:", {
+        orderId,
+        count: results?.length || 0,
+        results: results || [],
+        rawResponse: results,
       });
 
-      console.log("📊 Test results fetched:", allResults.length);
-      setTestResults(allResults);
+      // ✅ Extra debug: Check if results array is actually populated
+      if (results && Array.isArray(results)) {
+        console.log("📊 Test results details:");
+        results.forEach((result, index) => {
+          console.log(`  Result ${index + 1}:`, {
+            id: result.id,
+            type: result.result_type,
+            percentage: result.result_percentage,
+            conclusion: result.conclusion ? "Yes" : "No",
+            orderId: result.orders_id,
+            userId: result.userId,
+          });
+        });
+      } else {
+        console.log("⚠️ No test results found or invalid response format");
+      }
+
+      setTestResults(results || []);
     } catch (err) {
-      console.error("❌ Error fetching test results:", err);
-      setTestResultsError(
-        err instanceof Error ? err.message : "Failed to fetch test results"
-      );
+      const errorMessage =
+        err instanceof Error ? err.message : "Không thể tải kết quả xét nghiệm";
+      console.error("❌ Error fetching test results for order:", {
+        orderId,
+        error: err,
+        message: errorMessage,
+        stack: err instanceof Error ? err.stack : "No stack trace",
+      });
+
+      setTestResultsError(errorMessage);
+      setTestResults([]);
     } finally {
       setTestResultsLoading(false);
+    }
+  };
+
+  // ✅ Refresh test results function
+  const refreshTestResults = async () => {
+    if (order?.id) {
+      await fetchTestResultsByOrderId(order.id);
     }
   };
 
@@ -65,6 +89,7 @@ export const useOrderDetail = () => {
   useEffect(() => {
     const fetchOrderDetail = async () => {
       if (!id) {
+        console.warn("❌ No order ID provided, redirecting to dashboard");
         navigate("/dashboard");
         return;
       }
@@ -75,17 +100,17 @@ export const useOrderDetail = () => {
         console.log("🔍 Fetching order detail for ID:", id);
 
         const completeOrderData = await orderService.getCompleteOrderData(id);
-        console.log("📦 Complete order data received:", completeOrderData);
 
+        if (!completeOrderData) {
+          throw new Error("Không tìm thấy thông tin đơn hàng");
+        }
+
+        console.log("📦 Complete order data received:", completeOrderData);
         setOrder(completeOrderData);
 
-        // ✅ Fetch test results if samples exist
-        if (completeOrderData?.samples?.length > 0) {
-          const sampleIds = completeOrderData.samples.map(
-            (sample: any) => sample.id
-          );
-          await fetchTestResults(sampleIds);
-        }
+        // ✅ FIXED: Fetch test results by ORDER ID (the URL parameter)
+        console.log("🔍 Now fetching test results for ORDER ID:", id);
+        await fetchTestResultsByOrderId(id);
       } catch (err) {
         console.error("❌ Error fetching order detail:", err);
         setError(
@@ -135,13 +160,14 @@ export const useOrderDetail = () => {
     };
   };
 
-  // ✅ Enhanced tracking steps with sample kit stages
+  // ✅ Enhanced tracking steps with test results
   const getTrackingSteps = (orderData: any) => {
     if (!orderData) return [];
 
     const sampleKits = orderData.sampleKits || [];
     const samples = orderData.samples || [];
     const appointment = orderData.appointment;
+    const hasTestResults = testResults.length > 0;
 
     // Determine collection method
     const collectionMethod =
@@ -149,12 +175,13 @@ export const useOrderDetail = () => {
       (appointment ? "facility" : "home");
 
     console.log("🔍 Generating tracking steps for:", {
+      orderId: orderData.id,
       status: orderData.status,
       collectionMethod,
       sampleKitsCount: sampleKits.length,
       samplesCount: samples.length,
       hasAppointment: !!appointment,
-      testResultsCount: testResults.length, // ✅ Include test results
+      testResultsCount: testResults.length,
     });
 
     const steps = [
@@ -264,18 +291,10 @@ export const useOrderDetail = () => {
       {
         step: steps.length + 2,
         title: "Kết quả hoàn thành",
-        status:
-          testResults.length > 0 || orderData.status === "completed"
-            ? ("completed" as const)
-            : ("pending" as const),
-        date:
-          testResults.length > 0
-            ? testResults[0].tested_date
-            : orderData.status === "completed"
-            ? orderData.updatedAt || orderData.update_at || ""
-            : "",
+        status: hasTestResults ? ("completed" as const) : ("pending" as const),
+        date: hasTestResults ? testResults[0]?.tested_date || "" : "",
         description: `Kết quả đã hoàn thành và sẵn sàng tải về${
-          testResults.length > 0 ? ` (${testResults.length} kết quả)` : ""
+          hasTestResults ? ` (${testResults.length} kết quả)` : ""
         }`,
       }
     );
@@ -327,45 +346,25 @@ export const useOrderDetail = () => {
 
     const sampleKits = orderData.sampleKits || [];
     const samples = orderData.samples || [];
-    const appointment = orderData.appointment;
+    const hasTestResults = testResults.length > 0;
 
-    try {
-      let baseProgress = orderService.calculateOrderProgress(
-        orderData,
-        sampleKits,
-        samples,
-        appointment
-      );
+    let progress = 10; // Base progress
 
-      // ✅ Boost progress if test results are available
-      if (testResults.length > 0 && samples.length > 0) {
-        const testResultsRatio = testResults.length / samples.length;
-        const testResultsBonus = testResultsRatio * 10; // Up to 10% bonus
-        baseProgress = Math.min(100, baseProgress + testResultsBonus);
-      }
+    // Progress based on sample kits and samples
+    if (sampleKits.length > 0) progress = 30;
+    if (samples.length > 0) progress = 60;
+    if (samples.some((s: any) => s.received_date)) progress = 80;
+    if (hasTestResults) progress = 100;
 
-      console.log(
-        "📊 Calculated overall progress (with test results):",
-        baseProgress
-      );
-      return Math.round(baseProgress);
-    } catch (error) {
-      console.warn("⚠️ Error calculating progress, using fallback:", error);
+    console.log("📊 Calculated overall progress:", {
+      orderId: orderData.id,
+      progress,
+      sampleKits: sampleKits.length,
+      samples: samples.length,
+      testResults: testResults.length,
+    });
 
-      // Fallback: enhanced status-based progress
-      const statusProgress: Record<string, number> = {
-        pending: 10,
-        confirmed: 25,
-        kit_preparing: 35,
-        kit_sent: 50,
-        sample_collected: 65,
-        processing: 80,
-        completed: testResults.length > 0 ? 100 : 95, // ✅ Full completion only with results
-        cancelled: 0,
-      };
-
-      return statusProgress[orderData.status] || 10;
-    }
+    return Math.round(progress);
   };
 
   // Handle tab changes
@@ -379,18 +378,15 @@ export const useOrderDetail = () => {
   };
 
   const handleContactSupport = () => {
-    // TODO: Implement contact support logic
     console.log("Contact support clicked");
-    // Could open a modal, redirect to contact page, or open chat
   };
 
   // ✅ Enhanced: Handle download results with test results
   const handleDownloadResults = async () => {
-    console.log("Download results clicked");
+    console.log("Download results clicked for order:", id);
 
     if (testResults.length > 0) {
       try {
-        // Download all available test result files
         const resultsWithFiles = testResults.filter(
           (result: any) => result.result_file
         );
@@ -399,7 +395,6 @@ export const useOrderDetail = () => {
           console.log(
             `Downloading ${resultsWithFiles.length} test result files`
           );
-
           for (const result of resultsWithFiles) {
             await testResultService.downloadTestResultFile(result);
           }
@@ -410,10 +405,6 @@ export const useOrderDetail = () => {
         console.error("Error downloading test results:", error);
         alert("Có lỗi xảy ra khi tải kết quả. Vui lòng thử lại sau.");
       }
-    } else if (order?.status === "completed") {
-      // Fallback: Generate general PDF results
-      console.log("Generating general results PDF for order:", order.id);
-      // TODO: Implement general PDF generation
     } else {
       alert("Kết quả chưa sẵn sàng để tải xuống");
     }
@@ -423,34 +414,8 @@ export const useOrderDetail = () => {
     navigate("/services");
   };
 
-  // ✅ Enhanced: Handle kit tracking
   const handleTrackKit = (kitId: string, trackingNumber: string) => {
     console.log("📦 Tracking kit:", { kitId, trackingNumber });
-    // TODO: Implement kit tracking logic
-    // Could open tracking modal or redirect to tracking page
-  };
-
-  // ✅ Enhanced: Handle sample status update
-  const handleUpdateSampleStatus = async (
-    sampleId: string,
-    newStatus: string
-  ) => {
-    console.log("🧪 Updating sample status:", { sampleId, newStatus });
-    // TODO: Implement sample status update
-    // This might be for admin/staff interface
-  };
-
-  // ✅ New: Refresh test results
-  const refreshTestResults = async () => {
-    if (order?.samples?.length > 0) {
-      const sampleIds = order.samples.map((sample: any) => sample.id);
-      await fetchTestResults(sampleIds);
-    }
-  };
-
-  // ✅ New: Get test results count
-  const getTestResultsCount = (): number => {
-    return testResults.length;
   };
 
   return {
@@ -460,7 +425,7 @@ export const useOrderDetail = () => {
     error,
     activeTab,
 
-    // ✅ New: Test results state
+    // ✅ Test results state
     testResults,
     testResultsLoading,
     testResultsError,
@@ -474,36 +439,26 @@ export const useOrderDetail = () => {
     ),
     overallProgress: calculateOverallProgress(order),
 
-    // Legacy compatibility
-    samplesSummary: getKitsAndSamplesSummary(order?.sampleKits, order?.samples),
-
     // Actions
     handleTabChange,
     handleBackToDashboard,
     handleContactSupport,
-    handleDownloadResults, // ✅ Enhanced
+    handleDownloadResults,
     handleOrderNewService,
     handleTrackKit,
-    handleUpdateSampleStatus,
 
-    // ✅ New: Test results actions
+    // ✅ Test results actions
     refreshTestResults,
-    getTestResultsCount,
 
-    // ✅ Enhanced: Additional computed data
+    // Additional computed data
     collectionMethod:
       order?.orderDetails?.[0]?.collection_method ||
       (order?.appointment ? "facility" : "home"),
     hasAppointment: !!order?.appointment,
     totalParticipants: order?.participants?.length || 0,
-    expectedKits: order?.participants?.length || 0,
-    expectedSamples: order?.participants?.length || 0,
 
-    // ✅ New: Test results computed data
+    // ✅ Test results computed data
     hasTestResults: testResults.length > 0,
-    testResultsProgress:
-      order?.samples?.length > 0
-        ? Math.round((testResults.length / order.samples.length) * 100)
-        : 0,
+    testResultsCount: testResults.length,
   };
 };
