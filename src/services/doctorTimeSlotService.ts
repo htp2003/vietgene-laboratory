@@ -60,6 +60,7 @@ apiClient.interceptors.response.use(
 export interface DoctorTimeSlot {
   id: string;
   dayOfWeek: number;
+  specificDate: string; // Format: YYYY-MM-DD
   startTime: string;
   endTime: string;
   isAvailable: boolean;
@@ -71,6 +72,7 @@ export interface DoctorTimeSlot {
 // Time Slot request interface for create/update
 export interface TimeSlotRequest {
   dayOfWeek: number;
+  specificDate: string; // Format: YYYY-MM-DD
   startTime: string;
   endTime: string;
   isAvailable: boolean;
@@ -104,6 +106,43 @@ export const DAY_OPTIONS = [
   { value: 5, label: 'Thứ sáu' },
   { value: 6, label: 'Thứ bảy' }
 ];
+
+// Utility functions
+export const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+};
+
+export const formatShortDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+};
+
+export const getDayOfWeekFromDate = (dateString: string): number => {
+  try {
+    const date = new Date(dateString);
+    return date.getDay();
+  } catch {
+    return 0;
+  }
+};
 
 // Doctor Time Slot Service
 export const doctorTimeSlotService = {
@@ -192,6 +231,9 @@ export const doctorTimeSlotService = {
       if (timeSlotData.dayOfWeek < 0 || timeSlotData.dayOfWeek > 6) {
         return { success: false, message: "Ngày trong tuần không hợp lệ (0-6)" };
       }
+      if (!timeSlotData.specificDate?.trim()) {
+        return { success: false, message: "Ngày cụ thể không được để trống" };
+      }
       if (!timeSlotData.startTime?.trim()) {
         return { success: false, message: "Giờ bắt đầu không được để trống" };
       }
@@ -200,6 +242,12 @@ export const doctorTimeSlotService = {
       }
       if (!timeSlotData.doctorId?.trim()) {
         return { success: false, message: "ID bác sĩ không được để trống" };
+      }
+
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(timeSlotData.specificDate)) {
+        return { success: false, message: "Ngày không đúng định dạng (YYYY-MM-DD)" };
       }
 
       // Validate time format (HH:mm)
@@ -217,6 +265,21 @@ export const doctorTimeSlotService = {
       
       if (endTime <= startTime) {
         return { success: false, message: "Giờ kết thúc phải sau giờ bắt đầu" };
+      }
+
+      // Validate date is not in the past
+      const specificDate = new Date(timeSlotData.specificDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (specificDate < today) {
+        return { success: false, message: "Không thể tạo khung giờ cho ngày đã qua" };
+      }
+
+      // Validate dayOfWeek matches specificDate
+      const actualDayOfWeek = getDayOfWeekFromDate(timeSlotData.specificDate);
+      if (actualDayOfWeek !== timeSlotData.dayOfWeek) {
+        return { success: false, message: "Thứ trong tuần không khớp với ngày đã chọn" };
       }
       
       const response = await apiClient.post<ApiResponse<DoctorTimeSlot>>("/doctor-time-slots", timeSlotData);
@@ -258,6 +321,31 @@ export const doctorTimeSlotService = {
         return { success: false, message: "Ngày trong tuần không hợp lệ (0-6)" };
       }
 
+      // Validate date format if provided
+      if (timeSlotData.specificDate) {
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(timeSlotData.specificDate)) {
+          return { success: false, message: "Ngày không đúng định dạng (YYYY-MM-DD)" };
+        }
+
+        // Validate date is not in the past
+        const specificDate = new Date(timeSlotData.specificDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (specificDate < today) {
+          return { success: false, message: "Không thể cập nhật khung giờ cho ngày đã qua" };
+        }
+
+        // Validate dayOfWeek matches specificDate if both provided
+        if (timeSlotData.dayOfWeek !== undefined) {
+          const actualDayOfWeek = getDayOfWeekFromDate(timeSlotData.specificDate);
+          if (actualDayOfWeek !== timeSlotData.dayOfWeek) {
+            return { success: false, message: "Thứ trong tuần không khớp với ngày đã chọn" };
+          }
+        }
+      }
+
       // Validate time format if provided
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       if (timeSlotData.startTime && !timeRegex.test(timeSlotData.startTime)) {
@@ -265,13 +353,6 @@ export const doctorTimeSlotService = {
       }
       if (timeSlotData.endTime && !timeRegex.test(timeSlotData.endTime)) {
         return { success: false, message: "Giờ kết thúc không đúng định dạng (HH:mm)" };
-      }
-
-      // Validate time order if both provided OR get existing values to validate
-      if (timeSlotData.startTime || timeSlotData.endTime) {
-        // We need to validate with existing values if only one is being updated
-        // For now, we'll skip this validation in the service and let the frontend handle it
-        // The frontend should send complete data for proper validation
       }
       
       const response = await apiClient.put<ApiResponse<DoctorTimeSlot>>(`/doctor-time-slots/${timeSlotId}`, timeSlotData);
