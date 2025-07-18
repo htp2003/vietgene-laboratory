@@ -9,10 +9,8 @@ import { orderService, Doctor, TimeSlot } from "../services/orderService";
 export interface OrderForm {
   customerInfo: {
     fullName: string;
-    phone: string;
     email: string;
     address: string;
-    identityCard: string;
   };
   serviceInfo: {
     serviceId: string;
@@ -52,10 +50,8 @@ export const useOrderBooking = () => {
   const [formData, setFormData] = useState<OrderForm>({
     customerInfo: {
       fullName: "",
-      phone: "",
       email: "",
       address: "",
-      identityCard: "",
     },
     serviceInfo: {
       serviceId: id || "",
@@ -178,11 +174,6 @@ export const useOrderBooking = () => {
               currentUser.name ||
               "",
             email: currentUser.email || "",
-            phone:
-              currentUser.phone ||
-              currentUser.telephone ||
-              currentUser.mobile ||
-              "",
           },
           // ✅ Also auto-fill main test person
           participantInfo: {
@@ -421,17 +412,14 @@ export const useOrderBooking = () => {
       case 1:
         const step1Valid = !!(
           formData.customerInfo.fullName &&
-          formData.customerInfo.phone &&
           formData.customerInfo.email &&
-          formData.customerInfo.address &&
-          formData.customerInfo.identityCard
+          formData.customerInfo.address
         );
         console.log(`Step 1 validation: ${step1Valid}`, {
           fullName: !!formData.customerInfo.fullName,
-          phone: !!formData.customerInfo.phone,
+
           email: !!formData.customerInfo.email,
           address: !!formData.customerInfo.address,
-          identityCard: !!formData.customerInfo.identityCard,
         });
         return step1Valid;
 
@@ -506,10 +494,9 @@ export const useOrderBooking = () => {
       case 1:
         const missing1 = [];
         if (!formData.customerInfo.fullName) missing1.push("Họ tên");
-        if (!formData.customerInfo.phone) missing1.push("Số điện thoại");
+
         if (!formData.customerInfo.email) missing1.push("Email");
         if (!formData.customerInfo.address) missing1.push("Địa chỉ");
-        if (!formData.customerInfo.identityCard) missing1.push("CMND/CCCD");
 
         return missing1.length > 0
           ? `Vui lòng điền: ${missing1.join(", ")}`
@@ -599,10 +586,8 @@ export const useOrderBooking = () => {
       const orderData = {
         customerInfo: {
           fullName: formData.customerInfo.fullName.trim(),
-          phone: formData.customerInfo.phone.replace(/\s+/g, ""),
           email: formData.customerInfo.email.trim().toLowerCase(),
           address: formData.customerInfo.address.trim(),
-          identityCard: formData.customerInfo.identityCard.replace(/\s+/g, ""),
         },
         serviceInfo: {
           serviceId: id!,
@@ -654,7 +639,6 @@ export const useOrderBooking = () => {
         customer: {
           name: orderData.customerInfo.fullName,
           email: orderData.customerInfo.email,
-          phone: orderData.customerInfo.phone,
         },
         collectionMethod: orderData.serviceInfo.collectionMethod,
         appointmentDate: orderData.serviceInfo.appointmentDate,

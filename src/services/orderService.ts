@@ -125,10 +125,8 @@ export interface SampleKit {
 export interface CreateOrderRequest {
   customerInfo: {
     fullName: string;
-    phone: string;
     email: string;
     address: string;
-    identityCard: string;
   };
   serviceInfo: {
     serviceId: string;
@@ -153,7 +151,6 @@ export interface CreateOrderRequest {
     method: "cash" | "card" | "transfer";
   };
 }
-
 export interface PaymentResult {
   success: boolean;
   transactionId?: string;
