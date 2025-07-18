@@ -495,12 +495,12 @@ const TestResultsTab: React.FC<any> = ({
       </div>
 
       {/* Debug Info */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+      {/* <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
         <p className="text-xs text-yellow-700">
           <strong>Debug:</strong> Đang hiển thị {testResults.length} kết quả cho
           Order ID: {orderId}
         </p>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -656,7 +656,7 @@ const OrderDetail: React.FC = () => {
         />
 
         {/* ✅ Debug Info - Shows what order ID we're working with */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <details>
             <summary className="font-medium text-blue-800 cursor-pointer">
               🔍 Debug Info - Order & Test Results
@@ -691,7 +691,7 @@ const OrderDetail: React.FC = () => {
               </p>
             </div>
           </details>
-        </div>
+        </div> */}
 
         {/* ✅ Test Results Notification */}
         {hasTestResults && activeTab !== "results" && (

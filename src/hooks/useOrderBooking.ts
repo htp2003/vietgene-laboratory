@@ -16,7 +16,7 @@ export interface OrderForm {
     serviceId: string;
     quantity: number;
     collectionMethod: "home" | "facility";
-    appointmentDate: string;
+    appointmentDate: string; // ✅ UPDATED: Now automatically filled from timeSlot.specificDate
     appointmentTime: string;
     doctorId: string;
     timeSlotId: string;
@@ -405,6 +405,7 @@ export const useOrderBooking = () => {
   };
 
   // Enhanced step validation with detailed logging
+  // Enhanced step validation with detailed logging
   const validateStep = (step: number): boolean => {
     console.log(`🔍 Validating step ${step}...`);
 
@@ -417,7 +418,6 @@ export const useOrderBooking = () => {
         );
         console.log(`Step 1 validation: ${step1Valid}`, {
           fullName: !!formData.customerInfo.fullName,
-
           email: !!formData.customerInfo.email,
           address: !!formData.customerInfo.address,
         });
@@ -459,15 +459,20 @@ export const useOrderBooking = () => {
       case 3:
         let step3Valid = true;
         if (formData.serviceInfo.collectionMethod === "facility") {
+          // ✅ UPDATED: No longer require separate appointmentDate input
+          // The appointmentDate is automatically set from timeSlot.specificDate
           step3Valid = !!(
-            formData.serviceInfo.doctorId &&
-            formData.serviceInfo.timeSlotId &&
-            formData.serviceInfo.appointmentDate
+            (
+              formData.serviceInfo.doctorId &&
+              formData.serviceInfo.timeSlotId &&
+              formData.serviceInfo.appointmentDate
+            ) // This comes from timeSlot.specificDate
           );
           console.log(`Step 3 validation (facility): ${step3Valid}`, {
             doctorId: !!formData.serviceInfo.doctorId,
             timeSlotId: !!formData.serviceInfo.timeSlotId,
             appointmentDate: !!formData.serviceInfo.appointmentDate,
+            appointmentDateValue: formData.serviceInfo.appointmentDate,
           });
         } else {
           console.log(
@@ -494,7 +499,6 @@ export const useOrderBooking = () => {
       case 1:
         const missing1 = [];
         if (!formData.customerInfo.fullName) missing1.push("Họ tên");
-
         if (!formData.customerInfo.email) missing1.push("Email");
         if (!formData.customerInfo.address) missing1.push("Địa chỉ");
 
@@ -546,8 +550,9 @@ export const useOrderBooking = () => {
         if (formData.serviceInfo.collectionMethod === "facility") {
           const missing3 = [];
           if (!formData.serviceInfo.doctorId) missing3.push("bác sĩ");
-          if (!formData.serviceInfo.timeSlotId) missing3.push("khung giờ");
-          if (!formData.serviceInfo.appointmentDate) missing3.push("ngày hẹn");
+          if (!formData.serviceInfo.timeSlotId) missing3.push("lịch hẹn");
+          // ✅ UPDATED: More specific error message since date comes from time slot
+          if (!formData.serviceInfo.appointmentDate) missing3.push("thời gian");
 
           return missing3.length > 0
             ? `Vui lòng chọn: ${missing3.join(", ")}`
