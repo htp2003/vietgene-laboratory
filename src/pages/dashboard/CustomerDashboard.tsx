@@ -15,6 +15,7 @@ import {
   Search,
   User,
   RefreshCw,
+  TestTube,
 } from "lucide-react";
 
 import { authService } from "../../services/authService";
@@ -26,8 +27,6 @@ interface Order {
   orderCode: string;
   status: string;
   totalAmount: number;
-  paymentStatus: string;
-  paymentMethod: string;
   createdAt: string;
   updatedAt: string;
   notes?: string;
@@ -35,10 +34,7 @@ interface Order {
     name: string;
     type: string;
   };
-  participantCount?: number;
-  sampleCount?: number;
 }
-
 const CustomerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -123,12 +119,11 @@ const CustomerDashboard: React.FC = () => {
     try {
       console.log("🔍 Loading orders for user:", userId);
 
-      // Only get basic order data - NO getCompleteOrderData calls
       const userOrders = await orderService.getUserOrders(userId);
       console.log("📦 Raw orders from API:", userOrders);
 
       if (userOrders && userOrders.length > 0) {
-        // Transform orders with BASIC data only
+        // 🎯 SIMPLE: Just transform basic data, no complex calculations
         const basicOrders: Order[] = userOrders.map((apiOrder: any) => {
           return {
             id: apiOrder.orderId || apiOrder.id,
@@ -138,10 +133,7 @@ const CustomerDashboard: React.FC = () => {
               `DNA-${(apiOrder.orderId || apiOrder.id).slice(-8)}`,
             status: apiOrder.status || "pending",
             totalAmount: apiOrder.total_amount || apiOrder.totalAmount || 0,
-            paymentStatus:
-              apiOrder.payment_status || apiOrder.paymentStatus || "pending",
-            paymentMethod:
-              apiOrder.payment_method || apiOrder.paymentMethod || "transfer",
+            // 🚀 REMOVED: paymentStatus, paymentMethod - không cần thiết
             createdAt:
               apiOrder.createdAt ||
               apiOrder.created_at ||
@@ -149,27 +141,19 @@ const CustomerDashboard: React.FC = () => {
             updatedAt:
               apiOrder.updatedAt ||
               apiOrder.updated_at ||
-              apiOrder.update_at ||
               new Date().toISOString(),
             notes: apiOrder.notes || "",
-
-            // Basic service info without additional API calls
             service: {
               name: "Xét nghiệm DNA",
               type: "dna_test",
             },
-
-            // Placeholder counts - will be loaded on demand
-            participantCount: 0,
-            sampleCount: 0,
           };
         });
 
-        console.log("✅ Basic orders loaded:", basicOrders);
+        console.log("✅ Simple orders loaded:", basicOrders);
         setOrders(basicOrders);
         setFilteredOrders(basicOrders);
       } else {
-        console.log("📭 No orders found for user");
         setOrders([]);
         setFilteredOrders([]);
       }
@@ -178,7 +162,6 @@ const CustomerDashboard: React.FC = () => {
       throw new Error("Không thể tải danh sách đơn hàng của bạn");
     }
   };
-
   // Quick refresh without detailed loading
   const handleRefresh = async () => {
     if (!currentUser) return;
@@ -198,8 +181,15 @@ const CustomerDashboard: React.FC = () => {
   useEffect(() => {
     let filtered = orders;
 
-    if (activeFilter !== "all") {
-      filtered = filtered.filter((order) => order.status === activeFilter);
+    if (activeFilter === "processing") {
+      filtered = filtered.filter(
+        (order) =>
+          !["Completed", "completed", "cancelled"].includes(order.status)
+      );
+    } else if (activeFilter === "completed") {
+      filtered = filtered.filter((order) =>
+        ["Completed", "completed"].includes(order.status)
+      );
     }
 
     if (searchTerm) {
@@ -229,46 +219,54 @@ const CustomerDashboard: React.FC = () => {
   const getStatusInfo = (status: string) => {
     const statusMap: Record<string, any> = {
       pending: {
-        label: "Chờ xử lý",
-        color: "bg-yellow-100 text-yellow-800",
-        icon: Clock,
-        progress: 10,
-      },
-      confirmed: {
-        label: "Đã xác nhận",
+        label: "Đang xử lý",
         color: "bg-blue-100 text-blue-800",
-        icon: CheckCircle,
-        progress: 25,
+        icon: Clock,
       },
-      kit_sent: {
-        label: "Đã gửi kit",
-        color: "bg-purple-100 text-purple-800",
-        icon: Package,
-        progress: 40,
+      Pending: {
+        label: "Đang xử lý",
+        color: "bg-blue-100 text-blue-800",
+        icon: Clock,
       },
-      sample_collected: {
-        label: "Đã thu mẫu",
-        color: "bg-indigo-100 text-indigo-800",
-        icon: Package,
-        progress: 60,
-      },
-      processing: {
-        label: "Đang xét nghiệm",
-        color: "bg-orange-100 text-orange-800",
+      Confirmed: {
+        label: "Đang xử lý",
+        color: "bg-blue-100 text-blue-800",
         icon: RefreshCw,
-        progress: 80,
+      },
+      DeliveringKit: {
+        label: "Đang xử lý",
+        color: "bg-blue-100 text-blue-800",
+        icon: RefreshCw,
+      },
+      KitDelivered: {
+        label: "Đang xử lý",
+        color: "bg-blue-100 text-blue-800",
+        icon: RefreshCw,
+      },
+      SampleReceived: {
+        label: "Đang xử lý",
+        color: "bg-blue-100 text-blue-800",
+        icon: RefreshCw,
+      },
+      Testing: {
+        label: "Đang xử lý",
+        color: "bg-blue-100 text-blue-800",
+        icon: RefreshCw,
+      },
+      Completed: {
+        label: "Hoàn thành",
+        color: "bg-green-100 text-green-800",
+        icon: CheckCircle,
       },
       completed: {
         label: "Hoàn thành",
         color: "bg-green-100 text-green-800",
         icon: CheckCircle,
-        progress: 100,
       },
       cancelled: {
         label: "Đã hủy",
         color: "bg-red-100 text-red-800",
         icon: AlertCircle,
-        progress: 0,
       },
     };
     return statusMap[status] || statusMap.pending;
@@ -284,29 +282,78 @@ const CustomerDashboard: React.FC = () => {
     navigate(`/orders/${orderId}`);
   };
 
+  const calculateOrderProgress = (order: Order) => {
+    console.log("🔍 Dashboard calculating progress for order:", {
+      orderId: order.id,
+      status: order.status,
+      hasTestResults: order.hasTestResults,
+      testResultsCount: order.testResultsCount,
+    });
+
+    // 🚀 PRIORITY: Test results = 100% (SAME AS ORDER DETAIL)
+    if (
+      order.hasTestResults &&
+      order.testResultsCount &&
+      order.testResultsCount > 0
+    ) {
+      console.log(
+        "✅ Order has test results → 100% progress (matching order detail)"
+      );
+      return 100;
+    }
+
+    // 🚀 Fallback to status-based progress
+    const status = order.status;
+    const progressMap: Record<string, number> = {
+      pending: 10,
+      Pending: 10,
+      confirmed: 25,
+      Confirmed: 25,
+      DeliveringKit: 40,
+      kit_sent: 40,
+      KitDelivered: 60,
+      SampleReceived: 70,
+      sample_collected: 70,
+      Testing: 80,
+      processing: 80,
+      Completed: 90,
+      completed: 90, // Only 90% without test results
+    };
+
+    const calculatedProgress = progressMap[status] || 10;
+
+    console.log("📊 Dashboard final progress:", {
+      orderId: order.id,
+      status,
+      hasTestResults: order.hasTestResults,
+      progress: calculatedProgress,
+    });
+
+    return calculatedProgress;
+  };
   // Calculate stats
-  const completedOrders = orders.filter((o) => o.status === "completed").length;
+  const completedOrders = orders.filter((o) =>
+    ["Completed", "completed"].includes(o.status)
+  ).length;
   const activeOrders = orders.filter(
-    (o) => o.status !== "completed" && o.status !== "cancelled"
+    (o) => !["Completed", "completed", "cancelled"].includes(o.status)
   ).length;
   const unreadNotifications = notifications.filter((n) => !n.isRead).length;
 
   const filterOptions = [
     { value: "all", label: "Tất cả", count: orders.length },
     {
-      value: "pending",
-      label: "Chờ xử lý",
-      count: orders.filter((o) => o.status === "pending").length,
-    },
-    {
       value: "processing",
       label: "Đang xử lý",
-      count: orders.filter((o) => o.status === "processing").length,
+      count: orders.filter(
+        (o) => !["Completed", "completed", "cancelled"].includes(o.status)
+      ).length,
     },
     {
       value: "completed",
       label: "Hoàn thành",
-      count: orders.filter((o) => o.status === "completed").length,
+      count: orders.filter((o) => ["Completed", "completed"].includes(o.status))
+        .length,
     },
   ];
 
@@ -473,17 +520,17 @@ const CustomerDashboard: React.FC = () => {
 
               <div className="p-6">
                 {filteredOrders.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  <div className="text-center py-12">
+                    <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">
                       {searchTerm || activeFilter !== "all"
                         ? "Không tìm thấy đơn hàng"
                         : "Chưa có đơn hàng nào"}
                     </h3>
-                    <p className="text-gray-500 mb-6">
+                    <p className="text-gray-500 mb-6 max-w-md mx-auto">
                       {searchTerm || activeFilter !== "all"
-                        ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
-                        : "Bắt đầu đặt dịch vụ xét nghiệm DNA ngay hôm nay"}
+                        ? "Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem các đơn hàng khác"
+                        : "Bắt đầu hành trình khám phá di truyền của bạn ngay hôm nay"}
                     </p>
                     {!searchTerm && activeFilter === "all" && (
                       <Link
@@ -499,17 +546,15 @@ const CustomerDashboard: React.FC = () => {
                   <div className="space-y-4">
                     {filteredOrders.map((order) => {
                       const statusInfo = getStatusInfo(order.status);
-                      const paymentInfo = getPaymentStatusInfo(
-                        order.paymentStatus
-                      );
                       const StatusIcon = statusInfo.icon;
 
                       return (
                         <div
                           key={order.id}
-                          className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                          className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+                          onClick={() => handleViewOrder(order.id)} // 🎯 Click anywhere to view details
                         >
-                          <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                                 <StatusIcon
@@ -522,50 +567,36 @@ const CustomerDashboard: React.FC = () => {
                               </div>
                               <div>
                                 <h3 className="font-semibold text-gray-900 mb-1">
-                                  {order.service?.name || "Dịch vụ DNA"}
+                                  {order.service?.name || "Xét nghiệm DNA"}
                                 </h3>
                                 <p className="text-sm text-gray-500 font-mono">
                                   Mã: {order.orderCode}
                                 </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Ngày đặt: {formatDate(order.createdAt)}
+                                </p>
                               </div>
                             </div>
+
                             <div className="text-right">
-                              <p className="font-bold text-lg text-red-600">
+                              <p className="font-bold text-lg text-red-600 mb-2">
                                 {formatPrice(order.totalAmount)}
                               </p>
-                              <p className={`text-sm ${paymentInfo.color}`}>
-                                {paymentInfo.label}
-                              </p>
-                            </div>
-                          </div>
 
-                          {/* Order Info and Actions */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                              <span>
-                                Ngày đặt: {formatDate(order.createdAt)}
-                              </span>
-                              <span
-                                className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
+                              {/* 🚀 SIMPLIFIED: Only show basic status */}
+                              {/* <span
+                                className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
                               >
                                 {statusInfo.label}
-                              </span>
-                            </div>
+                              </span> */}
 
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleViewOrder(order.id)}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                              >
-                                <Eye className="w-4 h-4" />
-                                Xem chi tiết
-                              </button>
-                              {order.status === "completed" && (
-                                <button className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">
-                                  <Download className="w-4 h-4" />
-                                  Tải kết quả
-                                </button>
-                              )}
+                              {/* 🎯 Call to action */}
+                              <div className="mt-3">
+                                <div className="flex items-center gap-1 text-blue-600 text-sm font-medium">
+                                  <Eye className="w-4 h-4" />
+                                  Xem chi tiết
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>

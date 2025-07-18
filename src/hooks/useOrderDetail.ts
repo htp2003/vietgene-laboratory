@@ -168,138 +168,197 @@ export const useOrderDetail = () => {
     const samples = orderData.samples || [];
     const appointment = orderData.appointment;
     const hasTestResults = testResults.length > 0;
+    const orderStatus = orderData.status;
+
+    // 🔍 DEBUG: Log actual order data
+    console.log("🔍 DEBUG getTrackingSteps:", {
+      orderId: orderData.id,
+      rawStatus: orderStatus,
+      statusType: typeof orderStatus,
+      sampleKitsCount: sampleKits.length,
+      samplesCount: samples.length,
+      hasTestResults,
+      testResultsCount: testResults.length,
+      sampleKitsStatuses: sampleKits.map((k) => k.status),
+      samplesStatuses: samples.map((s) => s.status),
+      samplesWithDates: samples.map((s) => ({
+        id: s.id,
+        collection_date: s.collection_date,
+        received_date: s.received_date,
+        status: s.status,
+      })),
+    });
 
     // Determine collection method
     const collectionMethod =
       orderData.orderDetails?.[0]?.collection_method ||
-      (appointment ? "facility" : "home");
+      (appointment ? "Tại cơ sở" : "Tại nhà");
 
-    console.log("🔍 Generating tracking steps for:", {
-      orderId: orderData.id,
-      status: orderData.status,
-      collectionMethod,
-      sampleKitsCount: sampleKits.length,
-      samplesCount: samples.length,
-      hasAppointment: !!appointment,
-      testResultsCount: testResults.length,
+    console.log("🔍 Collection method determined:", collectionMethod);
+
+    // 🚀 IMPROVED: Base progress calculation on ACTUAL DATA, not just status
+    const hasKitsDelivered = sampleKits.some(
+      (kit) =>
+        kit.status === "delivered" ||
+        kit.delivered_date ||
+        kit.status === "KitDelivered"
+    );
+    const hasSamplesReceived = samples.some(
+      (sample) =>
+        sample.received_date ||
+        sample.status === "received" ||
+        sample.status === "SampleReceived"
+    );
+    const hasSamplesCollected = samples.some(
+      (sample) => sample.collection_date || sample.status === "collected"
+    );
+    const hasSamplesAnalyzing = samples.some(
+      (sample) => sample.status === "analyzing" || sample.status === "Testing"
+    );
+
+    console.log("🔍 Data-based progress indicators:", {
+      hasKitsDelivered,
+      hasSamplesReceived,
+      hasSamplesCollected,
+      hasSamplesAnalyzing,
+      hasTestResults,
     });
 
-    const steps = [
-      {
-        step: 1,
-        title: "Đơn hàng được xác nhận",
-        status: "completed" as const,
-        date: orderData.createdAt || orderData.created_at || "",
-        description: "Đơn hàng đã được tạo và xác nhận thành công",
-      },
-    ];
-
-    if (collectionMethod === "home") {
-      // Home collection flow
-      steps.push(
+    if (collectionMethod === "Tại nhà") {
+      return [
+        {
+          step: 1,
+          title: "Đặt lịch",
+          status: "completed" as const,
+          date: orderData.createdAt || orderData.created_at || "",
+          description: "Khách hàng đặt lịch hẹn",
+        },
         {
           step: 2,
-          title: "Chuẩn bị kit xét nghiệm",
+          title: "Giao kit",
           status:
-            sampleKits.length > 0
+            hasKitsDelivered ||
+            hasSamplesReceived ||
+            hasSamplesAnalyzing ||
+            hasTestResults
               ? ("completed" as const)
-              : orderData.status !== "pending"
+              : sampleKits.length > 0 ||
+                ["DeliveringKit", "confirmed", "Confirmed"].includes(
+                  orderStatus
+                )
               ? ("current" as const)
               : ("pending" as const),
           date: sampleKits.length > 0 ? sampleKits[0].createdAt || "" : "",
-          description: "Bộ kit xét nghiệm đang được chuẩn bị và đóng gói",
+          description: "Đang giao kit xét nghiệm",
         },
         {
           step: 3,
-          title: "Gửi kit đến địa chỉ",
-          status: sampleKits.some(
-            (kit: any) => kit.status === "shipped" || kit.status === "delivered"
-          )
-            ? ("completed" as const)
-            : sampleKits.length > 0
-            ? ("current" as const)
-            : ("pending" as const),
+          title: "Đã giao kit",
+          status:
+            hasSamplesReceived || hasSamplesAnalyzing || hasTestResults
+              ? ("completed" as const)
+              : hasKitsDelivered
+              ? ("current" as const)
+              : ("pending" as const),
           date:
-            sampleKits.find((kit: any) => kit.shipper_data)?.shipped_date || "",
-          description: "Kit đang được vận chuyển đến địa chỉ của bạn",
+            sampleKits.find(
+              (kit) => kit.delivered_date || kit.status === "delivered"
+            )?.delivered_date || "",
+          description: "Kit đã được giao thành công",
         },
         {
           step: 4,
-          title: "Thu thập mẫu tại nhà",
+          title: "Nhận mẫu",
           status:
-            samples.length > 0
+            hasSamplesAnalyzing || hasTestResults
               ? ("completed" as const)
-              : sampleKits.some((kit: any) => kit.status === "delivered")
+              : hasSamplesReceived
               ? ("current" as const)
               : ("pending" as const),
-          date: samples.length > 0 ? samples[0].collection_date || "" : "",
-          description: "Bạn tự thu thập mẫu theo hướng dẫn trong kit",
+          date: samples.find((s) => s.received_date)?.received_date || "",
+          description: "Đã nhận mẫu từ khách hàng",
         },
         {
           step: 5,
-          title: "Gửi mẫu về lab",
-          status: samples.some((s: any) => s.received_date)
+          title: "Xét nghiệm",
+          status: hasTestResults
             ? ("completed" as const)
-            : samples.length > 0
+            : hasSamplesAnalyzing
             ? ("current" as const)
             : ("pending" as const),
-          date: samples.find((s: any) => s.received_date)?.received_date || "",
-          description: "Mẫu đang được vận chuyển về phòng lab",
-        }
-      );
+          date: samples.find((s) => s.status === "analyzing")?.updated_at || "",
+          description: "Đang tiến hành xét nghiệm",
+        },
+        {
+          step: 6,
+          title: "Hoàn thành",
+          status: hasTestResults
+            ? ("completed" as const)
+            : ("pending" as const),
+          date: hasTestResults ? testResults[0]?.tested_date || "" : "",
+          description: `Có kết quả xét nghiệm${
+            hasTestResults ? ` (${testResults.length} kết quả)` : ""
+          }`,
+        },
+      ];
     } else {
-      // Facility collection flow
-      steps.push(
+      // Facility service flow
+      return [
+        {
+          step: 1,
+          title: "Đặt lịch",
+          status: "completed" as const,
+          date: orderData.createdAt || orderData.created_at || "",
+          description: "Khách hàng đặt lịch hẹn",
+        },
         {
           step: 2,
-          title: "Xác nhận lịch hẹn",
-          status: appointment ? ("completed" as const) : ("current" as const),
+          title: "Check-in",
+          status:
+            hasSamplesCollected || hasSamplesAnalyzing || hasTestResults
+              ? ("completed" as const)
+              : appointment || ["Confirmed", "confirmed"].includes(orderStatus)
+              ? ("current" as const)
+              : ("pending" as const),
           date: appointment?.createdAt || "",
-          description: "Lịch hẹn thu mẫu tại cơ sở y tế",
+          description: "Khách hàng check-in tại cơ sở",
         },
         {
           step: 3,
-          title: "Thu thập mẫu tại cơ sở",
+          title: "Nhận mẫu",
           status:
-            samples.length > 0
+            hasSamplesAnalyzing || hasTestResults
               ? ("completed" as const)
-              : appointment
+              : hasSamplesCollected
               ? ("current" as const)
               : ("pending" as const),
-          date: samples.length > 0 ? samples[0].collection_date || "" : "",
-          description: "Nhân viên y tế thu thập mẫu theo quy trình chuẩn",
-        }
-      );
+          date: samples.find((s) => s.collection_date)?.collection_date || "",
+          description: "Thu thập mẫu xét nghiệm",
+        },
+        {
+          step: 4,
+          title: "Xét nghiệm",
+          status: hasTestResults
+            ? ("completed" as const)
+            : hasSamplesAnalyzing
+            ? ("current" as const)
+            : ("pending" as const),
+          date: samples.find((s) => s.status === "analyzing")?.updated_at || "",
+          description: "Đang tiến hành xét nghiệm",
+        },
+        {
+          step: 5,
+          title: "Hoàn thành",
+          status: hasTestResults
+            ? ("completed" as const)
+            : ("pending" as const),
+          date: hasTestResults ? testResults[0]?.tested_date || "" : "",
+          description: `Có kết quả xét nghiệm${
+            hasTestResults ? ` (${testResults.length} kết quả)` : ""
+          }`,
+        },
+      ];
     }
-
-    // Common final steps
-    steps.push(
-      {
-        step: steps.length + 1,
-        title: "Phân tích tại phòng lab",
-        status: samples.some(
-          (s: any) => s.status === "analyzing" || s.status === "completed"
-        )
-          ? ("completed" as const)
-          : samples.some((s: any) => s.received_date)
-          ? ("current" as const)
-          : ("pending" as const),
-        date:
-          samples.find((s: any) => s.status === "analyzing")?.updated_at || "",
-        description: "Mẫu đang được phân tích và xét nghiệm",
-      },
-      {
-        step: steps.length + 2,
-        title: "Kết quả hoàn thành",
-        status: hasTestResults ? ("completed" as const) : ("pending" as const),
-        date: hasTestResults ? testResults[0]?.tested_date || "" : "",
-        description: `Kết quả đã hoàn thành và sẵn sàng tải về${
-          hasTestResults ? ` (${testResults.length} kết quả)` : ""
-        }`,
-      }
-    );
-
-    return steps;
   };
 
   // ✅ Enhanced: Get both sample kits and samples summary
@@ -346,24 +405,106 @@ export const useOrderDetail = () => {
 
     const sampleKits = orderData.sampleKits || [];
     const samples = orderData.samples || [];
+    const status = orderData.status;
     const hasTestResults = testResults.length > 0;
 
-    let progress = 10; // Base progress
-
-    // Progress based on sample kits and samples
-    if (sampleKits.length > 0) progress = 30;
-    if (samples.length > 0) progress = 60;
-    if (samples.some((s: any) => s.received_date)) progress = 80;
-    if (hasTestResults) progress = 100;
-
-    console.log("📊 Calculated overall progress:", {
+    console.log("🔍 DEBUG calculateOverallProgress:", {
       orderId: orderData.id,
-      progress,
-      sampleKits: sampleKits.length,
-      samples: samples.length,
-      testResults: testResults.length,
+      status,
+      sampleKitsCount: sampleKits.length,
+      samplesCount: samples.length,
+      testResultsCount: testResults.length,
+      hasTestResults,
     });
 
+    // 🚀 PRIORITY: Test results = 100% regardless of status
+    if (hasTestResults) {
+      console.log("✅ Has test results → 100% progress");
+      return 100;
+    }
+
+    // 🚀 QUICK FIX: If you had progress before, keep the old logic
+    if (samples.length > 0) {
+      const samplesReceived = samples.filter(
+        (s: any) => s.received_date
+      ).length;
+      const samplesCompleted = samples.filter(
+        (s: any) => s.status === "completed"
+      ).length;
+
+      if (samplesCompleted > 0) return 90;
+      if (samplesReceived > 0) return 80;
+      if (samples.length > 0) return 60;
+    }
+
+    if (sampleKits.length > 0) {
+      const kitsDelivered = sampleKits.filter(
+        (k: any) => k.delivered_date || k.status === "delivered"
+      ).length;
+      if (kitsDelivered > 0) return 60;
+      return 30;
+    }
+
+    // Check actual data states
+    const hasKitsDelivered = sampleKits.some(
+      (kit) => kit.status === "delivered" || kit.delivered_date
+    );
+    const hasSamplesReceived = samples.some(
+      (sample) => sample.received_date || sample.status === "received"
+    );
+    const hasSamplesCollected = samples.some(
+      (sample) => sample.collection_date || sample.status === "collected"
+    );
+    const hasSamplesAnalyzing = samples.some(
+      (sample) =>
+        sample.status === "analyzing" || sample.status === "processing"
+    );
+
+    console.log("🔍 Data indicators:", {
+      hasKitsDelivered,
+      hasSamplesReceived,
+      hasSamplesCollected,
+      hasSamplesAnalyzing,
+    });
+
+    // Calculate based on actual progress, not just status
+    let progress = 10; // Base: order created
+
+    // Status-based progress (fallback)
+    if (["confirmed", "Confirmed"].includes(status)) {
+      progress = Math.max(progress, 25);
+    }
+    if (["DeliveringKit", "kit_sent"].includes(status)) {
+      progress = Math.max(progress, 40);
+    }
+    if (["KitDelivered"].includes(status)) {
+      progress = Math.max(progress, 60);
+    }
+    if (["SampleReceived", "sample_collected"].includes(status)) {
+      progress = Math.max(progress, 70);
+    }
+    if (["Testing", "processing"].includes(status)) {
+      progress = Math.max(progress, 80);
+    }
+    if (["Completed", "completed"].includes(status)) {
+      progress = Math.max(progress, 90);
+    }
+
+    // Data-based progress (takes priority)
+    if (sampleKits.length > 0) {
+      progress = Math.max(progress, 30);
+    }
+    if (hasKitsDelivered) {
+      progress = Math.max(progress, 60);
+    }
+    if (hasSamplesCollected || hasSamplesReceived) {
+      progress = Math.max(progress, 70);
+    }
+    if (hasSamplesAnalyzing) {
+      progress = Math.max(progress, 80);
+    }
+
+    console.log("📊 Final calculated progress:", progress);
     return Math.round(progress);
   };
 
