@@ -185,3 +185,146 @@ export const getMaxAppointmentDate = (): string => {
   maxDate.setDate(maxDate.getDate() + 30);
   return maxDate.toISOString().split("T")[0];
 };
+
+// ===== DATETIME UTILITIES FOR APPOINTMENT =====
+
+export const createAppointmentDateTime = (
+  specificDate: string,
+  startTime: string
+): string => {
+  try {
+    console.log("🔧 Creating appointment datetime:", {
+      specificDate,
+      startTime,
+    });
+
+    // Validate inputs
+    if (!specificDate || !startTime) {
+      throw new Error("Missing specificDate or startTime");
+    }
+
+    // Clean the inputs
+    const cleanDate = specificDate.includes("T")
+      ? specificDate.split("T")[0]
+      : specificDate;
+
+    const cleanTime = startTime.includes(".")
+      ? startTime.split(".")[0]
+      : startTime;
+
+    // Construct ISO datetime
+    const isoDateTime = `${cleanDate}T${cleanTime}.000Z`;
+
+    // Validate the result
+    const testDate = new Date(isoDateTime);
+    if (isNaN(testDate.getTime())) {
+      throw new Error(`Invalid datetime: ${isoDateTime}`);
+    }
+
+    console.log("✅ DateTime created successfully:", {
+      input: { specificDate, startTime },
+      cleaned: { cleanDate, cleanTime },
+      result: isoDateTime,
+      validation: testDate,
+    });
+
+    return isoDateTime;
+  } catch (error) {
+    console.error("❌ DateTime creation failed:", error);
+    throw error;
+  }
+};
+
+export const parseAppointmentTime = (appointmentTime: string): string => {
+  try {
+    // Parse "07:00:00 - 11:00:00" to get "07:00:00"
+    if (appointmentTime.includes(" - ")) {
+      const startTime = appointmentTime.split(" - ")[0].trim();
+      console.log("✅ Parsed appointment time:", {
+        input: appointmentTime,
+        startTime,
+      });
+      return startTime;
+    }
+
+    // If no range, assume it's already start time
+    return appointmentTime.trim();
+  } catch (error) {
+    console.error("❌ Time parsing failed:", error);
+    throw new Error(`Cannot parse appointment time: ${appointmentTime}`);
+  }
+};
+
+export const validateDateTime = (dateTimeString: string): boolean => {
+  try {
+    const date = new Date(dateTimeString);
+    const isValid = !isNaN(date.getTime());
+
+    console.log("🔍 DateTime validation:", {
+      input: dateTimeString,
+      parsed: date,
+      isValid,
+      timestamp: isValid ? date.getTime() : null,
+    });
+
+    return isValid;
+  } catch (error) {
+    console.error("❌ DateTime validation failed:", error);
+    return false;
+  }
+};
+
+export const createFallbackDateTime = (
+  daysFromNow: number = 1,
+  hour: number = 9
+): string => {
+  try {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    date.setUTCHours(hour, 0, 0, 0);
+
+    const result = date.toISOString();
+    console.log("🔄 Fallback datetime created:", {
+      daysFromNow,
+      hour,
+      result,
+      humanReadable: date,
+    });
+
+    return result;
+  } catch (error) {
+    console.error("❌ Fallback datetime creation failed:", error);
+    throw error;
+  }
+};
+
+// ===== INTEGRATION WITH ORDER UTILS =====
+
+export const formatAppointmentDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("vi-VN", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch (error) {
+    console.error("❌ Date formatting failed:", error);
+    return dateString;
+  }
+};
+
+export const formatAppointmentTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  } catch (error) {
+    console.error("❌ Time formatting failed:", error);
+    return dateString;
+  }
+};

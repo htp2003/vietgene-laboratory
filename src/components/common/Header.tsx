@@ -515,11 +515,11 @@ const Header: React.FC = () => {
       path: "/dashboard",
       icon: User,
     },
-    {
-      label: "Đơn hàng của tôi",
-      path: "/orders/1",
-      icon: User,
-    },
+    // {
+    //   label: "Đơn hàng của tôi",
+    //   path: "/orders/1",
+    //   icon: User,
+    // },
     {
       label: "Cài đặt tài khoản",
       path: "/profile",
@@ -572,7 +572,7 @@ const Header: React.FC = () => {
               <>
                 {/* Notification Bell */}
                 <div className="relative" ref={notificationRef}>
-                  <button
+                  {/* <button
                     onClick={() => setIsNotificationOpen(!isNotificationOpen)}
                     className="relative p-2 text-gray-700 hover:text-black transition-colors rounded-lg hover:bg-gray-100"
                   >
@@ -582,7 +582,7 @@ const Header: React.FC = () => {
                         {unreadCount > 99 ? "99+" : unreadCount}
                       </span>
                     )}
-                  </button>
+                  </button> */}
 
                   {/* Notification Dropdown */}
                   {isNotificationOpen && (
