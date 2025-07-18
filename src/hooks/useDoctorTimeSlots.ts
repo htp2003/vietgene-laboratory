@@ -28,12 +28,22 @@ export const useDoctorTimeSlots = (doctorId: string) => {
       const response = await doctorTimeSlotService.getTimeSlotsByDoctorId(doctorId);
       
       if (response.success && response.data) {
-        // Sort by date and start time
-        const sortedSlots = response.data.sort((a, b) => {
+        // Filter out slots with null specificDate and normalize time format
+        const validSlots = response.data.filter(slot => slot.specificDate !== null);
+        
+        const normalizedSlots = validSlots.map(slot => ({
+          ...slot,
+          startTime: slot.startTime.includes(':') ? slot.startTime.substring(0, 5) : slot.startTime, // Convert "07:00:00" to "07:00"
+          endTime: slot.endTime.includes(':') ? slot.endTime.substring(0, 5) : slot.endTime
+        }));
+        
+        const sortedSlots = normalizedSlots.sort((a, b) => {
           const dateCompare = new Date(a.specificDate).getTime() - new Date(b.specificDate).getTime();
           if (dateCompare !== 0) return dateCompare;
           return a.startTime.localeCompare(b.startTime);
         });
+        
+        console.log('Filtered and normalized slots:', sortedSlots);
         setTimeSlots(sortedSlots);
       } else {
         setError(new Error(response.message));

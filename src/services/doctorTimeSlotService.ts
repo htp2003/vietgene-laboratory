@@ -137,10 +137,27 @@ export const formatShortDate = (dateString: string): string => {
 
 export const getDayOfWeekFromDate = (dateString: string): number => {
   try {
-    const date = new Date(dateString);
+    // Sử dụng cách parse an toàn hơn để tránh vấn đề timezone
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // month - 1 vì JavaScript month bắt đầu từ 0
     return date.getDay();
   } catch {
     return 0;
+  }
+};
+
+export const formatDateSafe = (dateString: string): string => {
+  try {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('vi-VN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
   }
 };
 

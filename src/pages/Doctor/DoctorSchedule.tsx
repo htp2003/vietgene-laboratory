@@ -11,12 +11,14 @@ import {
   FaUserMd,
   FaExclamationTriangle,
   FaCheckCircle,
+  FaCalendarCheck,
   FaCalendarPlus,
   FaHistory,
   FaChevronLeft,
   FaChevronRight,
   FaSearch,
   FaFilter,
+  FaEye,
   FaCalendarWeek,
   FaCalendarDay
 } from 'react-icons/fa';
@@ -66,30 +68,59 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   });
 
   // View preferences
-  const [selectedWeek, setSelectedWeek] = useState<Date>(new Date());
+  const [selectedWeek, setSelectedWeek] = useState<Date>(() => {
+    const today = new Date();
+    console.log('Initial selectedWeek:', today.toISOString().split('T')[0], 'dayOfWeek:', today.getDay());
+    return today;
+  });
   const [viewMode, setViewMode] = useState<'week' | 'upcoming' | 'all'>('week');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAvailable, setFilterAvailable] = useState<'all' | 'available' | 'unavailable'>('all');
 
-  // Get current week dates
+  // Get current week dates (Sunday to Saturday)
   const getCurrentWeekDates = (): Date[] => {
-    const startOfWeek = new Date(selectedWeek);
-    const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - day;
-    startOfWeek.setDate(diff);
+    const currentDate = new Date(selectedWeek);
+    const day = currentDate.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    
+    // Tính ngày Chủ nhật của tuần này
+    const sunday = new Date(currentDate);
+    sunday.setDate(currentDate.getDate() - day);
     
     const weekDates: Date[] = [];
     for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek);
-      date.setDate(startOfWeek.getDate() + i);
+      const date = new Date(sunday);
+      date.setDate(sunday.getDate() + i);
       weekDates.push(date);
     }
+    
+    // Debug: So sánh với dữ liệu từ API
+    console.log('=== WEEK CALCULATION DEBUG ===');
+    console.log('Current selected week:', selectedWeek.toISOString().split('T')[0]);
+    console.log('Week dates calculated:', weekDates.map(d => ({
+      date: formatDateForInput(d),
+      dayOfWeek: d.getDay(),
+      dayName: DAY_OPTIONS[d.getDay()].label
+    })));
+    
+    // Kiểm tra xem ngày 19/7/2025 có trong tuần này không
+    const testDate = '2025-07-19';
+    const testDayOfWeek = getDayOfWeekFromDate(testDate);
+    console.log(`Test date ${testDate}:`, {
+      calculatedDayOfWeek: testDayOfWeek,
+      expectedDayName: DAY_OPTIONS[testDayOfWeek].label,
+      isInCurrentWeek: weekDates.some(d => formatDateForInput(d) === testDate)
+    });
+    
     return weekDates;
   };
 
   // Format date for input
   const formatDateForInput = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+    // Sử dụng UTC để tránh vấn đề timezone
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   // Get day of week from date
@@ -118,14 +149,22 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
       const weekDates = getCurrentWeekDates();
       const weekStart = weekDates[0];
       const weekEnd = weekDates[6];
+      
+      // Set to start of day for proper comparison
+      weekStart.setHours(0, 0, 0, 0);
+      weekEnd.setHours(23, 59, 59, 999);
+      
       filtered = filtered.filter(slot => {
         const slotDate = new Date(slot.specificDate);
+        slotDate.setHours(0, 0, 0, 0);
         return slotDate >= weekStart && slotDate <= weekEnd;
       });
     } else if (viewMode === 'upcoming') {
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
       filtered = filtered.filter(slot => {
         const slotDate = new Date(slot.specificDate);
+        slotDate.setHours(0, 0, 0, 0);
         return slotDate >= today;
       });
     }
@@ -335,6 +374,50 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   const upcomingSlots = getUpcomingTimeSlots(7);
   const availableSlots = getAvailableTimeSlots();
   
+  // Debug logs - more detailed
+  console.log('=== DEBUG INFO ===');
+  
+  // Verify date calculation
+  const testDate = new Date('2025-07-19');
+  console.log('2025-07-19 actual dayOfWeek:', testDate.getDay()); // Should be 6 (Saturday)
+  
+  // Check what day today is
+  const today = new Date();
+  console.log('Today:', today.toISOString().split('T')[0], 'dayOfWeek:', today.getDay());
+  
+  console.log('Current week dates:', weekDates.map(d => ({
+    date: d.toISOString().split('T')[0],
+    dayOfWeek: d.getDay(),
+    dayName: DAY_OPTIONS.find(day => day.value === d.getDay())?.label
+  })));
+  
+  console.log('All time slots:', timeSlots.map(slot => ({
+    id: slot.id,
+    specificDate: slot.specificDate,
+    dayOfWeek: slot.dayOfWeek,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    isAvailable: slot.isAvailable
+  })));
+  
+  // Check each day of the week
+  weekDates.forEach((date, index) => {
+    const dateStr = formatDateForInput(date);
+    const slotsForDate = timeSlots.filter(slot => slot.specificDate === dateStr);
+    console.log(`${dateStr} (${DAY_OPTIONS[date.getDay()].label}):`, slotsForDate.length, 'slots');
+  });
+  
+  // Check specific dates
+  const targetDate1 = '2025-07-19';
+  const targetSlots1 = timeSlots.filter(slot => slot.specificDate === targetDate1);
+  console.log(`Slots for ${targetDate1}:`, targetSlots1);
+  
+  const targetDate2 = '2025-07-20';
+  const targetSlots2 = timeSlots.filter(slot => slot.specificDate === targetDate2);
+  console.log(`Slots for ${targetDate2}:`, targetSlots2);
+  
+  console.log('==================');
+  
   const isFormValid = (): boolean => {
     return !!(form.startTime && 
            form.endTime && 
@@ -448,6 +531,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
               >
                 <option value="week">Tuần này</option>
                 <option value="upcoming">Sắp tới</option>
+                <option value="all">Tất cả</option>
               </select>
             </div>
 
@@ -595,7 +679,15 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
               <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
                 {weekDates.map((date, index) => {
                   const dateStr = formatDateForInput(date);
-                  const daySlots = groupedTimeSlots[dateStr] || [];
+                  // Get slots for this specific date
+                  const daySlots = timeSlots.filter(slot => {
+                    const slotDate = slot.specificDate;
+                    console.log(`Checking date ${dateStr} vs slot date ${slotDate}, slot dayOfWeek: ${slot.dayOfWeek}, date dayOfWeek: ${date.getDay()}`);
+                    return slotDate === dateStr;
+                  });
+                  
+                  console.log(`Date ${dateStr} (${date.getDay()}) has ${daySlots.length} slots:`, daySlots);
+                  
                   const isToday = new Date().toDateString() === date.toDateString();
                   const isPast = date < new Date();
                   
