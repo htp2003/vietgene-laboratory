@@ -1,6 +1,5 @@
 import apiClient from "../apiClient";
 
-
 export interface NotificationRequest {
   title: string;
   message: string;
@@ -165,7 +164,7 @@ export class NotificationService {
   }
 
   /**
-   * Delete notification
+   * Delete notification - NEW FEATURE
    */
   static async deleteNotification(notificationId: string): Promise<void> {
     try {
@@ -177,6 +176,52 @@ export class NotificationService {
     } catch (error: any) {
       console.error('❌ Error deleting notification:', error);
       throw new Error('Có lỗi xảy ra khi xóa thông báo');
+    }
+  }
+
+  /**
+   * Delete multiple notifications - NEW FEATURE
+   */
+  static async deleteMultipleNotifications(notificationIds: string[]): Promise<void> {
+    try {
+      console.log('🗑️ Deleting multiple notifications:', notificationIds.length);
+      
+      const promises = notificationIds.map(id => this.deleteNotification(id));
+      await Promise.all(promises);
+      
+      console.log('✅ All notifications deleted successfully');
+    } catch (error: any) {
+      console.error('❌ Error deleting notifications:', error);
+      throw new Error('Có lỗi xảy ra khi xóa thông báo');
+    }
+  }
+
+  /**
+   * Delete all read notifications - NEW FEATURE
+   */
+  static async deleteAllReadNotifications(): Promise<void> {
+    try {
+      console.log('🗑️ Deleting all read notifications...');
+      
+      // Get all notifications
+      const notifications = await this.getAllNotifications();
+      
+      // Filter read notifications
+      const readNotifications = notifications.filter(n => n.is_read);
+      
+      if (readNotifications.length === 0) {
+        console.log('ℹ️ No read notifications to delete');
+        return;
+      }
+      
+      // Delete all read notifications
+      const readNotificationIds = readNotifications.map(n => n.id);
+      await this.deleteMultipleNotifications(readNotificationIds);
+      
+      console.log('✅ All read notifications deleted');
+    } catch (error: any) {
+      console.error('❌ Error deleting read notifications:', error);
+      throw new Error('Có lỗi xảy ra khi xóa thông báo đã đọc');
     }
   }
 
@@ -211,7 +256,7 @@ export class NotificationService {
   }
 
   /**
-   * Send notification to all staff about new appointment
+   * Send notification to all staff about new appointment - ONLY FOR NEW ORDERS
    */
   static async notifyStaffAboutNewAppointment(customerName: string, appointmentId: string): Promise<void> {
     try {
@@ -225,11 +270,11 @@ export class NotificationService {
         return;
       }
       
-      // Create notification for each staff member
+      // Create notification for each staff member - ONLY FOR NEW ORDERS
       const notificationData: NotificationRequest = {
-        title: 'Đơn hàng mới',
-        message: `Khách hàng ${customerName} đã đặt lịch xét nghiệm`,
-        type: 'Booking',
+        title: '🆕 Đơn hàng mới',
+        message: `Khách hàng ${customerName} đã đặt lịch xét nghiệm mới`,
+        type: 'NewOrder', // Changed type to be more specific
         is_read: false
       };
       
@@ -248,53 +293,13 @@ export class NotificationService {
   }
 
   /**
-   * Send notification to all staff about appointment status change
+   * REMOVED - No longer notifying about status changes
+   * This method is deprecated and should not be used
    */
   static async notifyStaffAboutStatusChange(customerName: string, appointmentId: string, newStatus: string): Promise<void> {
-    try {
-      console.log('📢 Notifying staff about status change:', { customerName, appointmentId, newStatus });
-      
-      // Get all staff users
-      const staffUsers = await this.getAllStaffUsers();
-      
-      if (staffUsers.length === 0) {
-        console.warn('⚠️ No staff users found to notify');
-        return;
-      }
-      
-      // Create status-specific message
-      const statusMessages = {
-        'Confirmed': 'đã được xác nhận',
-        'DeliveringKit': 'đang giao kit',
-        'KitDelivered': 'đã giao kit thành công',
-        'SampleReceived': 'đã nhận mẫu xét nghiệm',
-        'Testing': 'đang tiến hành xét nghiệm',
-        'Completed': 'đã hoàn thành xét nghiệm',
-        'Cancelled': 'đã bị hủy'
-      };
-      
-      const statusMessage = statusMessages[newStatus] || 'có cập nhật trạng thái';
-      
-      // Create notification for each staff member
-      const notificationData: NotificationRequest = {
-        title: 'Cập nhật lịch hẹn',
-        message: `Lịch hẹn của khách hàng ${customerName} ${statusMessage}`,
-        type: 'StatusUpdate',
-        is_read: false
-      };
-      
-      const promises = staffUsers.map(staff => 
-        this.createNotification(staff.id, notificationData)
-      );
-      
-      await Promise.all(promises);
-      
-      console.log('✅ All staff members notified about status change');
-    } catch (error: any) {
-      console.error('❌ Error notifying staff about status change:', error);
-      // Don't throw error to avoid breaking the main flow
-      console.warn('⚠️ Failed to send notifications to staff, but status was updated successfully');
-    }
+    console.log('ℹ️ Status change notifications are disabled. Not sending notification for:', { customerName, appointmentId, newStatus });
+    // This method now does nothing - status change notifications are disabled
+    return;
   }
 
   /**
@@ -312,8 +317,13 @@ export class NotificationService {
         try {
           const notifications = await this.getAllNotifications();
           
-          // Call all registered callbacks
-          this.callbacks.forEach(cb => cb(notifications));
+          // Filter notifications to only show new orders (not status updates)
+          const filteredNotifications = notifications.filter(n => 
+            n.type === 'NewOrder' || n.type === 'Booking' // Keep legacy 'Booking' type for existing notifications
+          );
+          
+          // Call all registered callbacks with filtered notifications
+          this.callbacks.forEach(cb => cb(filteredNotifications));
           
         } catch (error) {
           console.error('❌ Error in notification polling:', error);
@@ -323,7 +333,11 @@ export class NotificationService {
       // Initial fetch
       this.getAllNotifications()
         .then(notifications => {
-          this.callbacks.forEach(cb => cb(notifications));
+          // Filter notifications to only show new orders
+          const filteredNotifications = notifications.filter(n => 
+            n.type === 'NewOrder' || n.type === 'Booking' // Keep legacy 'Booking' type for existing notifications
+          );
+          this.callbacks.forEach(cb => cb(filteredNotifications));
         })
         .catch(error => {
           console.error('❌ Error in initial notification fetch:', error);
@@ -354,12 +368,27 @@ export class NotificationService {
   }
 
   /**
-   * Get recent notifications (last 50)
+   * Get recent notifications (last 50) - filtered for new orders only
    */
   static getRecentNotifications(notifications: NotificationResponse[]): NotificationResponse[] {
     return notifications
+      .filter(n => n.type === 'NewOrder' || n.type === 'Booking') // Only show new order notifications
       .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
       .slice(0, 50);
+  }
+
+  /**
+   * Get notifications by type
+   */
+  static getNotificationsByType(notifications: NotificationResponse[], type: string): NotificationResponse[] {
+    return notifications.filter(n => n.type === type);
+  }
+
+  /**
+   * Get only new order notifications
+   */
+  static getNewOrderNotifications(notifications: NotificationResponse[]): NotificationResponse[] {
+    return notifications.filter(n => n.type === 'NewOrder' || n.type === 'Booking');
   }
 
   /**
@@ -383,6 +412,36 @@ export class NotificationService {
       return `${diffDays} ngày trước`;
     } else {
       return created.toLocaleDateString('vi-VN');
+    }
+  }
+
+  /**
+   * Clear all notifications (mark as read and delete)
+   */
+  static async clearAllNotifications(): Promise<void> {
+    try {
+      console.log('🧹 Clearing all notifications...');
+      
+      const notifications = await this.getAllNotifications();
+      
+      if (notifications.length === 0) {
+        console.log('ℹ️ No notifications to clear');
+        return;
+      }
+      
+      // Mark all as read first, then delete
+      const notificationIds = notifications.map(n => n.id);
+      
+      // Mark all as read
+      await this.markMultipleAsRead(notificationIds);
+      
+      // Delete all
+      await this.deleteMultipleNotifications(notificationIds);
+      
+      console.log('✅ All notifications cleared');
+    } catch (error: any) {
+      console.error('❌ Error clearing notifications:', error);
+      throw new Error('Có lỗi xảy ra khi xóa tất cả thông báo');
     }
   }
 }

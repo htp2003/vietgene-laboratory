@@ -119,7 +119,7 @@ const StaffAppointments: React.FC = () => {
 
       console.log("📅 Loading appointments with simplified doctor info...");
 
-      const serviceAppointments = await AppointmentService.getAllAppointments();
+      const serviceAppointments = await AppointmentService.getAllAppointmentsAndOrders();
 
       setAppointments(serviceAppointments);
       console.log("✅ Loaded appointments:", serviceAppointments.length);
@@ -228,7 +228,7 @@ const StaffAppointments: React.FC = () => {
     try {
       console.log("✅ Confirming appointment:", appointment.id);
 
-      const success = await AppointmentService.confirmAppointment(
+      const success = await AppointmentService.confirmAppointmentOrOrder(
         appointment.id
       );
 
@@ -274,7 +274,7 @@ const StaffAppointments: React.FC = () => {
       const appointment = appointments.find((a) => a.id === appointmentId);
       if (!appointment) return;
 
-      const success = await AppointmentService.cancelAppointment(
+      const success = await AppointmentService.cancelAppointmentOrOrder(
         appointmentId,
         "Cancelled by staff"
       );

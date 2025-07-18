@@ -206,26 +206,26 @@ export class AppointmentService {
   }
 
   // ✅ Confirm appointment (convenience method)
-  static async confirmAppointment(appointmentId: string): Promise<boolean> {
-    return this.updateAppointment(appointmentId, {
-      status: true,
-      notes: "Appointment confirmed by staff"
-    });
-  }
+  // static async confirmAppointment(appointmentId: string): Promise<boolean> {
+  //   return this.updateAppointment(appointmentId, {
+  //     status: true,
+  //     notes: "Appointment confirmed by staff"
+  //   });
+  // }
 
-  // ✅ Cancel appointment (convenience method)
-  static async cancelAppointment(appointmentId: string, reason?: string): Promise<boolean> {
-    const success = await this.updateAppointment(appointmentId, {
-      status: false,
-      notes: reason || "Appointment cancelled by staff"
-    });
+  // // ✅ Cancel appointment (convenience method)
+  // static async cancelAppointment(appointmentId: string, reason?: string): Promise<boolean> {
+  //   const success = await this.updateAppointment(appointmentId, {
+  //     status: false,
+  //     notes: reason || "Appointment cancelled by staff"
+  //   });
     
-    if (success) {
-      StatusUtils.saveAppointmentStatus(appointmentId, 'Cancelled', 0);
-    }
+  //   if (success) {
+  //     StatusUtils.saveAppointmentStatus(appointmentId, 'Cancelled', 0);
+  //   }
     
-    return success;
-  }
+  //   return success;
+  // }
 
   // ✅ Get appointments by user (for staff to see user's appointments)
   static async getAppointmentsByUser(): Promise<ApiAppointment[]> {
@@ -456,5 +456,286 @@ export class AppointmentService {
   // ✅ Map appointment status
   static mapAppointmentStatus(apiStatus: boolean): Appointment['status'] {
     return apiStatus ? 'Confirmed' : 'Pending';
+  }
+  // ✅ NEW: Safe method to get all appointments + orders without duplicates
+
+  // ... keep all existing methods exactly as they are ...
+
+  // ✅ NEW: Safe method to get all appointments + orders without duplicates
+  static async getAllAppointmentsAndOrders(): Promise<Appointment[]> {
+    try {
+      console.log("📅 Loading all appointments and orders (deduplicated)...");
+
+      // ✅ STEP 1: Get existing appointments (already has orderId)
+      const appointments = await this.getAllAppointments();
+      console.log(`✅ Loaded ${appointments.length} appointments from /appointment/all`);
+
+      // ✅ STEP 2: Get all orders
+      const ordersResponse = await Promise.race([
+        apiClient.get<{ code: number; message: string; result: any[] }>("/orders/all"),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Orders API timeout')), 15000)
+        )
+      ]) as any;
+
+      if (ordersResponse.data.code !== 200) {
+        console.error("❌ Failed to fetch orders:", ordersResponse.data.message);
+        return appointments; // Return only appointments if orders fail
+      }
+
+      const allOrders = ordersResponse.data.result;
+      console.log(`✅ Loaded ${allOrders.length} orders from /orders/all`);
+
+      // ✅ STEP 3: Find orders that DON'T have appointments yet
+      const appointmentOrderIds = new Set(
+        appointments
+          .map(a => a.rawData?.appointment?.orderId)
+          .filter(Boolean)
+      );
+
+      const ordersWithoutAppointments = allOrders.filter(order => 
+        !appointmentOrderIds.has(order.orderId)
+      );
+
+      console.log(`🔍 Found ${ordersWithoutAppointments.length} orders without appointments`);
+
+      // ✅ STEP 4: Convert orders to appointments format (with chunking for safety)
+      const CHUNK_SIZE = 5;
+      const convertedOrders: Appointment[] = [];
+
+      for (let i = 0; i < ordersWithoutAppointments.length; i += CHUNK_SIZE) {
+        const chunk = ordersWithoutAppointments.slice(i, i + CHUNK_SIZE);
+        console.log(`📦 Converting orders chunk ${Math.floor(i/CHUNK_SIZE) + 1}/${Math.ceil(ordersWithoutAppointments.length/CHUNK_SIZE)}`);
+
+        const chunkResults = await Promise.allSettled(
+          chunk.map(order => this.convertOrderToAppointment(order))
+        );
+
+        chunkResults.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            convertedOrders.push(result.value);
+          } else {
+            console.warn(`⚠️ Failed to convert order ${chunk[index].orderId}:`, result.reason?.message);
+            // Create basic fallback
+            convertedOrders.push(this.createBasicOrderAppointment(chunk[index]));
+          }
+        });
+
+        // Brief delay between chunks
+        if (i + CHUNK_SIZE < ordersWithoutAppointments.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+
+      // ✅ STEP 5: Merge and sort
+      const allAppointments = [...appointments, ...convertedOrders];
+      
+      // Sort by creation date (newest first)
+      allAppointments.sort((a, b) => {
+        const dateA = new Date(a.rawData?.appointment?.createdAt || a.rawData?.order?.createdAt || 0);
+        const dateB = new Date(b.rawData?.appointment?.createdAt || b.rawData?.order?.createdAt || 0);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      console.log(`📊 Final result: ${allAppointments.length} total (${appointments.length} appointments + ${convertedOrders.length} orders)`);
+      
+      return allAppointments;
+
+    } catch (error) {
+      console.error("❌ Error loading appointments and orders:", error);
+      
+      // ✅ Fallback: Return appointments only if orders fail
+      try {
+        const fallbackAppointments = await this.getAllAppointments();
+        console.log(`🔄 Fallback: Returning ${fallbackAppointments.length} appointments only`);
+        return fallbackAppointments;
+      } catch (fallbackError) {
+        console.error("❌ Even fallback failed:", fallbackError);
+        throw new Error("Cannot load any appointment data");
+      }
+    }
+  }
+
+  // ✅ Convert order to appointment format
+  static async convertOrderToAppointment(order: any): Promise<Appointment> {
+    try {
+      console.log(`🔄 Converting order ${order.orderId} to appointment format...`);
+
+      // ✅ Get user info with timeout
+      const user = await Promise.race([
+        UserService.getUserById(order.userId),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('User fetch timeout')), 5000)
+        )
+      ]) as any;
+
+      // ✅ Map collection_method to location type
+      const locationType = order.collection_method === "home" ? "Tại nhà" : "Cơ sở y tế";
+      
+      // ✅ Map order status to appointment status
+      const status = this.mapOrderStatusToAppointmentStatus(order.status);
+
+      // ✅ Create appointment date/time
+      const now = new Date();
+      const appointmentDate = order.preferred_date ? new Date(order.preferred_date) : now;
+      const appointmentTime = order.preferred_time || "09:00";
+
+      const appointment: Appointment = {
+        id: order.orderId, // Use orderId as appointment ID
+        customerName: user?.full_name || user?.username || 'Unknown Customer',
+        phoneNumber: user?.phoneNumber || order.phone_number || 'N/A',
+        email: user?.email || order.email || 'N/A',
+        date: appointmentDate.toISOString().split('T')[0],
+        time: appointmentTime,
+        serviceType: 'DNA Test', // Default for orders
+        serviceName: 'DNA Test Service',
+        status: status,
+        locationType: locationType,
+        legalType: 'Dân Sự', // Default
+        address: user?.address || 'N/A',
+        notes: order.notes || '',
+        tasks: [],
+        doctorInfo: undefined, // Orders don't have doctors
+        currentStep: StatusUtils.getStepFromStatus(status),
+        completedSteps: StatusUtils.getCompletedSteps(StatusUtils.getStepFromStatus(status)),
+        lastStatusUpdate: order.updatedAt || order.createdAt,
+        orderId: order.orderId,
+        userId: order.userId,
+        
+      };
+
+      return appointment;
+
+    } catch (error) {
+      console.warn(`⚠️ Error converting order ${order.orderId}:`, error);
+      throw error;
+    }
+  }
+
+  // ✅ Create basic order appointment (fallback)
+  static createBasicOrderAppointment(order: any): Appointment {
+    const locationType = order.collection_method === "home" ? "Tại nhà" : "Cơ sở y tế";
+    const status = this.mapOrderStatusToAppointmentStatus(order.status);
+    const now = new Date();
+
+    return {
+      id: order.orderId,
+      customerName: 'Loading...', // Indicates user data failed to load
+      phoneNumber: 'N/A',
+      email: 'N/A',
+      date: now.toISOString().split('T')[0],
+      time: "09:00",
+      serviceType: 'DNA Test',
+      serviceName: 'DNA Test Service',
+      status: status,
+      locationType: locationType,
+      legalType: 'Dân Sự',
+      address: 'N/A',
+      notes: order.notes || '',
+      tasks: [],
+      doctorInfo: undefined,
+      currentStep: StatusUtils.getStepFromStatus(status),
+      completedSteps: StatusUtils.getCompletedSteps(StatusUtils.getStepFromStatus(status)),
+      lastStatusUpdate: order.updatedAt || order.createdAt,
+      orderId: order.orderId,
+      userId: order.userId,
+      
+    };
+  }
+
+  // ✅ Map order status to appointment status
+  static mapOrderStatusToAppointmentStatus(orderStatus: string): Appointment['status'] {
+    const statusMap: { [key: string]: Appointment['status'] } = {
+      'pending': 'Pending',
+      'confirmed': 'Confirmed', 
+      'processing': 'KitDelivered',
+      'completed': 'Completed',
+      'cancelled': 'Cancelled',
+      'paid': 'Confirmed',
+      'unpaid': 'Pending'
+    };
+    
+    return statusMap[orderStatus] || 'Pending';
+  }
+
+  // ✅ Enhanced confirm method - handles both appointments and orders
+  static async confirmAppointmentOrOrder(appointmentId: string): Promise<boolean> {
+    try {
+      // ✅ First try the existing appointment API method
+      const appointmentSuccess = await this.updateAppointment(appointmentId, {
+        status: true,
+        notes: "Appointment confirmed by staff"
+      });
+      
+      if (appointmentSuccess) {
+        console.log(`✅ Confirmed appointment ${appointmentId}`);
+        return true;
+      }
+
+      // ✅ If appointment API fails, try orders API (for orders without appointments)
+      console.log(`ℹ️ Appointment API failed for ${appointmentId}, trying orders API...`);
+      
+      const orderResponse = await Promise.race([
+        apiClient.put(`/orders/${appointmentId}`, { status: 'confirmed' }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Order confirm timeout')), 10000)
+        )
+      ]) as any;
+
+      if (orderResponse.data.code === 200) {
+        console.log(`✅ Confirmed order ${appointmentId}`);
+        return true;
+      }
+
+      console.error(`❌ Failed to confirm via both APIs for ${appointmentId}`);
+      return false;
+
+    } catch (error) {
+      console.error(`❌ Error confirming appointment/order ${appointmentId}:`, error);
+      return false;
+    }
+  }
+
+  // ✅ Enhanced cancel method - handles both appointments and orders  
+  static async cancelAppointmentOrOrder(appointmentId: string, reason?: string): Promise<boolean> {
+    try {
+      // ✅ First try the existing appointment API method
+      const appointmentSuccess = await this.updateAppointment(appointmentId, {
+        status: false,
+        notes: reason || "Appointment cancelled by staff"
+      });
+      
+      if (appointmentSuccess) {
+        console.log(`✅ Cancelled appointment ${appointmentId}`);
+        StatusUtils.saveAppointmentStatus(appointmentId, 'Cancelled', 0);
+        return true;
+      }
+
+      // ✅ If appointment API fails, try orders API
+      console.log(`ℹ️ Appointment API failed for ${appointmentId}, trying orders API...`);
+      
+      const orderResponse = await Promise.race([
+        apiClient.put(`/orders/${appointmentId}`, { 
+          status: 'cancelled',
+          notes: reason || 'Cancelled by staff'
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Order cancel timeout')), 10000)
+        )
+      ]) as any;
+
+      if (orderResponse.data.code === 200) {
+        console.log(`✅ Cancelled order ${appointmentId}`);
+        StatusUtils.saveAppointmentStatus(appointmentId, 'Cancelled', 0);
+        return true;
+      }
+
+      console.error(`❌ Failed to cancel via both APIs for ${appointmentId}`);
+      return false;
+
+    } catch (error) {
+      console.error(`❌ Error cancelling appointment/order ${appointmentId}:`, error);
+      return false;
+    }
   }
 }

@@ -335,7 +335,7 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-y-auto bg-black bg-opacity-50"
+      className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-y-auto"
       onClick={handleClose}
     >
       <div

@@ -27,6 +27,11 @@ import { useState, useEffect } from 'react';
 // ✅ Updated interface to include sample creation handler
 interface UpdatedAppointmentCardProps extends AppointmentCardProps {
   onCreateSamples: (appointment: Appointment) => void;
+  onUpdateStatus: (
+    appointmentId: string, 
+    newStatus: Appointment['status'], 
+    triggerElement?: HTMLElement // ✅ Add optional trigger element
+  ) => void;
 }
 
 const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
@@ -141,53 +146,57 @@ const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
 
   // Status configuration
   const getStatusConfig = (status: string) => {
-    const configs = {
-      'Pending': { 
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
-        label: 'Chờ xử lý',
-        icon: Clock
-      },
-      'Confirmed': { 
-        color: 'bg-blue-100 text-blue-800 border-blue-200', 
-        label: 'Đã xác nhận',
-        icon: CheckCircle
-      },
-      'DeliveringKit': { 
-        color: 'bg-purple-100 text-purple-800 border-purple-200', 
-        label: 'Đang giao kit',
-        icon: Truck
-      },
-      'KitDelivered': { 
-        color: 'bg-indigo-100 text-indigo-800 border-indigo-200', 
-        label: 'Đã giao kit',
-        icon: Package
-      },
-      'SampleReceived': { 
-        color: 'bg-cyan-100 text-cyan-800 border-cyan-200', 
-        label: 'Đã nhận mẫu',
-        icon: TestTube
-      },
-      'Testing': { 
-        color: 'bg-orange-100 text-orange-800 border-orange-200', 
-        label: 'Đang xét nghiệm',
-        icon: AlertCircle
-      },
-      'Completed': { 
-        color: 'bg-green-100 text-green-800 border-green-200', 
-        label: 'Hoàn thành',
-        icon: CheckCircle
-      },
-      'Cancelled': { 
-        color: 'bg-red-100 text-red-800 border-red-200', 
-        label: 'Đã hủy',
-        icon: XCircle
-      }
-    };
-    return configs[status] || configs['Pending'];
+  const mappedStatus = mapApiStatusToCode(status);
+  
+  const configs = {
+    'Pending': { 
+      color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+      label: 'Chờ xử lý',
+      icon: Clock
+    },
+    'Confirmed': { 
+      color: 'bg-blue-100 text-blue-800 border-blue-200', 
+      label: 'Đã xác nhận',
+      icon: CheckCircle
+    },
+    'DeliveringKit': { 
+      color: 'bg-purple-100 text-purple-800 border-purple-200', 
+      label: 'Đang giao kit',
+      icon: Truck
+    },
+    'KitDelivered': { 
+      color: 'bg-indigo-100 text-indigo-800 border-indigo-200', 
+      label: 'Đã giao kit',
+      icon: Package
+    },
+    'SampleReceived': { 
+      color: 'bg-cyan-100 text-cyan-800 border-cyan-200', 
+      label: 'Đã nhận mẫu',
+      icon: TestTube
+    },
+    'Testing': { 
+      color: 'bg-orange-100 text-orange-800 border-orange-200', 
+      label: 'Đang xét nghiệm', // Hoặc 'Đang thực hiện'
+      icon: AlertCircle
+    },
+    'Completed': { 
+      color: 'bg-green-100 text-green-800 border-green-200', 
+      label: 'Hoàn thành',
+      icon: CheckCircle
+    },
+    'Cancelled': { 
+      color: 'bg-red-100 text-red-800 border-red-200', 
+      label: 'Đã hủy',
+      icon: XCircle
+    }
   };
+  return configs[mappedStatus] || configs['Pending'];
+};
 
   // Get next possible status for progression based on location type
   const getNextStatus = (currentStatus: string, locationType: string): string | null => {
+  const mappedStatus = mapApiStatusToCode(currentStatus);
+  
   if (locationType === 'Tại nhà') {
     const homeStatusFlow = {
       'Pending': 'DeliveringKit',
@@ -195,42 +204,44 @@ const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
       'KitDelivered': 'SampleReceived',
       'SampleReceived': 'Testing',
       'Testing': 'Completed',
-      // ✅ Add fallback for "Confirmed" status in home service
-      'Confirmed': 'DeliveringKit'  // If somehow confirmed for home service, go to delivering kit
+      'Confirmed': 'DeliveringKit'  
     };
-    return homeStatusFlow[currentStatus] || null;
+    return homeStatusFlow[mappedStatus] || null;
   } else {
     const facilityStatusFlow = {
       'Pending': 'Confirmed',
       'Confirmed': 'SampleReceived', 
       'SampleReceived': 'Testing',
       'Testing': 'Completed',
-      // ✅ Add fallback for home service statuses in facility service
-      'DeliveringKit': 'SampleReceived',  // If somehow in delivering kit for facility, skip to sample received
-      'KitDelivered': 'SampleReceived'    // If somehow kit delivered for facility, go to sample received
+      'DeliveringKit': 'SampleReceived',
+      'KitDelivered': 'SampleReceived'
     };
-    return facilityStatusFlow[currentStatus] || null;
+    return facilityStatusFlow[mappedStatus] || null;
   }
 };
 
 const normalizeStatusForLocationType = (status: string, locationType: string): string => {
-  // If it's a home service but has "Confirmed" status, treat it as DeliveringKit
-  if (locationType === 'Tại nhà' && status === 'Confirmed') {
+  const mappedStatus = mapApiStatusToCode(status);
+  
+  if (locationType === 'Tại nhà' && mappedStatus === 'Confirmed') {
     return 'DeliveringKit';
   }
   
-  // If it's a facility service but has home-specific statuses, normalize them
   if (locationType === 'Cơ sở y tế') {
-    if (status === 'DeliveringKit' || status === 'KitDelivered') {
+    if (mappedStatus === 'DeliveringKit' || mappedStatus === 'KitDelivered') {
       return 'Confirmed';
     }
   }
   
-  return status;
+  return mappedStatus;
 };
 
   // ✅ Updated handler for step progression
-  const handleStepProgression = (appointment: Appointment, nextStatus: string) => {
+  const handleStepProgression = (
+    appointment: Appointment, 
+    nextStatus: string, 
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
     // ✅ Special handling for SampleReceived step - trigger sample creation
     if (nextStatus === 'SampleReceived') {
       console.log('🧪 Triggering sample creation for appointment:', appointment.id);
@@ -238,16 +249,43 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
       return;
     }
     
-    // For other statuses, proceed normally
-    onUpdateStatus(appointment.id, nextStatus as Appointment['status']);
+    // ✅ For other statuses, pass the trigger element
+    onUpdateStatus(
+      appointment.id, 
+      nextStatus as Appointment['status'], 
+      event.currentTarget // ✅ Pass the button that was clicked
+    );
   };
+  const mapApiStatusToCode = (apiStatus: string): string => {
+  // Map từ status hiển thị (tiếng Việt) sang status code (tiếng Anh)
+  const statusMapping = {
+    "Chờ xử lý": "Pending",
+    "Đã xác nhận": "Confirmed", 
+    "Đang giao kit": "DeliveringKit",
+    "Đã giao kit": "KitDelivered",
+    "Đã nhận mẫu": "SampleReceived",
+    "Đang xét nghiệm": "Testing",
+    "Đang thực hiện": "Testing", // ← FIX: Mapping này thiếu!
+    "Hoàn thành": "Completed",
+    "Đã hủy": "Cancelled"
+  };
+  
+  return statusMapping[apiStatus] || apiStatus;
+};
 
   // ✅ Get appropriate step configuration based on location type
   const steps = getStepsConfig(appointment.locationType);
   const getCurrentStepIndex = () => {
-    const index = steps.findIndex(step => step.key === appointment.status);
-    return index >= 0 ? index : 0;
-  };
+  console.log("🔍 Debug status:", {
+    originalStatus: appointment.status,
+    mappedStatus: mapApiStatusToCode(appointment.status),
+    availableSteps: steps.map(s => s.key)
+  });
+  
+  const mappedStatus = mapApiStatusToCode(appointment.status);
+  const index = steps.findIndex(step => step.key === mappedStatus);
+  return index >= 0 ? index : 0;
+};
 
   const statusConfig = getStatusConfig(appointment.status);
   const StatusIcon = statusConfig.icon;
@@ -328,11 +366,6 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
 
       {/* Contact Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Phone className="w-4 h-4" />
-          <span>{appointment.phoneNumber}</span>
-        </div>
-        
         <div className="flex items-center gap-2 text-sm text-gray-600">
           <Mail className="w-4 h-4" />
           <span>{appointment.email}</span>
@@ -421,70 +454,116 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
 )}
 
       {/* ✅ Updated Progress Steps - using dynamic steps based on location type */}
-      {appointment.status !== 'Pending' && appointment.status !== 'Cancelled' && (
+     {(appointment.locationType === 'Tại nhà' || appointment.locationType === 'Cơ sở y tế') && 
+       appointment.status !== 'Pending' && appointment.status !== 'Cancelled' && (
         <div className="mb-4">
           <p className="text-sm font-medium text-gray-700 mb-3">
             Tiến trình {appointment.locationType === 'Tại nhà' ? '(Tại nhà)' : '(Tại cơ sở)'}
           </p>
           
-          {/* Compact progress stepper */}
+          {/* Detailed steps for both service types */}
           <div className="w-full">
-            <div className="flex items-center justify-between relative">
-              {/* Progress Line */}
-              <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200 z-0">
-                <div 
-                  className={`h-full transition-all duration-500 ${
-                    appointment.locationType === 'Tại nhà'
-                      ? 'bg-gradient-to-r from-blue-500 to-green-500'
-                      : 'bg-gradient-to-r from-purple-500 to-blue-500'
-                  }`}
-                  style={{ width: `${(currentStepIndex / (steps.length - 1)) * 100}%` }}
-                />
-              </div>
-
+            <div className="space-y-3">
               {steps.map((step, index) => {
                 const StepIcon = step.icon;
                 const isCompleted = index < currentStepIndex;
                 const isCurrent = index === currentStepIndex;
+                const isPending = index > currentStepIndex;
 
                 return (
-                  <div key={step.key} className="flex flex-col items-center relative z-10">
+                  <div key={step.key} className="flex items-center gap-3">
+                    {/* Step Circle */}
                     <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm
+                      w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm flex-shrink-0
                       ${isCompleted 
                         ? appointment.locationType === 'Tại nhà'
-                          ? 'bg-green-500 text-white shadow-lg transform scale-110'
-                          : 'bg-blue-500 text-white shadow-lg transform scale-110'
+                          ? 'bg-green-500 text-white shadow-lg' 
+                          : 'bg-blue-500 text-white shadow-lg'
                         : isCurrent 
                           ? appointment.locationType === 'Tại nhà'
-                            ? 'bg-blue-500 text-white shadow-lg ring-2 ring-blue-100 transform scale-110'
-                            : 'bg-purple-500 text-white shadow-lg ring-2 ring-purple-100 transform scale-110'
+                            ? 'bg-blue-500 text-white shadow-lg ring-2 ring-blue-100' 
+                            : 'bg-purple-500 text-white shadow-lg ring-2 ring-purple-100'
                           : 'bg-gray-200 text-gray-400'
                       }
                     `}>
-                      <StepIcon className="w-3 h-3" />
+                      <StepIcon className="w-4 h-4" />
                     </div>
-                    
-                    <div className="mt-1 text-center max-w-16">
-                      <div className={`text-xs font-medium transition-colors duration-300 ${
-                        isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
-                      }`}>
-                        {step.label}
+
+                    {/* Step Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className={`text-sm font-medium transition-colors duration-300 ${
+                            isCompleted || isCurrent ? 'text-gray-900' : 'text-gray-400'
+                          }`}>
+                            {step.label}
+                          </h4>
+                          <p className={`text-xs mt-1 transition-colors duration-300 ${
+                            isCompleted || isCurrent ? 'text-gray-600' : 'text-gray-400'
+                          }`}>
+                            {step.description}
+                          </p>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-2">
+                          {isCompleted && (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              appointment.locationType === 'Tại nhà'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Hoàn thành
+                            </span>
+                          )}
+                          {isCurrent && (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              appointment.locationType === 'Tại nhà'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              <Clock className="w-3 h-3 mr-1" />
+                              Đang thực hiện
+                            </span>
+                          )}
+                          {isPending && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Chờ thực hiện
+                            </span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Estimated time/info for current step */}
+                      {isCurrent && (
+                        <div className={`mt-2 p-2 rounded text-xs ${
+                          appointment.locationType === 'Tại nhà'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-purple-50 text-purple-700'
+                        }`}>
+                          {/* Home service timing */}
+                          {appointment.locationType === 'Tại nhà' && (
+                            <>
+                              {step.key === 'DeliveringKit' && '⏱️ Thời gian dự kiến: 1-2 ngày'}
+                              {step.key === 'KitDelivered' && '📦 Vui lòng kiểm tra kit và làm theo hướng dẫn'}
+                              {step.key === 'SampleReceived' && '🧪 Mẫu sẽ được xử lý trong 1-2 ngày làm việc'}
+                              {step.key === 'Testing' && '🔬 Thời gian xét nghiệm: 3-5 ngày làm việc'}
+                            </>
+                          )}
+                          
+                          {/* Facility service timing */}
+                          {appointment.locationType === 'Cơ sở y tế' && (
+                            <>
+                              {step.key === 'Confirmed' && '🏥 Vui lòng đến cơ sở y tế đúng giờ hẹn'}
+                              {step.key === 'SampleReceived' && '🧪 Mẫu sẽ được xử lý ngay sau khi thu thập'}
+                              {step.key === 'Testing' && '🔬 Thời gian xét nghiệm: 3-5 ngày làm việc'}
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Progress indicator dot */}
-                    {(isCompleted || isCurrent) && (
-                      <div className={`absolute -bottom-1 w-1 h-1 rounded-full ${
-                        isCompleted 
-                          ? appointment.locationType === 'Tại nhà' 
-                            ? 'bg-green-500' 
-                            : 'bg-blue-500'
-                          : appointment.locationType === 'Tại nhà'
-                            ? 'bg-blue-500'
-                            : 'bg-purple-500'
-                      } animate-pulse`} />
-                    )}
                   </div>
                 );
               })}
@@ -506,68 +585,66 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
         <div className="flex items-center gap-2">
           {/* Status progression button */}
           {(() => {
-      // For Pending status - show Confirm button
-      if (appointment.status === 'Pending') {
-        return (
-          <button
-            onClick={() => onConfirm(appointment)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Xác nhận</span>
-          </button>
-        );
-      }
-      
-      // For other statuses with next step - show progression button
-      if (nextStatus && appointment.status !== 'Cancelled' && appointment.status !== 'Completed') {
-        const getNextStepLabel = (status: string) => {
-          const labels = {
-            'DeliveringKit': 'Giao kit',
-            'Confirmed': 'Check-in',
-            'KitDelivered': 'Đã giao kit', 
-            'SampleReceived': 'Nhận mẫu',  // ✅ This will trigger sample creation
-            'Testing': 'Bắt đầu XN',
-            'Completed': 'Hoàn thành'
-          };
-          return labels[status] || 'Tiếp theo';
-        };
+            // For Pending status - show Confirm button
+            if (appointment.status === 'Pending') {
+              return (
+                <button
+                  onClick={() => onConfirm(appointment)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Xác nhận</span>
+                </button>
+              );
+            }
+            
+            // For other statuses with next step - show progression button
+            if (nextStatus && appointment.status !== 'Cancelled' && appointment.status !== 'Completed') {
+              const getNextStepLabel = (status: string) => {
+                const labels = {
+                  'DeliveringKit': 'Giao kit',
+                  'Confirmed': 'Check-in',
+                  'KitDelivered': 'Đã giao kit', 
+                  'SampleReceived': 'Nhận mẫu',
+                  'Testing': 'Bắt đầu XN',
+                  'Completed': 'Hoàn thành'
+                };
+                return labels[status] || 'Tiếp theo';
+              };
 
-        return (
-          <button
-            onClick={() => handleStepProgression(appointment, nextStatus)}  // ✅ Use new handler
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
-          >
-            <ArrowRight className="w-4 h-4" />
-            <span>{getNextStepLabel(nextStatus)}</span>
-          </button>
-        );
-      }
+              return (
+                <button
+                  onClick={(event) => handleStepProgression(appointment, nextStatus, event)} // ✅ Pass event
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  <span>{getNextStepLabel(nextStatus)}</span>
+                </button>
+              );
+            }
 
-      // For completed status - show completion indicator
-      if (appointment.status === 'Completed') {
-        return (
-          <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
-            <CheckCircle className="w-4 h-4" />
-            <span>Đã hoàn thành</span>
-          </div>
-        );
-      }
+            // For completed status - show completion indicator
+            if (appointment.status === 'Completed') {
+              return (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Đã hoàn thành</span>
+                </div>
+              );
+            }
 
-      // For cancelled status - show cancellation indicator  
-      if (appointment.status === 'Cancelled') {
-        return (
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
-            <XCircle className="w-4 h-4" />
-            <span>Đã hủy</span>
-          </div>
-        );
-      }
+            // For cancelled status - show cancellation indicator  
+            if (appointment.status === 'Cancelled') {
+              return (
+                <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
+                  <XCircle className="w-4 h-4" />
+                  <span>Đã hủy</span>
+                </div>
+              );
+            }
 
-      return null;
-    })()}
-
-          
+            return null;
+          })()}
 
           {/* Cancel button - for non-completed appointments */}
           {appointment.status !== 'Cancelled' && appointment.status !== 'Completed' && (
@@ -593,5 +670,4 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
     </div>
   );
 };
-
 export default AppointmentCard;
