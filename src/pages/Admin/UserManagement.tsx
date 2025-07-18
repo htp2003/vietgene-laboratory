@@ -14,26 +14,6 @@ export default function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [roleFilter, setRoleFilter] = useState<string>('')
 
-  // 🔍 Debug authentication on component mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    console.log('🔍 UserManagement Debug Info:', {
-      hasToken: !!token,
-      hasUser: !!user,
-      tokenPreview: token ? token.substring(0, 20) + '...' : null,
-      userData: user ? JSON.parse(user) : null,
-      timestamp: new Date().toISOString()
-    });
-    
-    if (!token || !user) {
-      console.error('❌ Missing authentication data in UserManagement');
-    } else {
-      console.log('✅ Authentication data found in UserManagement');
-    }
-  }, []);
-
   const filteredUsers = searchUsers(searchTerm).filter(user => 
     !roleFilter || user.role === roleFilter
   )
