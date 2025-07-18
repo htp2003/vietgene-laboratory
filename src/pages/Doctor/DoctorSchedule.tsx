@@ -93,14 +93,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
       weekDates.push(date);
     }
     
-    // Debug: So sánh với dữ liệu từ API
-    console.log('=== WEEK CALCULATION DEBUG ===');
-    console.log('Current selected week:', selectedWeek.toISOString().split('T')[0]);
-    console.log('Week dates calculated:', weekDates.map(d => ({
-      date: formatDateForInput(d),
-      dayOfWeek: d.getDay(),
-      dayName: DAY_OPTIONS[d.getDay()].label
-    })));
+    
     
     // Kiểm tra xem ngày 19/7/2025 có trong tuần này không
     const testDate = '2025-07-19';
@@ -374,50 +367,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   const upcomingSlots = getUpcomingTimeSlots(7);
   const availableSlots = getAvailableTimeSlots();
   
-  // Debug logs - more detailed
-  console.log('=== DEBUG INFO ===');
-  
-  // Verify date calculation
-  const testDate = new Date('2025-07-19');
-  console.log('2025-07-19 actual dayOfWeek:', testDate.getDay()); // Should be 6 (Saturday)
-  
-  // Check what day today is
-  const today = new Date();
-  console.log('Today:', today.toISOString().split('T')[0], 'dayOfWeek:', today.getDay());
-  
-  console.log('Current week dates:', weekDates.map(d => ({
-    date: d.toISOString().split('T')[0],
-    dayOfWeek: d.getDay(),
-    dayName: DAY_OPTIONS.find(day => day.value === d.getDay())?.label
-  })));
-  
-  console.log('All time slots:', timeSlots.map(slot => ({
-    id: slot.id,
-    specificDate: slot.specificDate,
-    dayOfWeek: slot.dayOfWeek,
-    startTime: slot.startTime,
-    endTime: slot.endTime,
-    isAvailable: slot.isAvailable
-  })));
-  
-  // Check each day of the week
-  weekDates.forEach((date, index) => {
-    const dateStr = formatDateForInput(date);
-    const slotsForDate = timeSlots.filter(slot => slot.specificDate === dateStr);
-    console.log(`${dateStr} (${DAY_OPTIONS[date.getDay()].label}):`, slotsForDate.length, 'slots');
-  });
-  
-  // Check specific dates
-  const targetDate1 = '2025-07-19';
-  const targetSlots1 = timeSlots.filter(slot => slot.specificDate === targetDate1);
-  console.log(`Slots for ${targetDate1}:`, targetSlots1);
-  
-  const targetDate2 = '2025-07-20';
-  const targetSlots2 = timeSlots.filter(slot => slot.specificDate === targetDate2);
-  console.log(`Slots for ${targetDate2}:`, targetSlots2);
-  
-  console.log('==================');
-  
+ 
   const isFormValid = (): boolean => {
     return !!(form.startTime && 
            form.endTime && 
