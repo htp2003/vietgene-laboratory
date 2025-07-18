@@ -223,21 +223,29 @@ export default function DoctorDashboard() {
 
   // Format appointment data for display
   const formatAppointmentData = (appointmentsWithUsers: any[]) => {
-    return appointmentsWithUsers.map(appointment => ({
-      id: appointment.id,
-      patientName: appointment.patientInfo 
-        ? appointment.patientInfo.full_name || appointment.patientInfo.username
-        : `Bệnh nhân ${appointment.userId}`,
-      patientEmail: appointment.patientInfo?.email || '',
-      time: new Date(appointment.appointment_date).toLocaleTimeString('vi-VN', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      }),
-      type: appointment.appointment_type,
-      status: appointment.status ? 'confirmed' : 'pending',
-      notes: appointment.notes
-    }));
+    return appointmentsWithUsers.map(appointment => {
+      // Convert UTC time to Vietnam timezone
+      const appointmentDate = new Date(appointment.appointment_date);
+      const vietnamTime = new Date(appointmentDate.getTime() + (7 * 60 * 60 * 1000)); // UTC + 7 hours
+      
+      return {
+        id: appointment.id,
+        patientName: appointment.patientInfo 
+          ? appointment.patientInfo.full_name || appointment.patientInfo.username
+          : `Bệnh nhân ${appointment.userId}`,
+        patientEmail: appointment.patientInfo?.email || '',
+        time: vietnamTime.toLocaleTimeString('vi-VN', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          hour12: false 
+        }),
+        date: vietnamTime.toLocaleDateString('vi-VN'),
+        type: appointment.appointment_type,
+        status: appointment.status ? 'confirmed' : 'pending',
+        notes: appointment.notes,
+        originalDate: appointment.appointment_date
+      };
+    });
   };
 
   const formattedAppointments = formatAppointmentData(appointmentsWithUserInfo);
@@ -510,7 +518,6 @@ export default function DoctorDashboard() {
                             <FaClock className="text-blue-600" size={16} />
                             <p className="text-xl font-bold text-gray-800">{appointment.time}</p>
                           </div>
-                          <p className="text-sm text-gray-500 font-medium">Hôm nay</p>
                         </div>
                       </div>
                     ))}
