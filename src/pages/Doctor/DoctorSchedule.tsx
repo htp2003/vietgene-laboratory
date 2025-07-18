@@ -11,7 +11,14 @@ import {
   FaUserMd,
   FaExclamationTriangle,
   FaCheckCircle,
-  FaCalendarCheck
+  FaCalendarPlus,
+  FaHistory,
+  FaChevronLeft,
+  FaChevronRight,
+  FaSearch,
+  FaFilter,
+  FaCalendarWeek,
+  FaCalendarDay
 } from 'react-icons/fa';
 import useDoctorTimeSlots from '../../hooks/useDoctorTimeSlots';
 import { TimeSlotRequest, DAY_OPTIONS } from '../../services/doctorTimeSlotService';
@@ -19,6 +26,7 @@ import { TimeSlotRequest, DAY_OPTIONS } from '../../services/doctorTimeSlotServi
 interface DoctorScheduleProps {
   doctorId: string;
 }
+
 export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   const {
     timeSlots,
@@ -29,11 +37,17 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     deleteTimeSlot,
     toggleAvailability,
     getTimeSlotStats,
-    getTimeSlotsGroupedByDay,
+    getTimeSlotsGroupedByDate,
+    getTimeSlotsForWeek,
+    getTodayTimeSlots,
+    getTomorrowTimeSlots,
+    getUpcomingTimeSlots,
+    getAvailableTimeSlots,
     hasTimeConflict,
     getTimeSlotDisplay,
     formatTime,
     getDayName,
+    searchTimeSlots,
   } = useDoctorTimeSlots(doctorId);
 
   // Modal state
@@ -44,6 +58,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   // Form state
   const [form, setForm] = useState<TimeSlotRequest>({
     dayOfWeek: 1,
+    specificDate: '',
     startTime: '',
     endTime: '',
     isAvailable: true,
@@ -52,6 +67,9 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
 
   // View preferences
   const [selectedWeek, setSelectedWeek] = useState<Date>(new Date());
+  const [viewMode, setViewMode] = useState<'week' | 'upcoming' | 'all'>('week');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterAvailable, setFilterAvailable] = useState<'all' | 'available' | 'unavailable'>('all');
 
   // Get current week dates
   const getCurrentWeekDates = (): Date[] => {
@@ -69,11 +87,58 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     return weekDates;
   };
 
+  // Format date for input
+  const formatDateForInput = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Get day of week from date
+  const getDayOfWeekFromDate = (dateStr: string): number => {
+    return new Date(dateStr).getDay();
+  };
+
+  // Get filtered time slots based on current filters
+  const getFilteredTimeSlots = () => {
+    let filtered = timeSlots;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      filtered = searchTimeSlots(searchTerm);
+    }
+
+    // Apply availability filter
+    if (filterAvailable === 'available') {
+      filtered = filtered.filter(slot => slot.isAvailable);
+    } else if (filterAvailable === 'unavailable') {
+      filtered = filtered.filter(slot => !slot.isAvailable);
+    }
+
+    // Apply view mode filter
+    if (viewMode === 'week') {
+      const weekDates = getCurrentWeekDates();
+      const weekStart = weekDates[0];
+      const weekEnd = weekDates[6];
+      filtered = filtered.filter(slot => {
+        const slotDate = new Date(slot.specificDate);
+        return slotDate >= weekStart && slotDate <= weekEnd;
+      });
+    } else if (viewMode === 'upcoming') {
+      const today = new Date();
+      filtered = filtered.filter(slot => {
+        const slotDate = new Date(slot.specificDate);
+        return slotDate >= today;
+      });
+    }
+
+    return filtered;
+  };
+
   // Open modal for create/edit
-  const handleOpenModal = (timeSlot: any = null, presetDay?: number) => {
+  const handleOpenModal = (timeSlot: any = null, presetDate?: string) => {
     if (timeSlot) {
       setForm({
         dayOfWeek: timeSlot.dayOfWeek,
+        specificDate: timeSlot.specificDate,
         startTime: timeSlot.startTime,
         endTime: timeSlot.endTime,
         isAvailable: timeSlot.isAvailable,
@@ -81,8 +146,13 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
       });
       setEditingTimeSlot(timeSlot);
     } else {
+      const today = new Date();
+      const defaultDate = presetDate || formatDateForInput(today);
+      const dayOfWeek = getDayOfWeekFromDate(defaultDate);
+      
       setForm({
-        dayOfWeek: presetDay ?? 1,
+        dayOfWeek: dayOfWeek,
+        specificDate: defaultDate,
         startTime: '',
         endTime: '',
         isAvailable: true,
@@ -97,8 +167,10 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingTimeSlot(null);
+    const today = new Date();
     setForm({
-      dayOfWeek: 1,
+      dayOfWeek: today.getDay(),
+      specificDate: formatDateForInput(today),
       startTime: '',
       endTime: '',
       isAvailable: true,
@@ -109,10 +181,14 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   // Handle form changes
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
+    
     if (name === 'isAvailable') {
       setForm(prev => ({ ...prev, isAvailable: value === 'true' }));
     } else if (name === 'dayOfWeek') {
       setForm(prev => ({ ...prev, dayOfWeek: parseInt(value) }));
+    } else if (name === 'specificDate') {
+      const dayOfWeek = getDayOfWeekFromDate(value);
+      setForm(prev => ({ ...prev, specificDate: value, dayOfWeek }));
     } else {
       setForm(prev => ({ ...prev, [name]: value }));
     }
@@ -123,8 +199,8 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     e.preventDefault();
     
     // Validate required fields
-    if (!form.startTime || !form.endTime) {
-      alert('Vui lòng chọn giờ bắt đầu và kết thúc');
+    if (!form.startTime || !form.endTime || !form.specificDate) {
+      alert('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
@@ -137,8 +213,18 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
       return;
     }
 
+    // Validate date is not in the past
+    const selectedDate = new Date(form.specificDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+      alert('Không thể tạo khung giờ cho ngày đã qua');
+      return;
+    }
+
     // Check for time conflicts
-    if (hasTimeConflict(form.dayOfWeek, form.startTime, form.endTime, editingTimeSlot?.id)) {
+    if (hasTimeConflict(form.dayOfWeek, form.specificDate, form.startTime, form.endTime, editingTimeSlot?.id)) {
       alert('Khung giờ này bị trùng với khung giờ khác trong cùng ngày');
       return;
     }
@@ -171,7 +257,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
   // Delete time slot
   const handleDelete = async (timeSlot: any) => {
     const display = getTimeSlotDisplay(timeSlot);
-    if (window.confirm(`Bạn có chắc muốn xóa khung giờ "${display.dayName} ${display.timeRange}"?`)) {
+    if (window.confirm(`Bạn có chắc muốn xóa khung giờ "${display.shortDate} ${display.timeRange}"?`)) {
       try {
         const response = await deleteTimeSlot(timeSlot.id);
         if (response.success) {
@@ -191,7 +277,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     console.log('Before toggle - timeSlot:', timeSlot);
     
     try {
-      // Chuyển đổi format thời gian từ HH:mm:ss về HH:mm
+      // Format time for API
       const formatTimeForAPI = (time: string) => {
         if (time.includes(':')) {
           const parts = time.split(':');
@@ -200,12 +286,13 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
         return time;
       };
       
-      // Gọi trực tiếp updateTimeSlot với format thời gian đúng
+      // Call updateTimeSlot with correct format
       const result = await updateTimeSlot(timeSlot.id, {
         isAvailable: !timeSlot.isAvailable,
         startTime: formatTimeForAPI(timeSlot.startTime),
         endTime: formatTimeForAPI(timeSlot.endTime),
         dayOfWeek: timeSlot.dayOfWeek,
+        specificDate: timeSlot.specificDate,
         doctorId: timeSlot.doctorId
       });
         
@@ -228,13 +315,30 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
     setSelectedWeek(newDate);
   };
 
-  const groupedTimeSlots = getTimeSlotsGroupedByDay();
+  // Quick actions
+  const goToToday = () => {
+    setSelectedWeek(new Date());
+  };
+
+  const goToTomorrow = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setSelectedWeek(tomorrow);
+  };
+
+  const groupedTimeSlots = getTimeSlotsGroupedByDate();
   const stats = getTimeSlotStats();
   const weekDates: Date[] = getCurrentWeekDates();
+  const filteredTimeSlots = getFilteredTimeSlots();
+  const todaySlots = getTodayTimeSlots();
+  const tomorrowSlots = getTomorrowTimeSlots();
+  const upcomingSlots = getUpcomingTimeSlots(7);
+  const availableSlots = getAvailableTimeSlots();
   
   const isFormValid = (): boolean => {
     return !!(form.startTime && 
            form.endTime && 
+           form.specificDate &&
            new Date(`1970-01-01T${form.endTime}:00`) > new Date(`1970-01-01T${form.startTime}:00`));
   };
 
@@ -253,7 +357,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                   Lịch làm việc của tôi
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  Quản lý lịch làm việc cá nhân của bạn
+                  Quản lý lịch làm việc theo ngày cụ thể
                 </p>
               </div>
             </div>
@@ -271,14 +375,14 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
 
         {/* Quick Stats */}
         <div className="px-6 pb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-600 text-sm font-medium">Tổng khung giờ</p>
                   <p className="text-2xl font-bold text-blue-800">{stats.total}</p>
                 </div>
-                <FaClock className="text-blue-400" size={24} />
+                <FaClock className="text-blue-400" size={20} />
               </div>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
@@ -287,7 +391,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                   <p className="text-green-600 text-sm font-medium">Đang có sẵn</p>
                   <p className="text-2xl font-bold text-green-800">{stats.available}</p>
                 </div>
-                <FaCheckCircle className="text-green-400" size={24} />
+                <FaCheckCircle className="text-green-400" size={20} />
               </div>
             </div>
             <div className="bg-red-50 rounded-lg p-4">
@@ -296,48 +400,135 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                   <p className="text-red-600 text-sm font-medium">Không có sẵn</p>
                   <p className="text-2xl font-bold text-red-800">{stats.unavailable}</p>
                 </div>
-                <FaExclamationTriangle className="text-red-400" size={24} />
+                <FaExclamationTriangle className="text-red-400" size={20} />
               </div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-purple-600 text-sm font-medium">Ngày làm việc</p>
-                  <p className="text-2xl font-bold text-purple-800">
-                    {Object.keys(groupedTimeSlots).length}
-                  </p>
+                  <p className="text-purple-600 text-sm font-medium">Hôm nay</p>
+                  <p className="text-2xl font-bold text-purple-800">{todaySlots.length}</p>
                 </div>
-                <FaCalendarCheck className="text-purple-400" size={24} />
+                <FaCalendarDay className="text-purple-400" size={20} />
+              </div>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-600 text-sm font-medium">Ngày mai</p>
+                  <p className="text-2xl font-bold text-orange-800">{tomorrowSlots.length}</p>
+                </div>
+                <FaCalendarPlus className="text-orange-400" size={20} />
+              </div>
+            </div>
+            <div className="bg-indigo-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-indigo-600 text-sm font-medium">7 ngày tới</p>
+                  <p className="text-2xl font-bold text-indigo-800">{upcomingSlots.length}</p>
+                </div>
+                <FaCalendarWeek className="text-indigo-400" size={20} />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Week Navigator */}
+      {/* Controls */}
       <div className="bg-white rounded-lg shadow-sm mb-6">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigateWeek('prev')}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              ← Tuần trước
-            </button>
-            <div className="text-center">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Tuần từ {weekDates[0].toLocaleDateString('vi-VN')} đến {weekDates[6].toLocaleDateString('vi-VN')}
-              </h3>
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* View Mode Selector */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Chế độ xem:</label>
+              <select
+                value={viewMode}
+                onChange={(e) => setViewMode(e.target.value as 'week' | 'upcoming' | 'all')}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="week">Tuần này</option>
+                <option value="upcoming">Sắp tới</option>
+              </select>
             </div>
-            <button
-              onClick={() => navigateWeek('next')}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              Tuần sau →
-            </button>
+
+            {/* Search */}
+            <div className="flex items-center gap-2 flex-1">
+              <div className="relative flex-1 max-w-md">
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm khung giờ..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Filter */}
+            <div className="flex items-center gap-2">
+              <FaFilter className="text-gray-400" size={16} />
+              <select
+                value={filterAvailable}
+                onChange={(e) => setFilterAvailable(e.target.value as 'all' | 'available' | 'unavailable')}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Tất cả</option>
+                <option value="available">Có sẵn</option>
+                <option value="unavailable">Không có sẵn</option>
+              </select>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToToday}
+                className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+              >
+                Hôm nay
+              </button>
+              <button
+                onClick={goToTomorrow}
+                className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+              >
+                Ngày mai
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Week Navigator (only show in week view) */}
+      {viewMode === 'week' && (
+        <div className="bg-white rounded-lg shadow-sm mb-6">
+          <div className="px-6 py-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigateWeek('prev')}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <FaChevronLeft size={16} />
+                Tuần trước
+              </button>
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Tuần từ {weekDates[0].toLocaleDateString('vi-VN')} đến {weekDates[6].toLocaleDateString('vi-VN')}
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {filteredTimeSlots.length} khung giờ
+                </p>
+              </div>
+              <button
+                onClick={() => navigateWeek('next')}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Tuần sau
+                <FaChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -368,124 +559,331 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
         </div>
       )}
 
-      {/* Schedule Grid */}
+      {/* Schedule Display */}
       {!loading && !error && (
         <div className="bg-white rounded-lg shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                 <FaCalendarAlt className="text-blue-600" />
-                Lịch tuần này
+                {viewMode === 'week' ? 'Lịch tuần này' : 
+                 viewMode === 'upcoming' ? 'Lịch sắp tới' : 'Tất cả lịch làm việc'}
               </h2>
+              <p className="text-sm text-gray-500">
+                {filteredTimeSlots.length} khung giờ
+              </p>
             </div>
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
-              {DAY_OPTIONS.map((day, index) => {
-                const daySlots = groupedTimeSlots[day.value] || [];
-                const currentDate = weekDates[index];
-                const isToday = new Date().toDateString() === currentDate.toDateString();
-                
-                return (
-                  <div 
-                    key={day.value} 
-                    className={`border rounded-lg p-4 ${
-                      isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                    }`}
-                  >
-                    {/* Day Header */}
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className={`font-semibold ${
-                          isToday ? 'text-blue-800' : 'text-gray-800'
-                        }`}>
-                          {day.label}
-                        </h3>
-                        <button
-                          onClick={() => handleOpenModal(null, day.value)}
-                          className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-                          title="Thêm khung giờ"
-                        >
-                          <FaPlus size={14} />
-                        </button>
-                      </div>
-                      <p className={`text-sm ${
-                        isToday ? 'text-blue-600' : 'text-gray-500'
-                      }`}>
-                        {currentDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
-                      </p>
-                      {isToday && (
-                        <p className="text-xs text-blue-600 font-medium">Hôm nay</p>
-                      )}
-                    </div>
-
-                    {/* Time Slots */}
-                    <div className="space-y-2 min-h-[200px]">
-                      {daySlots.length === 0 ? (
-                        <div className="text-center text-gray-400 py-8">
-                          <FaClock size={24} className="mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Chưa có lịch</p>
-                        </div>
-                      ) : (
-                        daySlots.map(slot => {
-                          const display = getTimeSlotDisplay(slot);
-                          return (
-                            <div 
-                              key={slot.id} 
-                              className={`p-3 rounded-lg border-l-4 transition-all duration-200 ${
-                                slot.isAvailable 
-                                  ? 'border-green-500 bg-green-50 hover:bg-green-100' 
-                                  : 'border-red-500 bg-red-50 hover:bg-red-100'
-                              }`}
+            {filteredTimeSlots.length === 0 ? (
+              <div className="text-center py-12">
+                <FaCalendarAlt size={48} className="mx-auto mb-4 text-gray-300" />
+                <p className="text-gray-500 text-lg mb-2">Không có khung giờ nào</p>
+                <p className="text-gray-400 text-sm mb-4">
+                  {searchTerm ? 'Không tìm thấy khung giờ phù hợp với từ khóa tìm kiếm' : 'Bạn chưa có khung giờ làm việc nào'}
+                </p>
+                <button
+                  onClick={() => handleOpenModal()}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Thêm khung giờ đầu tiên
+                </button>
+              </div>
+            ) : viewMode === 'week' ? (
+              // Week View
+              <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+                {weekDates.map((date, index) => {
+                  const dateStr = formatDateForInput(date);
+                  const daySlots = groupedTimeSlots[dateStr] || [];
+                  const isToday = new Date().toDateString() === date.toDateString();
+                  const isPast = date < new Date();
+                  
+                  return (
+                    <div 
+                      key={dateStr} 
+                      className={`border rounded-lg p-4 ${
+                        isToday ? 'border-blue-500 bg-blue-50' : 
+                        isPast ? 'border-gray-200 bg-gray-50' : 'border-gray-200'
+                      }`}
+                    >
+                      {/* Day Header */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className={`font-semibold ${
+                            isToday ? 'text-blue-800' : 
+                            isPast ? 'text-gray-500' : 'text-gray-800'
+                          }`}>
+                            {DAY_OPTIONS[date.getDay()].label}
+                          </h3>
+                          {!isPast && (
+                            <button
+                              onClick={() => handleOpenModal(null, dateStr)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+                              title="Thêm khung giờ"
                             >
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="font-mono text-sm font-medium text-gray-800">
-                                    {display.timeRange}
-                                  </div>
-                                  <div className={`text-xs mt-1 ${display.statusColor}`}>
-                                    {display.status}
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-1 ml-2">
-                                  <button
-                                    onClick={() => handleQuickToggle(slot)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                                    title={slot.isAvailable ? 'Đặt không có sẵn' : 'Đặt có sẵn'}
-                                  >
-                                    {slot.isAvailable ? (
-                                      <FaToggleOn className="text-green-500" size={16} />
-                                    ) : (
-                                      <FaToggleOff className="text-gray-400" size={16} />
+                              <FaPlus size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <p className={`text-sm ${
+                          isToday ? 'text-blue-600' : 
+                          isPast ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
+                          {date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                        </p>
+                        {isToday && (
+                          <p className="text-xs text-blue-600 font-medium">Hôm nay</p>
+                        )}
+                        {isPast && (
+                          <p className="text-xs text-gray-400 flex items-center gap-1">
+                            <FaHistory size={10} />
+                            Đã qua
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Time Slots */}
+                      <div className="space-y-2 min-h-[200px]">
+                        {daySlots.length === 0 ? (
+                          <div className="text-center text-gray-400 py-8">
+                            <FaClock size={24} className="mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Chưa có lịch</p>
+                          </div>
+                        ) : (
+                          daySlots.map(slot => {
+                            const display = getTimeSlotDisplay(slot);
+                            return (
+                              <div 
+                                key={slot.id} 
+                                className={`p-3 rounded-lg border-l-4 transition-all duration-200 ${
+                                  slot.isAvailable 
+                                    ? 'border-green-500 bg-green-50 hover:bg-green-100' 
+                                    : 'border-red-500 bg-red-50 hover:bg-red-100'
+                                } ${display.isPast ? 'opacity-60' : ''}`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <div className="font-mono text-sm font-medium text-gray-800">
+                                      {display.timeRange}
+                                    </div>
+                                    <div className={`text-xs mt-1 ${display.statusColor}`}>
+                                      {display.status}
+                                    </div>
+                                    {display.isPast && (
+                                      <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                                        <FaHistory size={10} />
+                                        Đã qua
+                                      </div>
                                     )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleOpenModal(slot)}
-                                    className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-                                    title="Chỉnh sửa"
-                                  >
-                                    <FaEdit size={12} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(slot)}
-                                    className="text-red-600 hover:text-red-800 transition-colors p-1"
-                                    title="Xóa"
-                                  >
-                                    <FaTrash size={12} />
-                                  </button>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-1 ml-2">
+                                    {!display.isPast && (
+                                      <>
+                                        <button
+                                          onClick={() => handleQuickToggle(slot)}
+                                          className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                                          title={slot.isAvailable ? 'Đặt không có sẵn' : 'Đặt có sẵn'}
+                                        >
+                                          {slot.isAvailable ? (
+                                            <FaToggleOn className="text-green-500" size={16} />
+                                          ) : (
+                                            <FaToggleOff className="text-gray-400" size={16} />
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={() => handleOpenModal(slot)}
+                                          className="text-blue-600 hover:text-blue-800 transition-colors p-1"
+                                          title="Chỉnh sửa"
+                                        >
+                                          <FaEdit size={12} />
+                                        </button>
+                                      </>
+                                    )}
+                                    <button
+                                      onClick={() => handleDelete(slot)}
+                                      className="text-red-600 hover:text-red-800 transition-colors p-1"
+                                      title="Xóa"
+                                    >
+                                      <FaTrash size={12} />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })
-                      )}
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // List View for upcoming and all
+              <div className="space-y-4">
+                {Object.entries(groupedTimeSlots)
+                  .filter(([dateStr]) => {
+                    if (viewMode === 'upcoming') {
+                      const date = new Date(dateStr);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      return date >= today;
+                    }
+                    return true;
+                  })
+                  .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+                  .map(([dateStr, slots]) => {
+                    const date = new Date(dateStr);
+                    const isToday = date.toDateString() === new Date().toDateString();
+                    const isPast = date < new Date();
+                    const dayName = DAY_OPTIONS[date.getDay()].label;
+                    
+                    // Filter slots based on search and availability filter
+                    const filteredSlots = slots.filter(slot => {
+                      let matchesSearch = true;
+                      let matchesAvailability = true;
+                      
+                      if (searchTerm.trim()) {
+                        const searchLower = searchTerm.toLowerCase();
+                        matchesSearch = 
+                          slot.startTime.toLowerCase().includes(searchLower) ||
+                          slot.endTime.toLowerCase().includes(searchLower) ||
+                          dayName.toLowerCase().includes(searchLower) ||
+                          dateStr.includes(searchLower);
+                      }
+                      
+                      if (filterAvailable === 'available') {
+                        matchesAvailability = slot.isAvailable;
+                      } else if (filterAvailable === 'unavailable') {
+                        matchesAvailability = !slot.isAvailable;
+                      }
+                      
+                      return matchesSearch && matchesAvailability;
+                    });
+                    
+                    if (filteredSlots.length === 0) return null;
+                    
+                    return (
+                      <div key={dateStr} className="border rounded-lg overflow-hidden">
+                        {/* Date Header */}
+                        <div className={`px-6 py-4 border-b ${
+                          isToday ? 'bg-blue-50 border-blue-200' : 
+                          isPast ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-gray-200'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className={`text-lg font-semibold ${
+                                isToday ? 'text-blue-800' : 
+                                isPast ? 'text-gray-600' : 'text-gray-800'
+                              }`}>
+                                {dayName}, {date.toLocaleDateString('vi-VN', { 
+                                  day: 'numeric', 
+                                  month: 'long', 
+                                  year: 'numeric' 
+                                })}
+                              </h3>
+                              <div className="flex items-center gap-4 mt-1">
+                                {isToday && (
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+                                    Hôm nay
+                                  </span>
+                                )}
+                                {isPast && (
+                                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                                    <FaHistory size={10} />
+                                    Đã qua
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  {filteredSlots.length} khung giờ
+                                </span>
+                              </div>
+                            </div>
+                            {!isPast && (
+                              <button
+                                onClick={() => handleOpenModal(null, dateStr)}
+                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                              >
+                                <FaPlus size={14} />
+                                Thêm khung giờ
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Time Slots */}
+                        <div className="p-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredSlots.map(slot => {
+                              const display = getTimeSlotDisplay(slot);
+                              return (
+                                <div 
+                                  key={slot.id} 
+                                  className={`p-4 rounded-lg border-l-4 transition-all duration-200 ${
+                                    slot.isAvailable 
+                                      ? 'border-green-500 bg-green-50 hover:bg-green-100' 
+                                      : 'border-red-500 bg-red-50 hover:bg-red-100'
+                                  } ${display.isPast ? 'opacity-60' : ''}`}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="font-mono text-lg font-bold text-gray-800">
+                                        {display.timeRange}
+                                      </div>
+                                      <div className={`text-sm mt-1 font-medium ${display.statusColor}`}>
+                                        {display.status}
+                                      </div>
+                                      {display.isPast && (
+                                        <div className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                                          <FaHistory size={10} />
+                                          Đã qua
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="flex flex-col items-center gap-2 ml-4">
+                                      {!display.isPast && (
+                                        <>
+                                          <button
+                                            onClick={() => handleQuickToggle(slot)}
+                                            className="text-gray-400 hover:text-gray-600 transition-colors p-2"
+                                            title={slot.isAvailable ? 'Đặt không có sẵn' : 'Đặt có sẵn'}
+                                          >
+                                            {slot.isAvailable ? (
+                                              <FaToggleOn className="text-green-500" size={20} />
+                                            ) : (
+                                              <FaToggleOff className="text-gray-400" size={20} />
+                                            )}
+                                          </button>
+                                          <button
+                                            onClick={() => handleOpenModal(slot)}
+                                            className="text-blue-600 hover:text-blue-800 transition-colors p-2"
+                                            title="Chỉnh sửa"
+                                          >
+                                            <FaEdit size={16} />
+                                          </button>
+                                        </>
+                                      )}
+                                      <button
+                                        onClick={() => handleDelete(slot)}
+                                        className="text-red-600 hover:text-red-800 transition-colors p-2"
+                                        title="Xóa"
+                                      >
+                                        <FaTrash size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -498,7 +896,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
-                  <FaClock className="text-blue-600" size={20} />
+                  <FaCalendarPlus className="text-blue-600" size={20} />
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900">
@@ -521,26 +919,29 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
             {/* Modal Content */}
             <div className="p-6">
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Day of Week */}
+                {/* Specific Date */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <div className="flex items-center gap-2">
                       <FaCalendarAlt size={14} />
-                      Ngày trong tuần <span className="text-red-500">*</span>
+                      Ngày cụ thể <span className="text-red-500">*</span>
                     </div>
                   </label>
-                  <select
-                    name="dayOfWeek"
-                    value={form.dayOfWeek}
+                  <input
+                    type="date"
+                    name="specificDate"
+                    value={form.specificDate}
                     onChange={handleFormChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     required
                     disabled={submitting}
-                  >
-                    {DAY_OPTIONS.map(day => (
-                      <option key={day.value} value={day.value}>{day.label}</option>
-                    ))}
-                  </select>
+                    min={formatDateForInput(new Date())}
+                  />
+                  {form.specificDate && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      {getDayName(getDayOfWeekFromDate(form.specificDate))}
+                    </p>
+                  )}
                 </div>
 
                 {/* Time Fields */}
@@ -584,7 +985,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
                   </div>
                 )}
 
-                {form.startTime && form.endTime && isFormValid() && hasTimeConflict(form.dayOfWeek, form.startTime, form.endTime, editingTimeSlot?.id) && (
+                {form.startTime && form.endTime && form.specificDate && isFormValid() && hasTimeConflict(form.dayOfWeek, form.specificDate, form.startTime, form.endTime, editingTimeSlot?.id) && (
                   <div className="flex items-center gap-2 text-red-500 text-sm bg-red-50 p-3 rounded-lg">
                     <FaExclamationTriangle size={14} />
                     Khung giờ này bị trùng với khung giờ khác trong cùng ngày
@@ -663,7 +1064,7 @@ export default function DoctorSchedule({ doctorId }: DoctorScheduleProps) {
               <button
                 type="submit"
                 onClick={handleSubmit}
-                disabled={submitting || !isFormValid() || hasTimeConflict(form.dayOfWeek, form.startTime, form.endTime, editingTimeSlot?.id)}
+                disabled={submitting || !isFormValid() || Boolean(form.startTime && form.endTime && form.specificDate && hasTimeConflict(form.dayOfWeek, form.specificDate, form.startTime, form.endTime, editingTimeSlot?.id))}
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-colors font-medium flex items-center gap-2 disabled:cursor-not-allowed"
               >
                 {submitting ? (
