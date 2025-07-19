@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import doctorTimeSlotService, { DoctorTimeSlot, TimeSlotRequest, DAY_OF_WEEK } from '../services/doctorTimeSlotService';
+import doctorTimeSlotService, { DoctorTimeSlot, TimeSlotRequest, DAY_OF_WEEK, formatDate, formatShortDate, getDayOfWeekFromDate } from '../services/doctorTimeSlotService';
 
 export interface TimeSlotStats {
   total: number;
   available: number;
   unavailable: number;
   byDay: { [key: number]: number };
+  byDate: { [key: string]: number };
 }
 
 export const useDoctorTimeSlots = (doctorId: string) => {
@@ -27,13 +28,22 @@ export const useDoctorTimeSlots = (doctorId: string) => {
       const response = await doctorTimeSlotService.getTimeSlotsByDoctorId(doctorId);
       
       if (response.success && response.data) {
-        // Sort by day of week and start time
-        const sortedSlots = response.data.sort((a, b) => {
-          if (a.dayOfWeek !== b.dayOfWeek) {
-            return a.dayOfWeek - b.dayOfWeek;
-          }
+        // Filter out slots with null specificDate and normalize time format
+        const validSlots = response.data.filter(slot => slot.specificDate !== null);
+        
+        const normalizedSlots = validSlots.map(slot => ({
+          ...slot,
+          startTime: slot.startTime.includes(':') ? slot.startTime.substring(0, 5) : slot.startTime, // Convert "07:00:00" to "07:00"
+          endTime: slot.endTime.includes(':') ? slot.endTime.substring(0, 5) : slot.endTime
+        }));
+        
+        const sortedSlots = normalizedSlots.sort((a, b) => {
+          const dateCompare = new Date(a.specificDate).getTime() - new Date(b.specificDate).getTime();
+          if (dateCompare !== 0) return dateCompare;
           return a.startTime.localeCompare(b.startTime);
         });
+        
+        console.log('Filtered and normalized slots:', sortedSlots);
         setTimeSlots(sortedSlots);
       } else {
         setError(new Error(response.message));
@@ -51,16 +61,20 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     try {
       setError(null);
       
+      // Auto-set dayOfWeek from specificDate if not provided
+      if (!timeSlotData.dayOfWeek && timeSlotData.specificDate) {
+        timeSlotData.dayOfWeek = getDayOfWeekFromDate(timeSlotData.specificDate);
+      }
+      
       const response = await doctorTimeSlotService.createTimeSlot(timeSlotData);
       
       if (response.success && response.data) {
         setTimeSlots(prev => {
           const newSlots = [...prev, response.data!];
-          // Sort by day of week and start time
+          // Sort by date and start time
           return newSlots.sort((a, b) => {
-            if (a.dayOfWeek !== b.dayOfWeek) {
-              return a.dayOfWeek - b.dayOfWeek;
-            }
+            const dateCompare = new Date(a.specificDate).getTime() - new Date(b.specificDate).getTime();
+            if (dateCompare !== 0) return dateCompare;
             return a.startTime.localeCompare(b.startTime);
           });
         });
@@ -89,11 +103,17 @@ export const useDoctorTimeSlots = (doctorId: string) => {
         return { success: false, message: "Không tìm thấy khung giờ" };
       }
 
+      // Auto-set dayOfWeek from specificDate if specificDate is provided
+      if (timeSlotData.specificDate && !timeSlotData.dayOfWeek) {
+        timeSlotData.dayOfWeek = getDayOfWeekFromDate(timeSlotData.specificDate);
+      }
+
       const updateData = {
         ...timeSlotData,
         startTime: timeSlotData.startTime || oldTimeSlot.startTime,
         endTime: timeSlotData.endTime || oldTimeSlot.endTime,
         dayOfWeek: timeSlotData.dayOfWeek ?? oldTimeSlot.dayOfWeek,
+        specificDate: timeSlotData.specificDate || oldTimeSlot.specificDate,
         isAvailable: timeSlotData.isAvailable ?? oldTimeSlot.isAvailable,
         doctorId: timeSlotData.doctorId || oldTimeSlot.doctorId,
       }
@@ -105,11 +125,10 @@ export const useDoctorTimeSlots = (doctorId: string) => {
           const newSlots = prev.map(slot => 
             slot.id === timeSlotId ? response.data! : slot
           );
-          // Sort by day of week and start time
+          // Sort by date and start time
           return newSlots.sort((a, b) => {
-            if (a.dayOfWeek !== b.dayOfWeek) {
-              return a.dayOfWeek - b.dayOfWeek;
-            }
+            const dateCompare = new Date(a.specificDate).getTime() - new Date(b.specificDate).getTime();
+            if (dateCompare !== 0) return dateCompare;
             return a.startTime.localeCompare(b.startTime);
           });
         });
@@ -124,7 +143,7 @@ export const useDoctorTimeSlots = (doctorId: string) => {
       console.error('Update time slot error:', err);
       return { success: false, message: errorMessage };
     }
-  }, []);
+  }, [timeSlots]);
 
   // Delete time slot
   const deleteTimeSlot = useCallback(async (timeSlotId: string) => {
@@ -174,15 +193,17 @@ export const useDoctorTimeSlots = (doctorId: string) => {
   // Get time slot statistics
   const getTimeSlotStats = useCallback((): TimeSlotStats => {
     const byDay: { [key: number]: number } = {};
+    const byDate: { [key: string]: number } = {};
     
     // Initialize all days to 0
     for (let i = 0; i < 7; i++) {
       byDay[i] = 0;
     }
     
-    // Count slots by day
+    // Count slots by day and date
     timeSlots.forEach(slot => {
       byDay[slot.dayOfWeek] = (byDay[slot.dayOfWeek] || 0) + 1;
+      byDate[slot.specificDate] = (byDate[slot.specificDate] || 0) + 1;
     });
     
     const stats = {
@@ -190,6 +211,7 @@ export const useDoctorTimeSlots = (doctorId: string) => {
       available: timeSlots.filter(slot => slot.isAvailable).length,
       unavailable: timeSlots.filter(slot => !slot.isAvailable).length,
       byDay,
+      byDate,
     };
     
     return stats;
@@ -200,12 +222,36 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     return timeSlots.filter(slot => slot.dayOfWeek === dayOfWeek);
   }, [timeSlots]);
 
+  // Filter time slots by specific date
+  const getTimeSlotsByDate = useCallback((specificDate: string) => {
+    return timeSlots.filter(slot => slot.specificDate === specificDate);
+  }, [timeSlots]);
+
   // Filter time slots by availability
   const getTimeSlotsByAvailability = useCallback((isAvailable: boolean) => {
     return timeSlots.filter(slot => slot.isAvailable === isAvailable);
   }, [timeSlots]);
 
-  // Get time slots grouped by day
+  // Get time slots grouped by date
+  const getTimeSlotsGroupedByDate = useCallback(() => {
+    const grouped: { [key: string]: DoctorTimeSlot[] } = {};
+    
+    timeSlots.forEach(slot => {
+      if (!grouped[slot.specificDate]) {
+        grouped[slot.specificDate] = [];
+      }
+      grouped[slot.specificDate].push(slot);
+    });
+    
+    // Sort each date's slots by start time
+    Object.keys(grouped).forEach(date => {
+      grouped[date].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    });
+    
+    return grouped;
+  }, [timeSlots]);
+
+  // Get time slots grouped by day of week (for legacy compatibility)
   const getTimeSlotsGroupedByDay = useCallback(() => {
     const grouped: { [key: number]: DoctorTimeSlot[] } = {};
     
@@ -216,36 +262,39 @@ export const useDoctorTimeSlots = (doctorId: string) => {
       grouped[slot.dayOfWeek].push(slot);
     });
     
-    // Sort each day's slots by start time
+    // Sort each day's slots by date then start time
     Object.keys(grouped).forEach(day => {
-      grouped[parseInt(day)].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      grouped[parseInt(day)].sort((a, b) => {
+        const dateCompare = new Date(a.specificDate).getTime() - new Date(b.specificDate).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        return a.startTime.localeCompare(b.startTime);
+      });
     });
     
     return grouped;
   }, [timeSlots]);
 
   // Check for time conflicts
-  const hasTimeConflict = useCallback((dayOfWeek: number, startTime: string, endTime: string, excludeId?: string) => {
-    const slotsOnSameDay = timeSlots.filter(slot => 
-      slot.dayOfWeek === dayOfWeek && slot.id !== excludeId
+  const hasTimeConflict = useCallback((dayOfWeek: number, specificDate: string, startTime: string, endTime: string, excludeId?: string) => {
+    const slotsOnSameDate = timeSlots.filter(slot => 
+      slot.specificDate === specificDate && slot.id !== excludeId
     );
 
     // Chuyển đổi thời gian sang phút để so sánh chính xác hơn
-  const toMinutes = (timeStr: string) => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
+    const toMinutes = (timeStr: string) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    };
     
     const newStart = toMinutes(startTime);
     const newEnd = toMinutes(endTime);
     
-
     // Kiểm tra xung đột với các khung giờ khác
-    return slotsOnSameDay.some(slot => {
+    return slotsOnSameDate.some(slot => {
       const existingStart = toMinutes(slot.startTime);
       const existingEnd = toMinutes(slot.endTime);
       
-     // Kiểm tra xem có xung đột không
+      // Kiểm tra xem có xung đột không
       return newStart < existingEnd && newEnd > existingStart;
     });
   }, [timeSlots]);
@@ -272,10 +321,14 @@ export const useDoctorTimeSlots = (doctorId: string) => {
   const getTimeSlotDisplay = useCallback((timeSlot: DoctorTimeSlot) => {
     return {
       dayName: getDayName(timeSlot.dayOfWeek),
+      fullDate: formatDate(timeSlot.specificDate),
+      shortDate: formatShortDate(timeSlot.specificDate),
       timeRange: `${formatTime(timeSlot.startTime)} - ${formatTime(timeSlot.endTime)}`,
       status: timeSlot.isAvailable ? 'Có sẵn' : 'Không có sẵn',
       statusColor: timeSlot.isAvailable ? 'text-green-600' : 'text-red-600',
-      statusBg: timeSlot.isAvailable ? 'bg-green-100' : 'bg-red-100'
+      statusBg: timeSlot.isAvailable ? 'bg-green-100' : 'bg-red-100',
+      isToday: new Date(timeSlot.specificDate).toDateString() === new Date().toDateString(),
+      isPast: new Date(timeSlot.specificDate) < new Date()
     };
   }, [getDayName, formatTime]);
 
@@ -289,11 +342,101 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     return timeSlots.filter(slot => {
       const dayName = getDayName(slot.dayOfWeek).toLowerCase();
       const timeRange = `${slot.startTime} ${slot.endTime}`.toLowerCase();
+      const dateStr = formatShortDate(slot.specificDate).toLowerCase();
       
       return dayName.includes(lowerSearchTerm) || 
-             timeRange.includes(lowerSearchTerm);
+             timeRange.includes(lowerSearchTerm) ||
+             dateStr.includes(lowerSearchTerm);
     });
   }, [timeSlots, getDayName]);
+
+  // Get time slots for a specific week
+  const getTimeSlotsForWeek = useCallback((weekStart: Date) => {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    
+    return timeSlots.filter(slot => {
+      const slotDate = new Date(slot.specificDate);
+      return slotDate >= weekStart && slotDate <= weekEnd;
+    });
+  }, [timeSlots]);
+
+  // Get upcoming time slots
+  const getUpcomingTimeSlots = useCallback((days: number = 7) => {
+    const today = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(today.getDate() + days);
+    
+    return timeSlots.filter(slot => {
+      const slotDate = new Date(slot.specificDate);
+      return slotDate >= today && slotDate <= futureDate;
+    });
+  }, [timeSlots]);
+
+  // Get time slots for a specific month
+  const getTimeSlotsForMonth = useCallback((year: number, month: number) => {
+    return timeSlots.filter(slot => {
+      const slotDate = new Date(slot.specificDate);
+      return slotDate.getFullYear() === year && slotDate.getMonth() === month;
+    });
+  }, [timeSlots]);
+
+  // Get time slots for today
+  const getTodayTimeSlots = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return timeSlots.filter(slot => slot.specificDate === today);
+  }, [timeSlots]);
+
+  // Get time slots for tomorrow
+  const getTomorrowTimeSlots = useCallback(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    return timeSlots.filter(slot => slot.specificDate === tomorrowStr);
+  }, [timeSlots]);
+
+  // Get time slots for a date range
+  const getTimeSlotsForDateRange = useCallback((startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    return timeSlots.filter(slot => {
+      const slotDate = new Date(slot.specificDate);
+      return slotDate >= start && slotDate <= end;
+    });
+  }, [timeSlots]);
+
+  // Get available time slots only
+  const getAvailableTimeSlots = useCallback(() => {
+    return timeSlots.filter(slot => slot.isAvailable);
+  }, [timeSlots]);
+
+  // Get unavailable time slots only
+  const getUnavailableTimeSlots = useCallback(() => {
+    return timeSlots.filter(slot => !slot.isAvailable);
+  }, [timeSlots]);
+
+  // Get past time slots
+  const getPastTimeSlots = useCallback(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return timeSlots.filter(slot => {
+      const slotDate = new Date(slot.specificDate);
+      return slotDate < today;
+    });
+  }, [timeSlots]);
+
+  // Get future time slots
+  const getFutureTimeSlots = useCallback(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return timeSlots.filter(slot => {
+      const slotDate = new Date(slot.specificDate);
+      return slotDate >= today;
+    });
+  }, [timeSlots]);
 
   // Load time slots on component mount or when doctorId changes
   useEffect(() => {
@@ -323,8 +466,20 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     
     // Filtering & Search
     getTimeSlotsByDay,
+    getTimeSlotsByDate,
     getTimeSlotsByAvailability,
     getTimeSlotsGroupedByDay,
+    getTimeSlotsGroupedByDate,
+    getTimeSlotsForWeek,
+    getTimeSlotsForMonth,
+    getUpcomingTimeSlots,
+    getTodayTimeSlots,
+    getTomorrowTimeSlots,
+    getTimeSlotsForDateRange,
+    getAvailableTimeSlots,
+    getUnavailableTimeSlots,
+    getPastTimeSlots,
+    getFutureTimeSlots,
     searchTimeSlots,
     
     // Statistics

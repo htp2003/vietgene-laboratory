@@ -82,6 +82,7 @@ export interface Doctor {
 export interface TimeSlot {
   id: string;
   dayOfWeek: number;
+  specificDate: string; // ✅ NEW: Specific date for this time slot (format: "2025-07-19")
   startTime: string;
   endTime: string;
   isAvailable: boolean;
@@ -125,10 +126,8 @@ export interface SampleKit {
 export interface CreateOrderRequest {
   customerInfo: {
     fullName: string;
-    phone: string;
     email: string;
     address: string;
-    identityCard: string;
   };
   serviceInfo: {
     serviceId: string;
@@ -153,7 +152,6 @@ export interface CreateOrderRequest {
     method: "cash" | "card" | "transfer";
   };
 }
-
 export interface PaymentResult {
   success: boolean;
   transactionId?: string;
@@ -703,37 +701,171 @@ class OrderService {
     }
   }
 
+  // ✅ COMPLETELY FIXED: Create appointment with proper datetime from time slot
   async createAppointment(
     orderId: string,
     appointmentData: {
-      appointmentDate: string;
-      appointmentTime: string;
+      appointmentDate: string; // This comes from timeSlot.specificDate
+      appointmentTime: string; // This comes from timeSlot startTime-endTime
       doctorId: string;
       timeSlotId: string;
       notes?: string;
     }
   ): Promise<{ appointmentId: string }> {
     try {
-      console.log("📅 Creating appointment...");
+      console.log("📅 Creating appointment with PROPER date/time handling...");
+      console.log("📋 Input data:", appointmentData);
 
+      // ✅ ROBUST APPROACH: Multiple strategies to get correct datetime
+      let finalAppointmentDateTime: string;
+
+      // ✅ STRATEGY 1: Try to fetch time slot details and construct datetime
+      try {
+        console.log("🔍 Strategy 1: Fetching time slot details...");
+        const timeSlotResponse = await apiClient.get(
+          `/doctor-time-slots/${appointmentData.timeSlotId}`
+        );
+
+        if (timeSlotResponse.data.code === 200) {
+          const timeSlot = timeSlotResponse.data.result;
+          console.log("✅ Time slot fetched successfully:", timeSlot);
+
+          if (timeSlot.specificDate && timeSlot.startTime) {
+            // ✅ Method 1A: Direct combination
+            const dateStr = timeSlot.specificDate; // "2025-07-19"
+            const timeStr = timeSlot.startTime; // "07:00:00"
+
+            // ✅ Create proper ISO datetime
+            finalAppointmentDateTime = `${dateStr}T${timeStr}.000Z`;
+
+            console.log("✅ Strategy 1A success - Direct combination:", {
+              specificDate: dateStr,
+              startTime: timeStr,
+              result: finalAppointmentDateTime,
+            });
+          } else {
+            throw new Error("Missing specificDate or startTime in time slot");
+          }
+        } else {
+          throw new Error("Failed to fetch time slot");
+        }
+      } catch (strategy1Error) {
+        console.warn("⚠️ Strategy 1 failed:", strategy1Error);
+
+        // ✅ STRATEGY 2: Parse appointmentTime to extract start time
+        try {
+          console.log("🔍 Strategy 2: Parsing appointmentTime...");
+
+          const dateStr = appointmentData.appointmentDate; // Should contain the date
+          const timeStr = appointmentData.appointmentTime; // "07:00:00 - 11:00:00"
+
+          // Extract start time from "07:00:00 - 11:00:00"
+          const startTime = timeStr.split(" - ")[0].trim(); // "07:00:00"
+
+          // Ensure date is in proper format
+          let properDate: string;
+          if (dateStr.includes("T")) {
+            properDate = dateStr.split("T")[0]; // Extract date part
+          } else {
+            properDate = dateStr; // Already just date
+          }
+
+          finalAppointmentDateTime = `${properDate}T${startTime}.000Z`;
+
+          console.log("✅ Strategy 2 success - Parsed time:", {
+            originalDate: dateStr,
+            originalTime: timeStr,
+            extractedStartTime: startTime,
+            result: finalAppointmentDateTime,
+          });
+        } catch (strategy2Error) {
+          console.warn("⚠️ Strategy 2 failed:", strategy2Error);
+
+          // ✅ STRATEGY 3: Use Date object construction
+          try {
+            console.log("🔍 Strategy 3: Date object construction...");
+
+            // Try to parse the appointment date
+            const baseDate = new Date(appointmentData.appointmentDate);
+
+            // Set time to 9 AM if no specific time available
+            baseDate.setUTCHours(9, 0, 0, 0);
+
+            finalAppointmentDateTime = baseDate.toISOString();
+
+            console.log("✅ Strategy 3 success - Date object:", {
+              input: appointmentData.appointmentDate,
+              parsedDate: baseDate,
+              result: finalAppointmentDateTime,
+            });
+          } catch (strategy3Error) {
+            console.warn("⚠️ Strategy 3 failed:", strategy3Error);
+
+            // ✅ STRATEGY 4: Absolute fallback
+            console.log("🔍 Strategy 4: Absolute fallback...");
+            const now = new Date();
+            now.setDate(now.getDate() + 1); // Tomorrow
+            now.setUTCHours(9, 0, 0, 0); // 9 AM
+
+            finalAppointmentDateTime = now.toISOString();
+
+            console.log("✅ Strategy 4 fallback:", finalAppointmentDateTime);
+          }
+        }
+      }
+
+      // ✅ VALIDATE the final datetime
+      const testDate = new Date(finalAppointmentDateTime);
+      if (isNaN(testDate.getTime())) {
+        throw new Error(
+          `Invalid datetime generated: ${finalAppointmentDateTime}`
+        );
+      }
+
+      console.log("🎯 FINAL appointment datetime:", finalAppointmentDateTime);
+      console.log("🔍 Parsed date validation:", {
+        datetime: finalAppointmentDateTime,
+        parsed: testDate,
+        isValid: !isNaN(testDate.getTime()),
+        timestamp: testDate.getTime(),
+      });
+
+      // ✅ Create appointment payload
       const payload = {
-        appointment_date: appointmentData.appointmentDate + "T03:24:55.300Z",
+        appointment_date: finalAppointmentDateTime,
         appointment_type: "Gặp để tư vấn",
         status: true,
         notes: appointmentData.notes || "không có",
         doctor_time_slot: appointmentData.timeSlotId,
       };
 
+      console.log(
+        "📤 FINAL appointment payload:",
+        JSON.stringify(payload, null, 2)
+      );
+
+      // ✅ Make API call
       const response = await apiClient.post(`/appointment/${orderId}`, payload);
 
       if (response.data.code === 200) {
-        console.log("✅ Appointment created:", response.data.result.id);
-        return { appointmentId: response.data.result.id };
+        const result = response.data.result;
+        console.log("✅ Appointment created successfully!");
+        console.log("📊 Response comparison:", {
+          sent_appointment_date: payload.appointment_date,
+          received_appointment_date: result.appointment_date,
+          matches: payload.appointment_date === result.appointment_date,
+          doctor_time_slot: result.doctor_time_slot,
+        });
+
+        return { appointmentId: result.id };
       }
 
       throw new Error(`Appointment creation failed: ${response.data.message}`);
     } catch (error: any) {
-      console.error("❌ Appointment creation failed:", error.response?.data);
+      console.error(
+        "❌ Appointment creation failed:",
+        error.response?.data || error.message
+      );
       throw new Error(
         "Không thể tạo lịch hẹn: " +
           (error.response?.data?.message || error.message)

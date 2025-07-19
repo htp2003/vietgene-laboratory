@@ -2,7 +2,7 @@
   "name": "dna-testing-app",
   "private": true,
   "version": "0.0.0",
-  "proxy" : "https://dna-service-se1857.onrender.com",
+  "proxy": "https://dna-service-se1857.onrender.com",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,8 +20,8 @@
     "@mui/material": "^7.1.1",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/vite": "^4.1.7",
-    "chart.js": "^4.4.9",
     "axios": "^1.10.0",
+    "chart.js": "^4.4.9",
     "dotenv": "^16.5.0",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",

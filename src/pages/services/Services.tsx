@@ -164,7 +164,7 @@ const Services: React.FC = () => {
           <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
             <div className="grid md:grid-cols-2 gap-6">
               {/* Category Filter */}
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Loại xét nghiệm
                 </label>
@@ -190,7 +190,7 @@ const Services: React.FC = () => {
                     </button>
                   ))}
                 </div>
-              </div>
+              </div> */}
 
               {/* Type Filter */}
               <div>
@@ -253,9 +253,9 @@ const Services: React.FC = () => {
                       >
                         {getServiceTypeName(service.service_type)}
                       </span>
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      {/* <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         {getCategoryName(service.test_category)}
-                      </span>
+                      </span> */}
                     </div>
                   </div>
 

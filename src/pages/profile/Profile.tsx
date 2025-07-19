@@ -60,13 +60,13 @@ const Profile: React.FC = () => {
   const [updateLoading, setUpdateLoading] = useState(false);
 
   // 🔍 Auto-detect admin mode từ URL
-  const isAdminMode = location.pathname.startsWith('/admin');
-  
+  const isAdminMode = location.pathname.startsWith("/admin");
+
   // 🎯 Dynamic navigation based on mode
   const getBackPath = () => {
     return isAdminMode ? "/admin" : "/dashboard";
   };
-  
+
   const getBackLabel = () => {
     return isAdminMode ? "Admin Panel" : "Dashboard";
   };
@@ -251,20 +251,35 @@ const Profile: React.FC = () => {
         {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-8">
           {/* Profile Header với color khác nhau cho admin */}
-          <div className={`${isAdminMode 
-            ? 'bg-gradient-to-r from-blue-600 to-blue-700' 
-            : 'bg-gradient-to-r from-red-600 to-red-700'
-          } px-8 py-6`}>
+          <div
+            className={`${
+              isAdminMode
+                ? "bg-gradient-to-r from-blue-600 to-blue-700"
+                : "bg-gradient-to-r from-red-600 to-red-700"
+            } px-8 py-6`}
+          >
             <div className="flex items-center gap-6">
               <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-                <User className={`w-10 h-10 ${isAdminMode ? 'text-blue-600' : 'text-red-600'}`} />
+                <User
+                  className={`w-10 h-10 ${
+                    isAdminMode ? "text-blue-600" : "text-red-600"
+                  }`}
+                />
               </div>
               <div className="text-white">
                 <h2 className="text-2xl font-bold">{profile.full_name}</h2>
-                <p className={`${isAdminMode ? 'text-blue-100' : 'text-red-100'}`}>
+                <p
+                  className={`${
+                    isAdminMode ? "text-blue-100" : "text-red-100"
+                  }`}
+                >
                   @{profile.username}
                 </p>
-                <p className={`${isAdminMode ? 'text-blue-200' : 'text-red-200'} text-sm`}>
+                <p
+                  className={`${
+                    isAdminMode ? "text-blue-200" : "text-red-200"
+                  } text-sm`}
+                >
                   {getRoleName(profile.roles)}
                 </p>
                 {isAdminMode && (
@@ -307,7 +322,7 @@ const Profile: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                {/* <div className="flex items-center gap-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <div>
                     <p className="text-sm text-gray-500">Ngày tạo tài khoản</p>
@@ -315,7 +330,7 @@ const Profile: React.FC = () => {
                       {formatDate(profile.created_at)}
                     </p>
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
@@ -329,9 +344,10 @@ const Profile: React.FC = () => {
                 onClick={() => setActiveTab("profile")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "profile"
-                    ? `${isAdminMode 
-                        ? 'border-blue-500 text-blue-600 bg-blue-50' 
-                        : 'border-red-500 text-red-600 bg-red-50'
+                    ? `${
+                        isAdminMode
+                          ? "border-blue-500 text-blue-600 bg-blue-50"
+                          : "border-red-500 text-red-600 bg-red-50"
                       }`
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
@@ -350,7 +366,7 @@ const Profile: React.FC = () => {
                 <FileText className="w-4 h-4" />
                 Hồ sơ y tế
               </button>
-              <button
+              {/* <button
                 onClick={() => setActiveTab("password")}
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === "password"
@@ -363,7 +379,7 @@ const Profile: React.FC = () => {
               >
                 <Lock className="w-4 h-4" />
                 Đổi mật khẩu
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -377,9 +393,10 @@ const Profile: React.FC = () => {
                   {!isEditing && (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className={`flex items-center gap-2 ${isAdminMode 
-                        ? 'bg-blue-600 hover:bg-blue-700' 
-                        : 'bg-red-600 hover:bg-red-700'
+                      className={`flex items-center gap-2 ${
+                        isAdminMode
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "bg-red-600 hover:bg-red-700"
                       } text-white px-4 py-2 rounded-lg transition-colors`}
                     >
                       <Edit3 className="w-4 h-4" />
@@ -407,9 +424,10 @@ const Profile: React.FC = () => {
                         })}
                         type="text"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
-                          ? 'focus:ring-blue-500 focus:border-blue-500' 
-                          : 'focus:ring-red-500 focus:border-red-500'
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          isAdminMode
+                            ? "focus:ring-blue-500 focus:border-blue-500"
+                            : "focus:ring-red-500 focus:border-red-500"
                         } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } ${
@@ -439,9 +457,10 @@ const Profile: React.FC = () => {
                         })}
                         type="email"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
-                          ? 'focus:ring-blue-500 focus:border-blue-500' 
-                          : 'focus:ring-red-500 focus:border-red-500'
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          isAdminMode
+                            ? "focus:ring-blue-500 focus:border-blue-500"
+                            : "focus:ring-red-500 focus:border-red-500"
                         } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } ${
@@ -470,9 +489,10 @@ const Profile: React.FC = () => {
                         })}
                         type="tel"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
-                          ? 'focus:ring-blue-500 focus:border-blue-500' 
-                          : 'focus:ring-red-500 focus:border-red-500'
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          isAdminMode
+                            ? "focus:ring-blue-500 focus:border-blue-500"
+                            : "focus:ring-red-500 focus:border-red-500"
                         } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } ${
@@ -497,9 +517,10 @@ const Profile: React.FC = () => {
                         {...registerProfile("address")}
                         type="text"
                         disabled={!isEditing}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${isAdminMode 
-                          ? 'focus:ring-blue-500 focus:border-blue-500' 
-                          : 'focus:ring-red-500 focus:border-red-500'
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 ${
+                          isAdminMode
+                            ? "focus:ring-blue-500 focus:border-blue-500"
+                            : "focus:ring-red-500 focus:border-red-500"
                         } transition-colors ${
                           !isEditing ? "bg-gray-50 text-gray-500" : ""
                         } border-gray-300`}
@@ -513,9 +534,10 @@ const Profile: React.FC = () => {
                       <button
                         type="submit"
                         disabled={updateLoading}
-                        className={`flex items-center gap-2 ${isAdminMode 
-                          ? 'bg-blue-600 hover:bg-blue-700' 
-                          : 'bg-red-600 hover:bg-red-700'
+                        className={`flex items-center gap-2 ${
+                          isAdminMode
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-red-600 hover:bg-red-700"
                         } text-white px-6 py-3 rounded-lg transition-colors disabled:opacity-50`}
                       >
                         {updateLoading ? (
@@ -553,7 +575,7 @@ const Profile: React.FC = () => {
               </div>
             )}
 
-            {activeTab === "password" && (
+            {/* {activeTab === "password" && (
               <div>
                 <h3 className="text-xl font-bold text-gray-900 mb-6">
                   Đổi mật khẩu
@@ -692,7 +714,7 @@ const Profile: React.FC = () => {
                   </button>
                 </form>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </div>

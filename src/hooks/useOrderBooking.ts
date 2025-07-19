@@ -9,16 +9,14 @@ import { orderService, Doctor, TimeSlot } from "../services/orderService";
 export interface OrderForm {
   customerInfo: {
     fullName: string;
-    phone: string;
     email: string;
     address: string;
-    identityCard: string;
   };
   serviceInfo: {
     serviceId: string;
     quantity: number;
     collectionMethod: "home" | "facility";
-    appointmentDate: string;
+    appointmentDate: string; // ✅ UPDATED: Now automatically filled from timeSlot.specificDate
     appointmentTime: string;
     doctorId: string;
     timeSlotId: string;
@@ -52,10 +50,8 @@ export const useOrderBooking = () => {
   const [formData, setFormData] = useState<OrderForm>({
     customerInfo: {
       fullName: "",
-      phone: "",
       email: "",
       address: "",
-      identityCard: "",
     },
     serviceInfo: {
       serviceId: id || "",
@@ -178,11 +174,6 @@ export const useOrderBooking = () => {
               currentUser.name ||
               "",
             email: currentUser.email || "",
-            phone:
-              currentUser.phone ||
-              currentUser.telephone ||
-              currentUser.mobile ||
-              "",
           },
           // ✅ Also auto-fill main test person
           participantInfo: {
@@ -414,6 +405,7 @@ export const useOrderBooking = () => {
   };
 
   // Enhanced step validation with detailed logging
+  // Enhanced step validation with detailed logging
   const validateStep = (step: number): boolean => {
     console.log(`🔍 Validating step ${step}...`);
 
@@ -421,17 +413,13 @@ export const useOrderBooking = () => {
       case 1:
         const step1Valid = !!(
           formData.customerInfo.fullName &&
-          formData.customerInfo.phone &&
           formData.customerInfo.email &&
-          formData.customerInfo.address &&
-          formData.customerInfo.identityCard
+          formData.customerInfo.address
         );
         console.log(`Step 1 validation: ${step1Valid}`, {
           fullName: !!formData.customerInfo.fullName,
-          phone: !!formData.customerInfo.phone,
           email: !!formData.customerInfo.email,
           address: !!formData.customerInfo.address,
-          identityCard: !!formData.customerInfo.identityCard,
         });
         return step1Valid;
 
@@ -471,15 +459,20 @@ export const useOrderBooking = () => {
       case 3:
         let step3Valid = true;
         if (formData.serviceInfo.collectionMethod === "facility") {
+          // ✅ UPDATED: No longer require separate appointmentDate input
+          // The appointmentDate is automatically set from timeSlot.specificDate
           step3Valid = !!(
-            formData.serviceInfo.doctorId &&
-            formData.serviceInfo.timeSlotId &&
-            formData.serviceInfo.appointmentDate
+            (
+              formData.serviceInfo.doctorId &&
+              formData.serviceInfo.timeSlotId &&
+              formData.serviceInfo.appointmentDate
+            ) // This comes from timeSlot.specificDate
           );
           console.log(`Step 3 validation (facility): ${step3Valid}`, {
             doctorId: !!formData.serviceInfo.doctorId,
             timeSlotId: !!formData.serviceInfo.timeSlotId,
             appointmentDate: !!formData.serviceInfo.appointmentDate,
+            appointmentDateValue: formData.serviceInfo.appointmentDate,
           });
         } else {
           console.log(
@@ -506,10 +499,8 @@ export const useOrderBooking = () => {
       case 1:
         const missing1 = [];
         if (!formData.customerInfo.fullName) missing1.push("Họ tên");
-        if (!formData.customerInfo.phone) missing1.push("Số điện thoại");
         if (!formData.customerInfo.email) missing1.push("Email");
         if (!formData.customerInfo.address) missing1.push("Địa chỉ");
-        if (!formData.customerInfo.identityCard) missing1.push("CMND/CCCD");
 
         return missing1.length > 0
           ? `Vui lòng điền: ${missing1.join(", ")}`
@@ -559,8 +550,9 @@ export const useOrderBooking = () => {
         if (formData.serviceInfo.collectionMethod === "facility") {
           const missing3 = [];
           if (!formData.serviceInfo.doctorId) missing3.push("bác sĩ");
-          if (!formData.serviceInfo.timeSlotId) missing3.push("khung giờ");
-          if (!formData.serviceInfo.appointmentDate) missing3.push("ngày hẹn");
+          if (!formData.serviceInfo.timeSlotId) missing3.push("lịch hẹn");
+          // ✅ UPDATED: More specific error message since date comes from time slot
+          if (!formData.serviceInfo.appointmentDate) missing3.push("thời gian");
 
           return missing3.length > 0
             ? `Vui lòng chọn: ${missing3.join(", ")}`
@@ -599,10 +591,8 @@ export const useOrderBooking = () => {
       const orderData = {
         customerInfo: {
           fullName: formData.customerInfo.fullName.trim(),
-          phone: formData.customerInfo.phone.replace(/\s+/g, ""),
           email: formData.customerInfo.email.trim().toLowerCase(),
           address: formData.customerInfo.address.trim(),
-          identityCard: formData.customerInfo.identityCard.replace(/\s+/g, ""),
         },
         serviceInfo: {
           serviceId: id!,
@@ -654,7 +644,6 @@ export const useOrderBooking = () => {
         customer: {
           name: orderData.customerInfo.fullName,
           email: orderData.customerInfo.email,
-          phone: orderData.customerInfo.phone,
         },
         collectionMethod: orderData.serviceInfo.collectionMethod,
         appointmentDate: orderData.serviceInfo.appointmentDate,
