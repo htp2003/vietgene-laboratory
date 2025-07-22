@@ -223,8 +223,6 @@ export default function AdminDashboard() {
 
             const orderDetails = orderDetailsData.code === 200 ? orderDetailsData.result : [];
             const participants = participantsData.code === 200 ? participantsData.result : [];
-            console.log('Hello',orderDetails);
-            console.log('Hello123',participants);
 
             // Map services từ order details
             const orderServices = orderDetails.map((detail: OrderDetail) => {
@@ -1101,9 +1099,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
-      </div>
-
-    </div>
+    </div>    
   );
 }
