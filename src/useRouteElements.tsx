@@ -24,19 +24,16 @@ import Profile from "./pages/profile/Profile";
 import News from "./pages/News/News";
 import NewsDetail from "./pages/news/NewsDetail";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
-import AdminDashboard from "./pages/Admin/AdminDashboard";
-
 import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
 import Unauthorized from "./pages/Unauthorized";
 import StaffAppointments from "./pages/staff/appointment";
 import StaffMedicalRecord from "./pages/staff/StaffMedicalRecord";
-
-
-import StaffMedicalRecordPage from "./pages/staff/StaffMedicalRecord";
 import DoctorProfile from "./pages/Doctor/DoctorProfile";
 import DoctorScheduleWrapper from "./components/doctor/DoctorScheduleWrapper";
 import DoctorCertificatesWrapper from "./components/doctor/DoctorCertificatesWrapper";
 import DoctorDashboard from "./pages/Doctor/DoctorDashboard";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+
 
 export default function useRouteElements() {
   const routeElemets = useRoutes([
@@ -166,6 +163,7 @@ export default function useRouteElements() {
     // },
 
     // Admin
+
     {
       path: "/admin",
       element: (
