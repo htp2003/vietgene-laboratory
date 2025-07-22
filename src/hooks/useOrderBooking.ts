@@ -9,16 +9,14 @@ import { orderService, Doctor, TimeSlot } from "../services/orderService";
 export interface OrderForm {
   customerInfo: {
     fullName: string;
-    phone: string;
     email: string;
     address: string;
-    identityCard: string;
   };
   serviceInfo: {
     serviceId: string;
     quantity: number;
     collectionMethod: "home" | "facility";
-    appointmentDate: string;
+    appointmentDate: string; // ✅ UPDATED: Now automatically filled from timeSlot.specificDate
     appointmentTime: string;
     doctorId: string;
     timeSlotId: string;
@@ -52,10 +50,8 @@ export const useOrderBooking = () => {
   const [formData, setFormData] = useState<OrderForm>({
     customerInfo: {
       fullName: "",
-      phone: "",
       email: "",
       address: "",
-      identityCard: "",
     },
     serviceInfo: {
       serviceId: id || "",
@@ -69,7 +65,9 @@ export const useOrderBooking = () => {
     },
     participantInfo: {
       participants: [
-        { name: "", relationship: "Cha", age: "" },
+        // ✅ Person 1: Main test person
+        { name: "", relationship: "Người xét nghiệm chính", age: "" },
+        // ✅ Person 2: First relative
         { name: "", relationship: "Con", age: "" },
       ],
     },
@@ -170,22 +168,34 @@ export const useOrderBooking = () => {
           ...prev,
           customerInfo: {
             ...prev.customerInfo,
-            // Try different field name variations from API
             fullName:
               currentUser.full_name ||
               currentUser.fullName ||
               currentUser.name ||
               "",
             email: currentUser.email || "",
-            // Try to extract phone from various fields
-            phone:
-              currentUser.phone ||
-              currentUser.telephone ||
-              currentUser.mobile ||
-              "",
+          },
+          // ✅ Also auto-fill main test person
+          participantInfo: {
+            participants: prev.participantInfo.participants.map(
+              (participant, index) => {
+                if (index === 0 && currentUser.full_name) {
+                  // Pre-fill main person with user's name
+                  return {
+                    ...participant,
+                    name:
+                      currentUser.full_name ||
+                      currentUser.fullName ||
+                      currentUser.name ||
+                      "",
+                  };
+                }
+                return participant;
+              }
+            ),
           },
         }));
-        console.log("✅ User info auto-filled");
+        console.log("✅ User info auto-filled including main test person");
       } else {
         console.log("ℹ️ No logged in user, form remains empty");
       }
@@ -196,10 +206,15 @@ export const useOrderBooking = () => {
 
   // Helper functions
   const calculateTotal = () => {
-    const basePrice = service?.price || service?.test_price || 2500000; // Fallback price
+    const basePrice = service?.price || service?.test_price || 2500000;
     const quantity = formData.serviceInfo.quantity || 1;
-    const total = basePrice * quantity;
-    console.log(`💰 Calculating total: ${basePrice} x ${quantity} = ${total}`);
+    // ✅ FIXED: Price should be per participant, not per order
+    const participantCount = formData.participantInfo.participants.length;
+    const total = basePrice * participantCount; // Not quantity
+
+    console.log(
+      `💰 Calculating total: ${basePrice} x ${participantCount} participants = ${total}`
+    );
     return total;
   };
 
@@ -223,18 +238,50 @@ export const useOrderBooking = () => {
 
   const addParticipant = () => {
     console.log("➕ Adding new participant");
+
+    // ✅ Smart default relationship based on existing participants
+    const existingRelationships = formData.participantInfo.participants
+      .slice(1) // Skip main person
+      .map((p) => p.relationship);
+
+    let defaultRelationship = "Cha"; // Default to father
+
+    // ✅ Suggest relationships that aren't taken yet
+    const suggestedOrder = [
+      "Cha",
+      "Mẹ",
+      "Con",
+      "Anh/Chị",
+      "Em",
+      "Ông",
+      "Bà",
+      "Cháu",
+    ];
+
+    for (const suggestion of suggestedOrder) {
+      if (!existingRelationships.includes(suggestion)) {
+        defaultRelationship = suggestion;
+        break;
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
       participantInfo: {
         participants: [
           ...prev.participantInfo.participants,
-          { name: "", relationship: "", age: "" },
+          { name: "", relationship: defaultRelationship, age: "" },
         ],
       },
     }));
   };
-
   const removeParticipant = (index: number) => {
+    // ✅ Can't remove main person (index 0) or if only 2 people left
+    if (index === 0) {
+      console.warn("⚠️ Cannot remove main test person");
+      return;
+    }
+
     if (formData.participantInfo.participants.length > 2) {
       console.log(`➖ Removing participant at index ${index}`);
       const newParticipants = formData.participantInfo.participants.filter(
@@ -248,7 +295,6 @@ export const useOrderBooking = () => {
       console.warn("⚠️ Cannot remove participant - minimum 2 required");
     }
   };
-
   // Enhanced doctor selection with better error handling
   const handleDoctorSelect = async (doctorId: string) => {
     try {
@@ -359,6 +405,7 @@ export const useOrderBooking = () => {
   };
 
   // Enhanced step validation with detailed logging
+  // Enhanced step validation with detailed logging
   const validateStep = (step: number): boolean => {
     console.log(`🔍 Validating step ${step}...`);
 
@@ -366,48 +413,66 @@ export const useOrderBooking = () => {
       case 1:
         const step1Valid = !!(
           formData.customerInfo.fullName &&
-          formData.customerInfo.phone &&
           formData.customerInfo.email &&
-          formData.customerInfo.address &&
-          formData.customerInfo.identityCard
+          formData.customerInfo.address
         );
         console.log(`Step 1 validation: ${step1Valid}`, {
           fullName: !!formData.customerInfo.fullName,
-          phone: !!formData.customerInfo.phone,
           email: !!formData.customerInfo.email,
           address: !!formData.customerInfo.address,
-          identityCard: !!formData.customerInfo.identityCard,
         });
         return step1Valid;
 
       case 2:
         const step2Valid =
           formData.participantInfo.participants.length >= 2 &&
-          formData.participantInfo.participants.every(
-            (p) => p.name && p.relationship && p.age
-          );
+          formData.participantInfo.participants.every((p, index) => {
+            // ✅ Main person (index 0) must have relationship set
+            if (index === 0) {
+              return p.name && p.relationship && p.age;
+            }
+            // ✅ Other participants must have all fields + relationship with main person
+            return p.name && p.relationship && p.age;
+          });
+
         console.log(`Step 2 validation: ${step2Valid}`, {
           participantCount: formData.participantInfo.participants.length,
-          allFieldsFilled: formData.participantInfo.participants.map((p) => ({
-            name: !!p.name,
-            relationship: !!p.relationship,
-            age: !!p.age,
-          })),
+          mainPersonComplete: formData.participantInfo.participants[0]
+            ? !!(
+                formData.participantInfo.participants[0].name &&
+                formData.participantInfo.participants[0].relationship &&
+                formData.participantInfo.participants[0].age
+              )
+            : false,
+          allFieldsFilled: formData.participantInfo.participants.map(
+            (p, i) => ({
+              index: i,
+              isMainPerson: i === 0,
+              name: !!p.name,
+              relationship: !!p.relationship,
+              age: !!p.age,
+            })
+          ),
         });
         return step2Valid;
 
       case 3:
         let step3Valid = true;
         if (formData.serviceInfo.collectionMethod === "facility") {
+          // ✅ UPDATED: No longer require separate appointmentDate input
+          // The appointmentDate is automatically set from timeSlot.specificDate
           step3Valid = !!(
-            formData.serviceInfo.doctorId &&
-            formData.serviceInfo.timeSlotId &&
-            formData.serviceInfo.appointmentDate
+            (
+              formData.serviceInfo.doctorId &&
+              formData.serviceInfo.timeSlotId &&
+              formData.serviceInfo.appointmentDate
+            ) // This comes from timeSlot.specificDate
           );
           console.log(`Step 3 validation (facility): ${step3Valid}`, {
             doctorId: !!formData.serviceInfo.doctorId,
             timeSlotId: !!formData.serviceInfo.timeSlotId,
             appointmentDate: !!formData.serviceInfo.appointmentDate,
+            appointmentDateValue: formData.serviceInfo.appointmentDate,
           });
         } else {
           console.log(
@@ -426,6 +491,82 @@ export const useOrderBooking = () => {
       default:
         console.warn(`Unknown step: ${step}`);
         return false;
+    }
+  };
+
+  const getStepSpecificError = (step: number): string => {
+    switch (step) {
+      case 1:
+        const missing1 = [];
+        if (!formData.customerInfo.fullName) missing1.push("Họ tên");
+        if (!formData.customerInfo.email) missing1.push("Email");
+        if (!formData.customerInfo.address) missing1.push("Địa chỉ");
+
+        return missing1.length > 0
+          ? `Vui lòng điền: ${missing1.join(", ")}`
+          : "Vui lòng điền đầy đủ thông tin khách hàng";
+
+      case 2:
+        if (formData.participantInfo.participants.length < 2) {
+          return "Cần ít nhất 2 người tham gia xét nghiệm (bao gồm người xét nghiệm chính)";
+        }
+
+        // Check main person specifically
+        const mainPerson = formData.participantInfo.participants[0];
+        if (
+          !mainPerson?.name ||
+          !mainPerson?.relationship ||
+          !mainPerson?.age
+        ) {
+          const missing = [];
+          if (!mainPerson?.name) missing.push("tên");
+          if (!mainPerson?.relationship) missing.push("vai trò");
+          if (!mainPerson?.age) missing.push("tuổi");
+          return `Người xét nghiệm chính thiếu: ${missing.join(", ")}`;
+        }
+
+        // Check other participants
+        const incompleteParticipants = formData.participantInfo.participants
+          .slice(1) // Skip main person
+          .map((p, i) => {
+            const missing = [];
+            if (!p.name) missing.push("tên");
+            if (!p.relationship) missing.push("mối quan hệ");
+            if (!p.age) missing.push("tuổi");
+            return missing.length > 0
+              ? `Người ${i + 2}: ${missing.join(", ")}`
+              : null;
+          })
+          .filter(Boolean);
+
+        return incompleteParticipants.length > 0
+          ? `Vui lòng điền đầy đủ: ${incompleteParticipants.join("; ")}`
+          : "Vui lòng điền đầy đủ thông tin người tham gia";
+
+      case 3:
+        if (!formData.serviceInfo.collectionMethod) {
+          return "Vui lòng chọn phương thức lấy mẫu";
+        }
+        if (formData.serviceInfo.collectionMethod === "facility") {
+          const missing3 = [];
+          if (!formData.serviceInfo.doctorId) missing3.push("bác sĩ");
+          if (!formData.serviceInfo.timeSlotId) missing3.push("lịch hẹn");
+          // ✅ UPDATED: More specific error message since date comes from time slot
+          if (!formData.serviceInfo.appointmentDate) missing3.push("thời gian");
+
+          return missing3.length > 0
+            ? `Vui lòng chọn: ${missing3.join(", ")}`
+            : "Vui lòng hoàn tất thông tin đặt lịch";
+        }
+        return "Vui lòng hoàn tất thông tin lấy mẫu";
+
+      case 4:
+        return !formData.paymentInfo.method
+          ? "Vui lòng chọn phương thức thanh toán"
+          : "Vui lòng hoàn tất thông tin thanh toán";
+
+      default:
+        return "Vui lòng kiểm tra lại thông tin";
     }
   };
 
@@ -450,10 +591,8 @@ export const useOrderBooking = () => {
       const orderData = {
         customerInfo: {
           fullName: formData.customerInfo.fullName.trim(),
-          phone: formData.customerInfo.phone.replace(/\s+/g, ""),
           email: formData.customerInfo.email.trim().toLowerCase(),
           address: formData.customerInfo.address.trim(),
-          identityCard: formData.customerInfo.identityCard.replace(/\s+/g, ""),
         },
         serviceInfo: {
           serviceId: id!,
@@ -505,7 +644,6 @@ export const useOrderBooking = () => {
         customer: {
           name: orderData.customerInfo.fullName,
           email: orderData.customerInfo.email,
-          phone: orderData.customerInfo.phone,
         },
         collectionMethod: orderData.serviceInfo.collectionMethod,
         appointmentDate: orderData.serviceInfo.appointmentDate,
@@ -564,6 +702,7 @@ export const useOrderBooking = () => {
     getDayName,
     validateStep,
     calculateTotal,
+    getStepSpecificError,
     handleSubmit,
   };
 };

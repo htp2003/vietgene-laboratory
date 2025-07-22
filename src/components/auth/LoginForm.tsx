@@ -98,7 +98,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit }) => {
         // ✅ Navigate to dashboard
         const userData = JSON.parse(localStorage.getItem("user") || "{}");
         const roles = userData.roles || [];
-        const role = Array.isArray(roles) && roles.length > 0 ? roles[0].name : "ROLE_CUSTOMER";
+        const role =
+          Array.isArray(roles) && roles.length > 0
+            ? roles[0].name
+            : "ROLE_CUSTOMER";
         setTimeout(() => {
           switch (role) {
             case "ROLE_ADMIN":
@@ -288,7 +291,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit }) => {
           </Link>
         </div>
 
-        {/* Demo Info */}
+        {/* Demo Info
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800 text-center">
             <strong>Demo:</strong> Username: admin, Password: 123456
@@ -296,7 +299,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSubmit }) => {
           <p className="text-xs text-blue-600 text-center mt-1">
             Hoặc sử dụng tài khoản thật từ database
           </p>
-        </div>
+        </div> */}
       </div>
 
       {/* Toast Container */}

@@ -56,9 +56,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
         password: data.password.trim(),
         email: data.email.trim(),
         full_name: data.fullName.trim(),
-        dob: data.dob || new Date().toISOString().split('T')[0],
-      }
-      
+        dob: data.dob || new Date().toISOString().split("T")[0],
+      };
+
       const result = await userService.createUser(apiData);
       if (result.success && result.data) {
         localStorage.setItem("user", JSON.stringify(result.data));
@@ -78,9 +78,9 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
       setTimeout(() => navigate("/login"), 1500);
     } catch (error: any) {
       console.error("❌ Registration error:", error);
-      
+
       let errorMessage = "Có lỗi xảy ra, vui lòng thử lại!";
-      
+
       if (error.response) {
         // Handle specific API errors
         switch (error.response.status) {
@@ -97,7 +97,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
             errorMessage = error.response.data?.message || errorMessage;
         }
       } else if (error.request) {
-        errorMessage = "Không thể kết nối đến server, vui lòng kiểm tra kết nối mạng!";
+        errorMessage =
+          "Không thể kết nối đến server, vui lòng kiểm tra kết nối mạng!";
       }
 
       toast.error(errorMessage, {
@@ -108,7 +109,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
       setIsLoading(false);
     }
   };
-      
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center py-12 px-4">
@@ -240,8 +240,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
               )}
             </div>
 
-                        {/* Date of Birth */}
-                        <div>
+            {/* Date of Birth */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Ngày sinh
               </label>
@@ -250,20 +250,20 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
                   {...register("dob", {
                     validate: (value) => {
                       if (!value) return true; // Optional field
-                      
+
                       const date = new Date(value);
                       const today = new Date();
                       const minDate = new Date();
                       minDate.setFullYear(today.getFullYear() - 100);
-                      
+
                       if (date > today) {
                         return "Ngày sinh không thể trong tương lai";
                       }
-                      
+
                       if (date < minDate) {
                         return "Ngày sinh không hợp lệ";
                       }
-                      
+
                       return true;
                     },
                   })}
@@ -478,12 +478,12 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSubmit }) => {
         </div>
 
         {/* Demo Info */}
-        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        {/* <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800 text-center">
             <strong>Lưu ý:</strong> Email/username: admin@vietgene.vn, admin,
             test@gmail.com, testuser đã tồn tại
           </p>
-        </div>
+        </div> */}
       </div>
 
       {/* Toast Container */}

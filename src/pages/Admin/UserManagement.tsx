@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FaPlus, FaUsers, FaUserShield, FaUserTie } from 'react-icons/fa'
+import { FaPlus, FaUserMd, FaUsers, FaUserShield, FaUserTie } from 'react-icons/fa'
 import { useUsers } from '../../hooks/useUsers'
 import { User } from '../../services/userService'
 import UserModal from '../../components/admin/user/UserModal'
@@ -125,6 +125,18 @@ export default function UserManagement() {
             </div>
           </div>
         </div>
+
+           <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+              <FaUserMd  size={24} />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Bác sĩ</p>
+              <p className="text-2xl font-semibold text-gray-900">{stats.staff}</p>
+            </div>
+          </div>
+        </div>
         
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center">
@@ -157,6 +169,7 @@ export default function UserManagement() {
               <option value="">Tất cả vai trò</option>
               <option value="customer">Khách hàng</option>
               <option value="staff">Nhân viên</option>
+               <option value="doctor">Bác sĩ</option>
               <option value="admin">Quản trị viên</option>
             </select>
           </div>

@@ -975,6 +975,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
       )}
 
       {/* Order Detail Modal */}
@@ -1100,6 +1101,9 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      </div>
+
     </div>
   );
 }

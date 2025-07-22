@@ -1,5 +1,5 @@
-import React from 'react';
-import { FaTimes, FaNewspaper, FaImage, FaEdit, FaEye } from 'react-icons/fa';
+import React, { useRef } from 'react';
+import { FaTimes, FaNewspaper, FaImage, FaEdit, FaEye, FaTrash, FaUpload } from 'react-icons/fa';
 
 interface BlogModalProps {
   isOpen: boolean;
@@ -8,10 +8,12 @@ interface BlogModalProps {
   form: {
     title: string;
     content: string;
+    imageFile?: File | null;
     imageUrl: string;
-    status?: 'draft' | 'published'; // ✅ Removed 'pending'
+    status?: 'draft' | 'published';
   };
   onFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  onFileChange: (file: File | null) => void;
   categories: any[]; // Not used in current implementation
   editing: boolean;
   submitting?: boolean;
@@ -23,9 +25,11 @@ const BlogModal: React.FC<BlogModalProps> = ({
   onSubmit,
   form,
   onFormChange,
+  onFileChange,
   editing,
   submitting = false
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   if (!isOpen) return null;
 
   const handleClose = () => {
@@ -33,6 +37,31 @@ const BlogModal: React.FC<BlogModalProps> = ({
       onClose();
     }
   };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    onFileChange(file);
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveImage = () => {
+    onFileChange(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const getImagePreviewUrl = () => {
+    if (form.imageFile) {
+      return URL.createObjectURL(form.imageFile);
+    }
+    return form.imageUrl || '';
+  };
+
+  const hasImage = form.imageFile || form.imageUrl
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -84,42 +113,96 @@ const BlogModal: React.FC<BlogModalProps> = ({
               </p>
             </div>
 
-            {/* Image URL */}
+            {/* Image Upload */}
             <div>
               <label className=" text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                 <FaImage size={14} />
                 Hình ảnh đại diện
               </label>
+
+              {/* Hidden file input */}
               <input
-                type="url"
-                name="imageUrl"
-                value={form.imageUrl}
-                onChange={onFormChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder="https://example.com/image.jpg"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
                 disabled={submitting}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                URL hình ảnh sẽ hiển thị như thumbnail của bài viết
-              </p>
-              
-              {/* Image Preview */}
-              {form.imageUrl && (
-                <div className="mt-3">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Xem trước:</p>
-                  <div className="relative inline-block">
-                    <img
-                      src={form.imageUrl}
-                      alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                      }}
-                    />
+
+              {/* Upload area */}
+              <div className="space-y-3">
+                {!hasImage ? (
+                  <div
+                    onClick={handleUploadClick}
+                    className="w-full px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    <div className="text-center">
+                      <FaUpload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-600 mb-1">
+                        Nhấp để chọn hình ảnh
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        PNG, JPG, GIF tối đa 10MB
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="relative">
+                    <div className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      {/* Image preview */}
+                      <div className="relative">
+                        <img
+                          src={getImagePreviewUrl()}
+                          alt="Preview"
+                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      </div>
+
+                      {/* File info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {form.imageFile ? form.imageFile.name : 'Hình ảnh hiện tại'}
+                        </p>
+                        {form.imageFile && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {(form.imageFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={handleUploadClick}
+                            disabled={submitting}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                          >
+                            Thay đổi
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveImage}
+                            disabled={submitting}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <FaTrash size={10} />
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-500 mt-2">
+                Hình ảnh sẽ hiển thị như thumbnail của bài viết
+              </p>
             </div>
 
             {/* Content */}

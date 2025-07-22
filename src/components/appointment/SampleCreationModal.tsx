@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   User,
@@ -11,7 +11,8 @@ import {
   FileText,
   Users,
   Save,
-  Loader2
+  Loader2,
+  ChevronUp
 } from 'lucide-react';
 
 import { Appointment } from '../../types/appointment';
@@ -23,6 +24,7 @@ interface SampleCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSamplesCreated: (appointmentId: string) => Promise<void>;
+  triggerElement?: HTMLElement | null; // Element that triggered the modal
 }
 
 interface SampleFormData {
@@ -44,7 +46,8 @@ const SampleCreationModal: React.FC<SampleCreationModalProps> = ({
   appointment,
   isOpen,
   onClose,
-  onSamplesCreated
+  onSamplesCreated,
+  triggerElement
 }) => {
   const [participants, setParticipants] = useState<OrderParticipant[]>([]);
   const [sampleKits, setSampleKits] = useState<SampleKit[]>([]);
@@ -53,6 +56,87 @@ const SampleCreationModal: React.FC<SampleCreationModalProps> = ({
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [modalPosition, setModalPosition] = useState({ 
+    top: 0, 
+    left: 0, 
+    width: 0,
+    positioning: 'center' as 'center' | 'below-card' 
+  });
+  
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // ✅ Tính toán vị trí modal dựa trên trigger element
+  useEffect(() => {
+    if (isOpen) {
+      if (triggerElement) {
+        // ✅ Position below the card
+        const rect = triggerElement.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        // ✅ Calculate available space
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const modalHeight = 600; // Estimated modal height
+        
+        let top = rect.bottom + scrollTop + 8; // 8px gap
+        let positioning: 'center' | 'below-card' = 'below-card';
+        
+        // ✅ If not enough space below, check if we should center instead
+        if (spaceBelow < modalHeight && spaceAbove < modalHeight) {
+          // ✅ Center the modal if no good position near card
+          top = scrollTop + (window.innerHeight - modalHeight) / 2;
+          positioning = 'center';
+        } else if (spaceBelow < modalHeight) {
+          // ✅ Position above the card
+          top = rect.top + scrollTop - modalHeight - 8;
+        }
+        
+        setModalPosition({
+          top: Math.max(top, scrollTop + 20), // Ensure minimum top margin
+          left: Math.max(rect.left + scrollLeft, 20), // Ensure minimum left margin
+          width: Math.max(rect.width, 800), // Minimum width
+          positioning
+        });
+      } else {
+        // ✅ Fallback to center if no trigger element
+        setModalPosition({
+          top: window.pageYOffset + 100,
+          left: (window.innerWidth - 800) / 2,
+          width: 800,
+          positioning: 'center'
+        });
+      }
+    }
+  }, [isOpen, triggerElement]);
+
+  // ✅ Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (isOpen && triggerElement) {
+        // Recalculate position on resize
+        const rect = triggerElement.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        setModalPosition(prev => ({
+          ...prev,
+          top: rect.bottom + scrollTop + 8,
+          left: Math.max(rect.left + scrollLeft, 20),
+        }));
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('scroll', handleResize);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('scroll', handleResize);
+      };
+    }
+  }, [isOpen, triggerElement]);
 
   // Load data when modal opens
   useEffect(() => {
@@ -184,51 +268,60 @@ const SampleCreationModal: React.FC<SampleCreationModalProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!validateForms()) {
-      setError('Vui lòng kiểm tra và điền đầy đủ thông tin bắt buộc');
-      return;
-    }
+  if (!validateForms()) {
+    setError('Vui lòng kiểm tra và điền đầy đủ thông tin bắt buộc');
+   console.log('💾 Creating samples for appointment:', appointment?.id);
+  console.log('📋 Appointment data:', {
+    orderId: appointment?.orderId,
+    userId: appointment?.userId,
+    rawData: appointment?.rawData
+  });
+    return;
+  }
 
-    try {
-      setLoading(true);
-      setError('');
+  try {
+    setLoading(true);
+    setError('');
 
-      console.log('💾 Creating samples for appointment:', appointment?.id);
+    console.log('💾 Creating samples for appointment:', appointment?.id);
 
-      // Create all samples
-      const samplePromises = sampleForms.map(async (form) => {
-        const sampleData: SampleRequest = {
-          sample_code: form.sample_code.trim(),
-          sample_type: form.sample_type.trim(),
-          collection_date: form.collection_date,
-          received_date: form.received_date,
-          status: form.status,
-          shipping_tracking: form.shipping_tracking,
-          notes: form.notes.trim(),
-          sample_quality: form.sample_quality.trim(),
-          sampleKitsId: form.sampleKitId
-        };
+    // Create all samples
+    const samplePromises = sampleForms.map(async (form, index) => {
+      const sampleData: SampleRequest = {
+        sample_code: form.sample_code.trim(),
+        sample_type: form.sample_type.trim(),
+        collection_date: form.collection_date,
+        received_date: form.received_date,
+        status: form.status,
+        shipping_tracking: form.shipping_tracking,
+        notes: form.notes.trim(),
+        sample_quality: form.sample_quality.trim(),
+        sampleKitsId: form.sampleKitId,
+        ordersId: appointment?.orderId || '',
 
-        return SampleService.createSample(sampleData);
-      });
+      };
+      console.log(`📦 Sample ${index + 1} data:`, sampleData);
+      return SampleService.createSample(sampleData);
+      
+    });
 
-      await Promise.all(samplePromises);
+    await Promise.all(samplePromises);
 
-      console.log('✅ All samples created successfully');
+    console.log('✅ All samples created successfully');
 
-      // Notify parent component
-      await onSamplesCreated(appointment!.id);
+    // Notify parent component
+    await onSamplesCreated(appointment!.id);
 
-      // Close modal
-      onClose();
+    // Close modal
+    onClose();
 
-    } catch (error: any) {
-      console.error('❌ Error creating samples:', error);
-      setError(error.message || 'Có lỗi xảy ra khi tạo mẫu xét nghiệm');
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error: any) {
+    console.error('❌ Error creating samples:', error);
+    setError(error.message || 'Có lỗi xảy ra khi tạo mẫu xét nghiệm');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleClose = () => {
     if (!loading) {
@@ -236,252 +329,306 @@ const SampleCreationModal: React.FC<SampleCreationModalProps> = ({
     }
   };
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleClose();
+    }
+  };
+
   if (!isOpen || !appointment) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Tạo Mẫu Xét Nghiệm</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Lịch hẹn: {appointment.customerName} - {appointment.id.substring(0, 8)}...
-            </p>
+    <>
+      {/* ✅ Fixed Backdrop với blur effect */}
+      <div 
+        className="absolute z-40 transition-all duration-200"
+        onClick={handleBackdropClick}
+      />
+      
+      {/* ✅ Positioned Modal with better positioning logic */}
+      <div
+        ref={modalRef}
+        className="absolute z-50 transition-all duration-200 ease-out"
+        style={{
+          top: `${modalPosition.top}px`,
+          left: `${modalPosition.left}px`,
+          width: `${Math.min(modalPosition.width, window.innerWidth - 40)}px`, // Respect screen width
+          maxWidth: 'calc(100vw - 40px)',
+          maxHeight: 'calc(100vh - 40px)',
+          // ✅ Ensure modal doesn't go off screen
+          transform: modalPosition.left + modalPosition.width > window.innerWidth 
+            ? `translateX(-${(modalPosition.left + modalPosition.width) - window.innerWidth + 20}px)` 
+            : 'none'
+        }}
+      >
+        {/* ✅ Arrow pointing to the trigger card - only show if positioned below card */}
+        {modalPosition.positioning === 'below-card' && (
+          <div 
+            className="absolute -top-2 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45 z-10"
+            style={{
+              left: triggerElement ? Math.min(32, triggerElement.getBoundingClientRect().width / 2) : 32
+            }}
+          />
+        )}
+        
+        <div 
+          className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden"
+          style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid #e5e7eb'
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <TestTube className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Tạo Mẫu Xét Nghiệm</h2>
+                <p className="text-sm text-gray-600">
+                  {appointment.customerName} - {appointment.id.substring(0, 8)}...
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleClose}
+              disabled={loading}
+              className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-white/50 transition-colors disabled:opacity-50"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <button
-            onClick={handleClose}
-            disabled={loading}
-            className="text-gray-400 hover:text-gray-600 p-1 transition-colors disabled:opacity-50"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Error Message */}
-          {error && (
-            <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
-              <div className="flex">
-                <AlertCircle className="w-5 h-5 text-red-400 mr-3 mt-0.5" />
-                <div>
-                  <p className="text-red-700 font-medium">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {loadingData ? (
-            <div className="text-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-              <p className="text-gray-600">Đang tải thông tin người tham gia và kit xét nghiệm...</p>
-            </div>
-          ) : (
-            <>
-              {/* Summary Info */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-blue-900">Tổng quan</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-blue-700 font-medium">Số người tham gia:</span>
-                    <span className="text-blue-900 ml-2">{participants.length}</span>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium">Số kit có sẵn:</span>
-                    <span className="text-blue-900 ml-2">{sampleKits.length}</span>
-                  </div>
-                  <div>
-                    <span className="text-blue-700 font-medium">Mẫu sẽ tạo:</span>
-                    <span className="text-blue-900 ml-2">{sampleForms.length}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Sample Forms */}
-              <div className="space-y-6">
-                {sampleForms.map((form, index) => (
-                  <div key={form.participantId} className="border border-gray-200 rounded-lg p-6">
-                    {/* Participant Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-blue-600 font-semibold text-sm">{index + 1}</span>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{form.participantName}</h4>
-                          <p className="text-sm text-gray-500">Kit: {form.kitCode}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Package className="w-4 h-4" />
-                        <span>ID Kit: {form.sampleKitId.substring(0, 8)}...</span>
-                      </div>
-                    </div>
-
-                    {/* Form Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {/* Sample Code - Required */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Mã mẫu <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={form.sample_code}
-                          onChange={(e) => updateSampleForm(index, 'sample_code', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            validationErrors[`${index}_sample_code`] ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          placeholder="Nhập mã mẫu"
-                          disabled={loading}
-                        />
-                        {validationErrors[`${index}_sample_code`] && (
-                          <p className="text-red-500 text-xs mt-1">{validationErrors[`${index}_sample_code`]}</p>
-                        )}
-                      </div>
-
-                      {/* Sample Type - Required */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Loại mẫu <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={form.sample_type}
-                          onChange={(e) => updateSampleForm(index, 'sample_type', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            validationErrors[`${index}_sample_type`] ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          placeholder="VD: blood, saliva, hair, tissue"
-                          disabled={loading}
-                        />
-                        {validationErrors[`${index}_sample_type`] && (
-                          <p className="text-red-500 text-xs mt-1">{validationErrors[`${index}_sample_type`]}</p>
-                        )}
-                      </div>
-
-                      {/* Sample Quality - Required */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Chất lượng mẫu <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={form.sample_quality}
-                          onChange={(e) => updateSampleForm(index, 'sample_quality', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            validationErrors[`${index}_sample_quality`] ? 'border-red-300' : 'border-gray-300'
-                          }`}
-                          placeholder="VD: good, fair, poor"
-                          disabled={loading}
-                        />
-                        {validationErrors[`${index}_sample_quality`] && (
-                          <p className="text-red-500 text-xs mt-1">{validationErrors[`${index}_sample_quality`]}</p>
-                        )}
-                      </div>
-
-                      {/* Collection Date */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Ngày thu thập</label>
-                        <input
-                          type="datetime-local"
-                          value={form.collection_date.substring(0, 16)}
-                          onChange={(e) => updateSampleForm(index, 'collection_date', new Date(e.target.value).toISOString())}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          disabled={loading}
-                        />
-                      </div>
-
-                      {/* Received Date */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhận</label>
-                        <input
-                          type="datetime-local"
-                          value={form.received_date.substring(0, 16)}
-                          onChange={(e) => updateSampleForm(index, 'received_date', new Date(e.target.value).toISOString())}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          disabled={loading}
-                        />
-                      </div>
-
-                      {/* Shipping Tracking */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tracking</label>
-                        <input
-                          type="text"
-                          value={form.shipping_tracking}
-                          onChange={(e) => updateSampleForm(index, 'shipping_tracking', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Mã tracking"
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Notes */}
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                      <textarea
-                        value={form.notes}
-                        onChange={(e) => updateSampleForm(index, 'notes', e.target.value)}
-                        rows={3}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Ghi chú về mẫu xét nghiệm..."
-                        disabled={loading}
-                      />
+          {/* Content with custom scrollbar */}
+          <div className="max-h-[60vh] overflow-y-auto" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            <div className="p-6 space-y-6">
+              {/* Error Message */}
+              {error && (
+                <div className="p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
+                  <div className="flex">
+                    <AlertCircle className="w-5 h-5 text-red-400 mr-3 mt-0.5" />
+                    <div>
+                      <p className="text-red-700 font-medium">{error}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+                </div>
+              )}
 
-        {/* Actions */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-          <button
-            onClick={handleClose}
-            disabled={loading}
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            Hủy
-          </button>
-
-          <div className="flex items-center gap-3">
-            {/* Sample Count Info */}
-            <div className="text-sm text-gray-600">
-              Sẽ tạo <span className="font-semibold text-blue-600">{sampleForms.length}</span> mẫu xét nghiệm
-            </div>
-
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmit}
-              disabled={loading || loadingData || sampleForms.length === 0}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang tạo mẫu...</span>
-                </>
+              {/* Loading State */}
+              {loadingData ? (
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+                  <p className="text-gray-600">Đang tải thông tin người tham gia và kit xét nghiệm...</p>
+                </div>
               ) : (
                 <>
-                  <Save className="w-4 h-4" />
-                  <span>Tạo mẫu xét nghiệm</span>
+                  {/* Summary Info */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <h3 className="font-semibold text-blue-900">Tổng quan</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="bg-white/70 rounded-lg p-3">
+                        <span className="text-blue-700 font-medium block">Người tham gia</span>
+                        <span className="text-blue-900 text-lg font-bold">{participants.length}</span>
+                      </div>
+                      <div className="bg-white/70 rounded-lg p-3">
+                        <span className="text-blue-700 font-medium block">Kit có sẵn</span>
+                        <span className="text-blue-900 text-lg font-bold">{sampleKits.length}</span>
+                      </div>
+                      <div className="bg-white/70 rounded-lg p-3">
+                        <span className="text-blue-700 font-medium block">Mẫu sẽ tạo</span>
+                        <span className="text-blue-900 text-lg font-bold">{sampleForms.length}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sample Forms */}
+                  <div className="space-y-4">
+                    {sampleForms.map((form, index) => (
+                      <div key={form.participantId} className="border border-gray-200 rounded-xl p-5 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                        {/* Participant Header */}
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
+                              <span className="text-white font-semibold text-sm">{index + 1}</span>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-gray-900">{form.participantName}</h4>
+                              <p className="text-sm text-gray-500">Kit: {form.kitCode}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600 bg-white rounded-lg px-3 py-1 border">
+                            <Package className="w-4 h-4" />
+                            <span>ID: {form.sampleKitId.substring(0, 8)}...</span>
+                          </div>
+                        </div>
+
+                        {/* Form Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {/* Sample Code - Required */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Mã mẫu <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={form.sample_code}
+                              onChange={(e) => updateSampleForm(index, 'sample_code', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                validationErrors[`${index}_sample_code`] ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
+                              }`}
+                              placeholder="Nhập mã mẫu"
+                              disabled={loading}
+                            />
+                            {validationErrors[`${index}_sample_code`] && (
+                              <p className="text-red-500 text-xs mt-1">{validationErrors[`${index}_sample_code`]}</p>
+                            )}
+                          </div>
+
+                          {/* Sample Type - Required */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Loại mẫu <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={form.sample_type}
+                              onChange={(e) => updateSampleForm(index, 'sample_type', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                validationErrors[`${index}_sample_type`] ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
+                              }`}
+                              placeholder="VD: blood, saliva, hair, tissue"
+                              disabled={loading}
+                            />
+                            {validationErrors[`${index}_sample_type`] && (
+                              <p className="text-red-500 text-xs mt-1">{validationErrors[`${index}_sample_type`]}</p>
+                            )}
+                          </div>
+
+                          {/* Sample Quality - Required */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Chất lượng mẫu <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={form.sample_quality}
+                              onChange={(e) => updateSampleForm(index, 'sample_quality', e.target.value)}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                                validationErrors[`${index}_sample_quality`] ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'
+                              }`}
+                              placeholder="VD: good, fair, poor"
+                              disabled={loading}
+                            />
+                            {validationErrors[`${index}_sample_quality`] && (
+                              <p className="text-red-500 text-xs mt-1">{validationErrors[`${index}_sample_quality`]}</p>
+                            )}
+                          </div>
+
+                          {/* Collection Date */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày thu thập</label>
+                            <input
+                              type="datetime-local"
+                              value={form.collection_date.substring(0, 16)}
+                              onChange={(e) => updateSampleForm(index, 'collection_date', new Date(e.target.value).toISOString())}
+                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                              disabled={loading}
+                            />
+                          </div>
+
+                          {/* Received Date */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhận</label>
+                            <input
+                              type="datetime-local"
+                              value={form.received_date.substring(0, 16)}
+                              onChange={(e) => updateSampleForm(index, 'received_date', new Date(e.target.value).toISOString())}
+                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                              disabled={loading}
+                            />
+                          </div>
+
+                          {/* Shipping Tracking */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tracking</label>
+                            <input
+                              type="text"
+                              value={form.shipping_tracking}
+                              onChange={(e) => updateSampleForm(index, 'shipping_tracking', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                              placeholder="Mã tracking"
+                              disabled={loading}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                          <textarea
+                            value={form.notes}
+                            onChange={(e) => updateSampleForm(index, 'notes', e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-2 border border-gray-300 bg-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
+                            placeholder="Ghi chú về mẫu xét nghiệm..."
+                            disabled={loading}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </>
               )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50/50">
+            <button
+              onClick={handleClose}
+              disabled={loading}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
+            >
+              Hủy
             </button>
+
+            <div className="flex items-center gap-4">
+              {/* Sample Count Info */}
+              <div className="text-sm text-gray-600 bg-white rounded-lg px-3 py-2 border">
+                Sẽ tạo <span className="font-semibold text-blue-600">{sampleForms.length}</span> mẫu xét nghiệm
+              </div>
+
+              {/* Submit Button */}
+              <button
+                onClick={handleSubmit}
+                disabled={loading || loadingData || sampleForms.length === 0}
+                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang tạo mẫu...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Tạo mẫu xét nghiệm</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

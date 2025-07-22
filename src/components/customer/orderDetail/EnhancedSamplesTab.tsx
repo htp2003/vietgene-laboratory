@@ -13,12 +13,12 @@ import {
   Building,
 } from "lucide-react";
 
-// ✅ V9 API Interfaces
+// ✅ Simplified Interfaces
 interface SampleKit {
   id: string;
   kit_code: string;
   kit_type: string;
-  status: string;
+  status: string; // Keep simple status
   shipper_data?: string;
   delivered_date?: string | null;
   tracking_number?: number;
@@ -27,9 +27,9 @@ interface SampleKit {
   instruction?: string;
   createdAt: string;
   updatedAt?: string;
-  samplesId: string; // V9: Single sample ID reference
-  userId: string; // V9: User who owns this kit
-  orderId: string; // V9: Direct order reference
+  samplesId: string;
+  userId: string;
+  orderId: string;
 }
 
 interface Sample {
@@ -39,30 +39,18 @@ interface Sample {
   collection_method: string;
   collection_date?: string;
   received_date?: string;
-  status: string;
+  status: string; // 🚀 SIMPLIFIED: Only basic status
   shipping_tracking?: string;
   notes?: string;
   sample_quality?: string;
-  userId: string; // V9: User who owns this sample
-  sampleKitsId: string; // V9: Single kit ID reference
+  userId: string;
+  sampleKitsId: string;
 }
 
 interface KitsAndSamplesSummary {
   totalKits: number;
-  kitsPreparing: number;
-  kitsShipped: number;
-  kitsDelivered: number;
-  kitsExpired: number;
   totalSamples: number;
-  samplesCollected: number;
-  samplesReceived: number;
-  samplesCompleted: number;
-  samplesAnalyzing: number;
-  // Legacy fields for compatibility
-  total: number;
-  collected: number;
-  received: number;
-  completed: number;
+  // 🚀 REMOVED: Complex counting
 }
 
 interface EnhancedSamplesTabProps {
@@ -98,94 +86,87 @@ const formatDateTime = (dateString: string): string => {
   }
 };
 
+// 🚀 SIMPLIFIED: Basic kit status only
 const getKitStatusInfo = (status: string) => {
   const statusMap: Record<string, any> = {
-    ordered: {
-      label: "Đã đặt hàng",
-      color: "bg-blue-100 text-blue-800",
-      icon: Package,
-      description: "Kit đã được đặt hàng",
-    },
+    // Simple states only
     preparing: {
       label: "Đang chuẩn bị",
-      color: "bg-yellow-100 text-yellow-800",
+      color: "bg-blue-100 text-blue-800",
       icon: Package,
-      description: "Kit đang được chuẩn bị",
     },
     shipped: {
       label: "Đã gửi",
-      color: "bg-blue-100 text-blue-800",
+      color: "bg-purple-100 text-purple-800",
       icon: Truck,
-      description: "Kit đã được gửi đi",
     },
     delivered: {
       label: "Đã giao",
       color: "bg-green-100 text-green-800",
       icon: CheckCircle,
-      description: "Kit đã được giao thành công",
-    },
-    expired: {
-      label: "Hết hạn",
-      color: "bg-red-100 text-red-800",
-      icon: AlertCircle,
-      description: "Kit đã hết hạn sử dụng",
-    },
-    ready: {
-      label: "Sẵn sàng",
-      color: "bg-green-100 text-green-800",
-      icon: CheckCircle,
-      description: "Kit sẵn sàng để sử dụng",
     },
   };
   return statusMap[status] || statusMap.preparing;
 };
 
+// 🚀 SIMPLIFIED: Sample status matching staff pattern
 const getSampleStatusInfo = (status: string) => {
   const statusMap: Record<string, any> = {
-    pending: {
-      label: "Chờ xử lý",
-      color: "bg-yellow-100 text-yellow-800",
-      icon: Clock,
-      description: "Đang chờ xử lý",
-    },
-    collected: {
-      label: "Đã thu mẫu",
+    // 🎯 MATCH STAFF PATTERN: RECEIVED → PROCESSING → COMPLETED
+    RECEIVED: {
+      label: "Mẫu đã được nhận",
       color: "bg-blue-100 text-blue-800",
-      icon: TestTube,
-      description: "Mẫu đã được thu thập",
-    },
-    shipped: {
-      label: "Đang vận chuyển",
-      color: "bg-purple-100 text-purple-800",
-      icon: Truck,
-      description: "Mẫu đang được vận chuyển về lab",
+      icon: CheckCircle,
     },
     received: {
-      label: "Đã nhận",
-      color: "bg-indigo-100 text-indigo-800",
+      label: "Mẫu đã được nhận",
+      color: "bg-blue-100 text-blue-800",
       icon: CheckCircle,
-      description: "Lab đã nhận được mẫu",
     },
-    analyzing: {
-      label: "Đang phân tích",
+    Received: {
+      label: "Mẫu đã được nhận",
+      color: "bg-blue-100 text-blue-800",
+      icon: CheckCircle,
+    },
+    PROCESSING: {
+      label: "Bắt đầu xét nghiệm",
       color: "bg-orange-100 text-orange-800",
       icon: Eye,
-      description: "Mẫu đang được phân tích",
     },
-    completed: {
-      label: "Hoàn thành",
+    processing: {
+      label: "Bắt đầu xét nghiệm",
+      color: "bg-orange-100 text-orange-800",
+      icon: Eye,
+    },
+    Processing: {
+      label: "Bắt đầu xét nghiệm",
+      color: "bg-orange-100 text-orange-800",
+      icon: Eye,
+    },
+    COMPLETED: {
+      label: "Xét nghiệm hoàn thành",
       color: "bg-green-100 text-green-800",
       icon: CheckCircle,
-      description: "Phân tích hoàn thành",
     },
-    failed: {
-      label: "Thất bại",
-      color: "bg-red-100 text-red-800",
-      icon: AlertCircle,
-      description: "Mẫu không đạt chất lượng",
+    completed: {
+      label: "Xét nghiệm hoàn thành",
+      color: "bg-green-100 text-green-800",
+      icon: CheckCircle,
     },
+    Completed: {
+      label: "Xét nghiệm hoàn thành",
+      color: "bg-green-100 text-green-800",
+      icon: CheckCircle,
+    },
+    // 🚀 REMOVED: All complex statuses (pending, collected, shipped, analyzing, failed, etc.)
   };
-  return statusMap[status] || statusMap.pending;
+  return (
+    statusMap[status] || {
+      label: "Đang xử lý",
+      color: "bg-gray-100 text-gray-800",
+      icon: Clock,
+    }
+  );
 };
 
 const getCollectionMethodDisplay = (method: string): string => {
@@ -193,7 +174,6 @@ const getCollectionMethodDisplay = (method: string): string => {
     home: "Thu mẫu tại nhà",
     facility: "Thu mẫu tại cơ sở",
     clinic: "Thu mẫu tại phòng khám",
-    pending: "Chưa xác định",
   };
   return methodMap[method] || method;
 };
@@ -202,7 +182,6 @@ const extractParticipantInfo = (
   instruction: string,
   notes: string
 ): { name: string; relationship: string } => {
-  // Try to extract from instruction first
   if (instruction) {
     const instructionMatch = instruction.match(/cho (.+?) \((.+?)\)/);
     if (instructionMatch) {
@@ -213,7 +192,6 @@ const extractParticipantInfo = (
     }
   }
 
-  // Try to extract from notes
   if (notes) {
     const notesMatch = notes.match(/for (.+?) \((.+?)\)/);
     if (notesMatch) {
@@ -225,31 +203,6 @@ const extractParticipantInfo = (
   }
 
   return { name: "Không xác định", relationship: "Không xác định" };
-};
-
-const calculateProgress = (status: string, type: "kit" | "sample"): number => {
-  if (type === "kit") {
-    const kitProgress: Record<string, number> = {
-      ordered: 15,
-      preparing: 30,
-      shipped: 70,
-      delivered: 100,
-      expired: 0,
-      ready: 100,
-    };
-    return kitProgress[status] || 0;
-  } else {
-    const sampleProgress: Record<string, number> = {
-      pending: 10,
-      collected: 40,
-      shipped: 60,
-      received: 70,
-      analyzing: 85,
-      completed: 100,
-      failed: 0,
-    };
-    return sampleProgress[status] || 0;
-  }
 };
 
 export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
@@ -268,72 +221,41 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
 
   const currentUserId = getCurrentUserId();
 
-  // ✅ Filter data by current user and create kit-sample pairs
+  // ✅ Filter data by current user
   useEffect(() => {
     console.log("🔍 Filtering kits and samples for user:", currentUserId);
-    console.log("📦 Total kits received:", sampleKits.length);
-    console.log("🧬 Total samples received:", samples.length);
 
-    // Filter kits for current user
     const userKits = sampleKits.filter((kit) => {
-      // Check multiple possible user ID fields
       const kitUserId =
         kit.userId || (kit as any).user_id || (kit as any).customerId;
-      const belongs = kitUserId === currentUserId;
-
-      if (!belongs) {
-        console.log(
-          `📦 Kit ${kit.kit_code} belongs to user ${kitUserId}, not current user ${currentUserId}`
-        );
-      }
-
-      return belongs;
+      return kitUserId === currentUserId;
     });
 
-    // Filter samples for current user
-    const userSamples = samples.filter((sample) => {
-      const sampleUserId =
-        sample.userId || (sample as any).user_id || (sample as any).customerId;
-      const belongs = sampleUserId === currentUserId;
+    // Find samples that belong to customer's kits
+    const customerSamples: Sample[] = [];
+    const customerKitIds = userKits.map((kit) => kit.id);
 
-      if (!belongs) {
-        console.log(
-          `🧬 Sample ${sample.sample_code} belongs to user ${sampleUserId}, not current user ${currentUserId}`
-        );
+    samples.forEach((sample) => {
+      const belongsToCustomerKit = customerKitIds.includes(sample.sampleKitsId);
+      if (belongsToCustomerKit) {
+        customerSamples.push(sample);
       }
-
-      return belongs;
     });
-
-    console.log("✅ Filtered kits for current user:", userKits.length);
-    console.log("✅ Filtered samples for current user:", userSamples.length);
 
     setFilteredKits(userKits);
-    setFilteredSamples(userSamples);
+    setFilteredSamples(customerSamples);
 
-    // ✅ Create kit-sample pairs based on V9 relationships
+    // Create kit-sample pairs
     const pairs: Array<{ kit: SampleKit; sample?: Sample }> = [];
-
     userKits.forEach((kit) => {
-      // V9: Find sample by kit's samplesId OR find sample that references this kit
-      let associatedSample = userSamples.find(
+      let associatedSample = customerSamples.find(
         (sample) =>
           sample.id === kit.samplesId || sample.sampleKitsId === kit.id
       );
-
       pairs.push({ kit, sample: associatedSample });
-
-      if (associatedSample) {
-        console.log(
-          `🔗 Kit ${kit.kit_code} paired with sample ${associatedSample.sample_code}`
-        );
-      } else {
-        console.log(`📦 Kit ${kit.kit_code} has no associated sample yet`);
-      }
     });
 
     setKitSamplePairs(pairs);
-    console.log("🔗 Created kit-sample pairs:", pairs.length);
   }, [sampleKits, samples, currentUserId]);
 
   // ✅ Show message if no user is logged in
@@ -356,7 +278,7 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
     );
   }
 
-  // ✅ Show message if no kits found for user
+  // ✅ Show message if no kits found
   if (filteredKits.length === 0 && filteredSamples.length === 0) {
     return (
       <div className="space-y-6">
@@ -372,12 +294,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
           <p className="text-gray-500 mb-4">
             Kit sẽ được tạo tự động sau khi đơn hàng được xác nhận
           </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-            <p className="text-sm text-blue-800">
-              💡 <strong>Lưu ý:</strong> Số lượng kit sẽ tương ứng với số người
-              tham gia xét nghiệm
-            </p>
-          </div>
         </div>
       </div>
     );
@@ -389,12 +305,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
         <h3 className="text-xl font-bold text-gray-900">
           Bộ kit & Mẫu xét nghiệm
         </h3>
-
-        {/* User Info Display */}
-        <div className="text-sm text-gray-500">
-          <User className="w-4 h-4 inline mr-1" />
-          User ID: {currentUserId.slice(0, 8)}...
-        </div>
 
         {/* View Toggle */}
         {filteredKits.length > 0 && (
@@ -423,8 +333,8 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
         )}
       </div>
 
-      {/* Summary Cards - Updated with filtered data */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 🚀 SIMPLIFIED: Summary Cards */}
+      <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <Package className="w-8 h-8 text-blue-600" />
@@ -437,56 +347,36 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-            <div>
-              <p className="text-2xl font-bold text-green-700">
-                {
-                  filteredKits.filter((kit) =>
-                    ["delivered", "ready"].includes(kit.status)
-                  ).length
-                }
-              </p>
-              <p className="text-sm text-green-600">Kit sẵn sàng</p>
-            </div>
-          </div>
-        </div>
-
         <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <TestTube className="w-8 h-8 text-purple-600" />
             <div>
               <p className="text-2xl font-bold text-purple-700">
-                {
-                  filteredSamples.filter((sample) =>
-                    ["collected", "received"].includes(sample.status)
-                  ).length
-                }
+                {filteredSamples.length}
               </p>
               <p className="text-sm text-purple-600">Mẫu đã thu</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-lg p-4">
+        <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <Eye className="w-8 h-8 text-orange-600" />
+            <CheckCircle className="w-8 h-8 text-green-600" />
             <div>
-              <p className="text-2xl font-bold text-orange-700">
+              <p className="text-2xl font-bold text-green-700">
                 {
                   filteredSamples.filter((sample) =>
-                    ["analyzing", "completed"].includes(sample.status)
+                    ["COMPLETED", "completed"].includes(sample.status)
                   ).length
                 }
               </p>
-              <p className="text-sm text-orange-600">Đang/Đã phân tích</p>
+              <p className="text-sm text-green-600">Đã hoàn thành</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ✅ Kit-Sample Pairs View (Main view) */}
+      {/* ✅ Kit-Sample Pairs View */}
       {activeView === "kits" && (
         <div className="space-y-6">
           <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -512,10 +402,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                 : null;
               const KitIcon = kitStatusInfo.icon;
               const SampleIcon = sampleStatusInfo?.icon || TestTube;
-              const kitProgress = calculateProgress(kit.status, "kit");
-              const sampleProgress = sample
-                ? calculateProgress(sample.status, "sample")
-                : 0;
               const participantInfo = extractParticipantInfo(
                 kit.instruction || "",
                 sample?.notes || ""
@@ -553,23 +439,14 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-6">
-                    {/* Kit Section */}
+                    {/* 🚀 SIMPLIFIED: Kit Section */}
                     <div className="space-y-4">
                       <h6 className="font-medium text-gray-900 flex items-center gap-2">
                         <Package className="w-4 h-4" />
-                        Thông tin Kit
+                        Kit xét nghiệm
                       </h6>
 
                       <div className="space-y-3 text-sm">
-                        <div>
-                          <p className="text-gray-600 font-medium">
-                            Trạng thái:
-                          </p>
-                          <p className="text-gray-900">
-                            {kitStatusInfo.description}
-                          </p>
-                        </div>
-
                         {kit.shipping_address && (
                           <div>
                             <p className="text-gray-600 font-medium">
@@ -577,6 +454,17 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                             </p>
                             <p className="text-gray-900">
                               {kit.shipping_address}
+                            </p>
+                          </div>
+                        )}
+
+                        {kit.delivered_date && (
+                          <div>
+                            <p className="text-gray-600 font-medium">
+                              Ngày giao:
+                            </p>
+                            <p className="text-gray-900">
+                              {formatDateTime(kit.delivered_date)}
                             </p>
                           </div>
                         )}
@@ -606,50 +494,10 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                             </div>
                           </div>
                         )}
-
-                        {kit.delivered_date && (
-                          <div>
-                            <p className="text-gray-600 font-medium">
-                              Ngày giao:
-                            </p>
-                            <p className="text-gray-900">
-                              {formatDateTime(kit.delivered_date)}
-                            </p>
-                          </div>
-                        )}
-
-                        {kit.expiry_date && (
-                          <div>
-                            <p className="text-gray-600 font-medium">
-                              Hạn sử dụng:
-                            </p>
-                            <p className="text-gray-900">
-                              {formatDateTime(kit.expiry_date)}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Kit Progress */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">
-                            Tiến độ kit
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {kitProgress}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${kitProgress}%` }}
-                          ></div>
-                        </div>
                       </div>
                     </div>
 
-                    {/* Sample Section */}
+                    {/* 🚀 SIMPLIFIED: Sample Section */}
                     <div className="space-y-4">
                       <h6 className="font-medium text-gray-900 flex items-center gap-2">
                         <TestTube className="w-4 h-4" />
@@ -706,35 +554,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                               </p>
                             </div>
                           )}
-
-                          {sample.sample_quality && (
-                            <div>
-                              <p className="text-gray-600 font-medium">
-                                Chất lượng:
-                              </p>
-                              <p className="text-gray-900">
-                                {sample.sample_quality}
-                              </p>
-                            </div>
-                          )}
-
-                          {/* Sample Progress */}
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-gray-700">
-                                Tiến độ mẫu
-                              </span>
-                              <span className="text-sm text-gray-500">
-                                {sampleProgress}%
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-gradient-to-r from-red-500 to-red-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${sampleProgress}%` }}
-                              ></div>
-                            </div>
-                          </div>
                         </div>
                       ) : (
                         <div className="text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
@@ -792,7 +611,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
             filteredSamples.map((sample, index) => {
               const sampleStatusInfo = getSampleStatusInfo(sample.status);
               const SampleIcon = sampleStatusInfo.icon;
-              const progress = calculateProgress(sample.status, "sample");
               const participantInfo = extractParticipantInfo(
                 "",
                 sample.notes || ""
@@ -826,14 +644,11 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                         <SampleIcon className="w-3 h-3" />
                         {sampleStatusInfo.label}
                       </span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {sampleStatusInfo.description}
-                      </p>
                     </div>
                   </div>
 
-                  {/* Sample Details */}
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-4">
+                  {/* 🚀 SIMPLIFIED: Sample Details */}
+                  <div className="grid md:grid-cols-2 gap-4 text-sm mb-4">
                     <div>
                       <p className="text-gray-600 font-medium">Phương thức:</p>
                       <p className="text-gray-900">
@@ -863,24 +678,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                       </div>
                     )}
 
-                    {sample.shipping_tracking && (
-                      <div>
-                        <p className="text-gray-600 font-medium">
-                          Mã vận chuyển:
-                        </p>
-                        <p className="text-gray-900 font-mono text-xs">
-                          {sample.shipping_tracking}
-                        </p>
-                      </div>
-                    )}
-
-                    {sample.sample_quality && (
-                      <div>
-                        <p className="text-gray-600 font-medium">Chất lượng:</p>
-                        <p className="text-gray-900">{sample.sample_quality}</p>
-                      </div>
-                    )}
-
                     <div>
                       <p className="text-gray-600 font-medium">
                         Kit liên quan:
@@ -900,22 +697,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                       <p className="text-sm text-gray-800">{sample.notes}</p>
                     </div>
                   )}
-
-                  {/* Sample Progress Bar */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        Tiến độ mẫu
-                      </span>
-                      <span className="text-sm text-gray-500">{progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-red-500 to-red-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
                 </div>
               );
             })
@@ -943,7 +724,6 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                 <li>• Kit sẽ được gửi đến địa chỉ của bạn</li>
                 <li>• Làm theo hướng dẫn trong kit để thu mẫu</li>
                 <li>• Gửi mẫu về lab theo địa chỉ có trong kit</li>
-                <li>• Thời gian xử lý: 7-10 ngày làm việc</li>
               </ul>
             </div>
           ) : (
@@ -955,93 +735,11 @@ export const EnhancedSamplesTab: React.FC<EnhancedSamplesTabProps> = ({
                 <li>• Đến cơ sở y tế theo lịch hẹn đã đặt</li>
                 <li>• Nhân viên sẽ hỗ trợ thu mẫu chuyên nghiệp</li>
                 <li>• Mẫu được xử lý ngay tại phòng lab</li>
-                <li>• Thời gian xử lý: 5-7 ngày làm việc</li>
               </ul>
             </div>
           )}
         </div>
       </div>
-
-      {/* ✅ Process Timeline */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h4 className="font-semibold text-gray-900 mb-4">
-          Quy trình xử lý mẫu
-        </h4>
-        <div className="space-y-3">
-          {collectionMethod === "home" ? (
-            <>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-medium">
-                  1
-                </div>
-                <span>
-                  Chuẩn bị và gửi kit → Giao kit → Thu mẫu → Gửi về lab
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-medium">
-                  2
-                </div>
-                <span>
-                  Nhận mẫu → Kiểm tra chất lượng → Phân tích → Báo cáo kết quả
-                </span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-medium">
-                  1
-                </div>
-                <span>
-                  Xác nhận lịch hẹn → Thu mẫu tại cơ sở → Chuyển vào lab
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-medium">
-                  2
-                </div>
-                <span>
-                  Xử lý mẫu → Phân tích → Kiểm tra kết quả → Báo cáo hoàn thành
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* ✅ Debug Info */}
-      <details className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <summary className="font-medium text-yellow-800 cursor-pointer">
-          🔍 Debug Info
-        </summary>
-        <div className="mt-3 text-sm space-y-2">
-          <div>
-            <strong>Current User ID:</strong> {currentUserId}
-          </div>
-          <div>
-            <strong>Total Kits Received:</strong> {sampleKits.length}
-          </div>
-          <div>
-            <strong>Filtered Kits (User):</strong> {filteredKits.length}
-          </div>
-          <div>
-            <strong>Total Samples Received:</strong> {samples.length}
-          </div>
-          <div>
-            <strong>Filtered Samples (User):</strong> {filteredSamples.length}
-          </div>
-          <div>
-            <strong>Kit-Sample Pairs:</strong> {kitSamplePairs.length}
-          </div>
-          <div>
-            <strong>Collection Method:</strong> {collectionMethod}
-          </div>
-          <div>
-            <strong>Active View:</strong> {activeView}
-          </div>
-        </div>
-      </details>
     </div>
   );
 };
