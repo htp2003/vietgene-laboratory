@@ -275,19 +275,19 @@ const NewsDetail: React.FC = () => {
                   to={`/news/${relatedArticle.id}`}
                   className="group bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden"
                 >
-                  {relatedArticle.featured_image ||
-                    (relatedArticle.imageUrl && (
-                      <div className="relative h-32">
-                        <img
-                          src={
-                            relatedArticle.featured_image ||
-                            relatedArticle.imageUrl
-                          }
-                          alt={relatedArticle.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                    ))}
+                  {(relatedArticle.featured_image ||
+                    relatedArticle.imageUrl) && (
+                    <div className="relative h-32">
+                      <img
+                        src={
+                          relatedArticle.featured_image ||
+                          relatedArticle.imageUrl
+                        }
+                        alt={relatedArticle.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                  )}
                   <div className="p-4">
                     <h3 className="font-semibold text-gray-900 mb-2 group-hover:text-red-600 transition-colors line-clamp-2">
                       {relatedArticle.title}
