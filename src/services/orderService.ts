@@ -232,7 +232,13 @@ class OrderService {
       if (response.data.code === 200) {
         const timeSlots = response.data.result || [];
         console.log("✅ Time slots loaded:", timeSlots.length);
-        return timeSlots.filter((slot: TimeSlot) => slot.isAvailable);
+
+        // ✅ CHANGED: Return ALL time slots (both available and unavailable)
+        // This allows UI to show disabled slots with proper styling
+        return timeSlots;
+
+        // ❌ OLD CODE (removed):
+        // return timeSlots.filter((slot: TimeSlot) => slot.isAvailable);
       }
 
       throw new Error("Failed to fetch time slots");

@@ -1,5 +1,13 @@
 import React from "react";
-import { Home, Truck, User, Clock, AlertCircle, Calendar } from "lucide-react";
+import {
+  Home,
+  Truck,
+  User,
+  Clock,
+  AlertCircle,
+  Calendar,
+  Ban,
+} from "lucide-react";
 import { OrderForm } from "../../../../hooks/useOrderBooking";
 import { Doctor, TimeSlot } from "../../../../services/orderService";
 
@@ -32,11 +40,17 @@ export const CollectionMethodStep: React.FC<CollectionMethodStepProps> = ({
     });
   };
 
-  const handleTimeSlotSelect = (timeSlotId: string) => {
+  const handleTimeSlotSelect = (timeSlotId: string, slot: TimeSlot) => {
+    // ✅ Kiểm tra slot có available không
+    if (!slot.isAvailable) {
+      console.log("⚠️ Time slot not available:", timeSlotId);
+      return; // Không cho phép chọn slot không available
+    }
+
     console.log("🕐 Time slot selected:", timeSlotId);
 
     const timeSlot = availableTimeSlots.find(
-      (slot) => slot.id.toString() === timeSlotId
+      (s) => s.id.toString() === timeSlotId
     );
 
     if (timeSlot) {
@@ -60,9 +74,9 @@ export const CollectionMethodStep: React.FC<CollectionMethodStepProps> = ({
       });
     } else {
       console.error("❌ Time slot not found:", timeSlotId);
-      setError("Khung giờ được chọn không hợp lệ");
     }
   };
+
   // Helper function to format date display
   const formatDate = (dateString: string) => {
     try {
@@ -209,29 +223,49 @@ export const CollectionMethodStep: React.FC<CollectionMethodStepProps> = ({
             )}
           </div>
 
-          {/* Time Slot Selection with Specific Dates */}
+          {/* ✅ Time Slot Selection with Available/Disabled States */}
           {formData.serviceInfo.doctorId && availableTimeSlots.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Chọn lịch hẹn *
               </label>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {availableTimeSlots
-                  .filter((slot) => slot.isAvailable)
-                  .map((slot) => (
+                {availableTimeSlots.map((slot) => {
+                  const isSelected =
+                    formData.serviceInfo.timeSlotId === slot.id.toString();
+                  const isDisabled = !slot.isAvailable;
+
+                  return (
                     <div
                       key={slot.id}
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        formData.serviceInfo.timeSlotId === slot.id.toString()
-                          ? "border-red-500 bg-red-50 text-red-700"
-                          : "border-gray-200 hover:border-gray-300"
+                      className={`p-4 border-2 rounded-lg transition-all ${
+                        isDisabled
+                          ? // ✅ Disabled state: Mờ và không cho click
+                            "border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed"
+                          : isSelected
+                          ? // ✅ Selected state: Active
+                            "border-red-500 bg-red-50 text-red-700 cursor-pointer hover:bg-red-100"
+                          : // ✅ Available state: Normal
+                            "border-gray-200 hover:border-gray-300 cursor-pointer"
                       }`}
-                      onClick={() => handleTimeSlotSelect(slot.id.toString())}
+                      onClick={() => {
+                        if (!isDisabled) {
+                          handleTimeSlotSelect(slot.id.toString(), slot);
+                        }
+                      }}
                     >
                       {/* Date Display */}
                       <div className="flex items-center gap-2 mb-2">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <div className="text-sm font-medium text-gray-700">
+                        <Calendar
+                          className={`w-4 h-4 ${
+                            isDisabled ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        />
+                        <div
+                          className={`text-sm font-medium ${
+                            isDisabled ? "text-gray-400" : "text-gray-700"
+                          }`}
+                        >
                           {slot.specificDate
                             ? formatDate(slot.specificDate)
                             : getDayName(slot.dayOfWeek)}
@@ -240,22 +274,65 @@ export const CollectionMethodStep: React.FC<CollectionMethodStepProps> = ({
 
                       {/* Time Display */}
                       <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-500" />
-                        <div className="text-lg font-semibold">
+                        <Clock
+                          className={`w-4 h-4 ${
+                            isDisabled ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        />
+                        <div
+                          className={`text-lg font-semibold ${
+                            isDisabled ? "text-gray-400" : ""
+                          }`}
+                        >
                           {slot.startTime} - {slot.endTime}
                         </div>
+
+                        {/* ✅ Disabled indicator */}
+                        {isDisabled && (
+                          <Ban className="w-4 h-4 text-gray-400 ml-auto" />
+                        )}
                       </div>
 
                       {/* Additional date info if specificDate exists */}
                       {slot.specificDate && (
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div
+                          className={`text-xs mt-1 ${
+                            isDisabled ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
                           {getDayName(slot.dayOfWeek)}
                         </div>
                       )}
+
+                      {/* ✅ Disabled message */}
+                      {isDisabled && (
+                        <div className="text-xs text-gray-400 mt-2 italic">
+                          Không khả dụng
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  );
+                })}
               </div>
 
+              {/* ✅ Updated: Show count of available vs total slots */}
+              {availableTimeSlots.length > 0 && (
+                <div className="mt-3 text-sm text-gray-600">
+                  <span className="font-medium">
+                    {
+                      availableTimeSlots.filter((slot) => slot.isAvailable)
+                        .length
+                    }
+                  </span>{" "}
+                  khung giờ khả dụng trên tổng số{" "}
+                  <span className="font-medium">
+                    {availableTimeSlots.length}
+                  </span>{" "}
+                  khung giờ
+                </div>
+              )}
+
+              {/* ✅ No available slots message */}
               {availableTimeSlots.filter((slot) => slot.isAvailable).length ===
                 0 && (
                 <div className="text-center py-4">
