@@ -474,7 +474,7 @@ export class AppointmentService {
       const ordersResponse = await Promise.race([
         apiClient.get<{ code: number; message: string; result: any[] }>("/orders/all"),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Orders API timeout')), 15000)
+          setTimeout(() => reject(new Error('Orders API timeout')), 50000)
         )
       ]) as any;
 
@@ -565,7 +565,7 @@ export class AppointmentService {
       const user = await Promise.race([
         UserService.getUserById(order.userId),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('User fetch timeout')), 5000)
+          setTimeout(() => reject(new Error('User fetch timeout')), 50000)
         )
       ]) as any;
 
@@ -678,7 +678,7 @@ export class AppointmentService {
       const orderResponse = await Promise.race([
         apiClient.put(`/orders/${appointmentId}`, { status: 'confirmed' }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Order confirm timeout')), 10000)
+          setTimeout(() => reject(new Error('Order confirm timeout')), 50000)
         )
       ]) as any;
 
@@ -720,7 +720,7 @@ export class AppointmentService {
           notes: reason || 'Cancelled by staff'
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Order cancel timeout')), 10000)
+          setTimeout(() => reject(new Error('Order cancel timeout')), 50000)
         )
       ]) as any;
 

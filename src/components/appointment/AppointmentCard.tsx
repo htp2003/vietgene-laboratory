@@ -30,7 +30,7 @@ interface UpdatedAppointmentCardProps extends AppointmentCardProps {
   onUpdateStatus: (
     appointmentId: string, 
     newStatus: Appointment['status'], 
-    triggerElement?: HTMLElement // ✅ Add optional trigger element
+    triggerElement?: HTMLElement
   ) => void;
 }
 
@@ -40,32 +40,55 @@ const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
   onConfirm,
   onCancel,
   onUpdateStatus,
-  onCreateSamples  // ✅ New prop for sample creation
+  onCreateSamples
 }) => {
 
   const [participants, setParticipants] = useState<OrderParticipant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
 
   useEffect(() => {
-  if (appointment.rawData?.order?.orderId) {
-    loadParticipants(appointment.rawData.order.orderId);
-  }
-}, [appointment.id]);
+    if (appointment.rawData?.order?.orderId) {
+      loadParticipants(appointment.rawData.order.orderId);
+    }
+  }, [appointment.id]);
 
   const loadParticipants = async (orderId: string) => {
-  try {
-    setLoadingParticipants(true);
-    const participantsList = await OrderParticipantsService.getParticipantsByOrderIdCached(orderId);
-    setParticipants(participantsList);
-  } catch (error) {
-    console.error('Error loading participants:', error);
-  } finally {
-    setLoadingParticipants(false);
-  }
-};
+    try {
+      setLoadingParticipants(true);
+      const participantsList = await OrderParticipantsService.getParticipantsByOrderIdCached(orderId);
+      setParticipants(participantsList);
+    } catch (error) {
+      console.error('Error loading participants:', error);
+    } finally {
+      setLoadingParticipants(false);
+    }
+  };
 
+  // ✅ FIXED: Comprehensive status mapping function
+  const mapApiStatusToCode = (apiStatus: string): string => {
+    // Map từ status hiển thị (tiếng Việt) sang status code (tiếng Anh)
+    const statusMapping = {
+      "Chờ xử lý": "Pending",
+      "Đã xác nhận": "Confirmed", 
+      "Đang giao kit": "DeliveringKit",
+      "Đã giao kit": "KitDelivered",
+      "Đã nhận mẫu": "SampleReceived",
+      "Đang xét nghiệm": "Testing",
+      "Đang thực hiện": "Testing", // ✅ FIXED: Both map to Testing
+      "Hoàn thành": "Completed",   // ✅ FIXED: Properly mapped
+      "Đã hủy": "Cancelled"
+    };
+    
+    // If direct mapping exists, use it
+    if (statusMapping[apiStatus]) {
+      return statusMapping[apiStatus];
+    }
+    
+    // If no mapping found, assume it's already in English format
+    return apiStatus;
+  };
   
-  // ✅ Define steps for different service types (same as modal)
+  // ✅ FIXED: Define steps for different service types with proper flow
   const getStepsConfig = (locationType: string) => {
     if (locationType === 'Tại nhà') {
       // Steps for home service
@@ -108,29 +131,29 @@ const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
         }
       ];
     } else {
-      // Steps for facility service
+      // ✅ FIXED: Steps for facility service - MUST include Pending -> Confirmed flow
       return [
         { 
           key: 'Pending', 
           label: 'Đặt lịch', 
           icon: Calendar, 
-          description: 'Khách hàng đặt lịch hẹn' 
+          description: 'Khách hàng đặt lịch hẹn - CẦN XÁC NHẬN' 
         },
         { 
           key: 'Confirmed', 
-          label: 'Check-in', 
-          icon: User, 
-          description: 'Khách hàng check-in tại cơ sở' 
+          label: 'Đã xác nhận', 
+          icon: UserCheck, 
+          description: 'Lịch hẹn đã được xác nhận - Chờ check-in' 
         },
         { 
           key: 'SampleReceived', 
           label: 'Nhận mẫu', 
           icon: TestTube, 
-          description: 'Thu thập mẫu xét nghiệm' 
+          description: 'Thu thập mẫu xét nghiệm tại cơ sở' 
         },
         { 
           key: 'Testing', 
-          label: 'Xét nghiệm', 
+          label: 'Đang xét nghiệm', 
           icon: AlertCircle, 
           description: 'Đang tiến hành xét nghiệm' 
         },
@@ -138,103 +161,93 @@ const AppointmentCard: React.FC<UpdatedAppointmentCardProps> = ({
           key: 'Completed', 
           label: 'Hoàn thành', 
           icon: CheckCircle, 
-          description: 'Có kết quả xét nghiệm' 
+          description: 'Đã có kết quả xét nghiệm' 
         }
       ];
     }
   };
 
-  // Status configuration
+  // ✅ FIXED: Status configuration with proper mapping
   const getStatusConfig = (status: string) => {
-  const mappedStatus = mapApiStatusToCode(status);
-  
-  const configs = {
-    'Pending': { 
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
-      label: 'Chờ xử lý',
-      icon: Clock
-    },
-    'Confirmed': { 
-      color: 'bg-blue-100 text-blue-800 border-blue-200', 
-      label: 'Đã xác nhận',
-      icon: CheckCircle
-    },
-    'DeliveringKit': { 
-      color: 'bg-purple-100 text-purple-800 border-purple-200', 
-      label: 'Đang giao kit',
-      icon: Truck
-    },
-    'KitDelivered': { 
-      color: 'bg-indigo-100 text-indigo-800 border-indigo-200', 
-      label: 'Đã giao kit',
-      icon: Package
-    },
-    'SampleReceived': { 
-      color: 'bg-cyan-100 text-cyan-800 border-cyan-200', 
-      label: 'Đã nhận mẫu',
-      icon: TestTube
-    },
-    'Testing': { 
-      color: 'bg-orange-100 text-orange-800 border-orange-200', 
-      label: 'Đang xét nghiệm', // Hoặc 'Đang thực hiện'
-      icon: AlertCircle
-    },
-    'Completed': { 
-      color: 'bg-green-100 text-green-800 border-green-200', 
-      label: 'Hoàn thành',
-      icon: CheckCircle
-    },
-    'Cancelled': { 
-      color: 'bg-red-100 text-red-800 border-red-200', 
-      label: 'Đã hủy',
-      icon: XCircle
+    const mappedStatus = mapApiStatusToCode(status);
+    
+    const configs = {
+      'Pending': { 
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
+        label: 'Chờ xử lý',
+        icon: Clock
+      },
+      'Confirmed': { 
+        color: 'bg-blue-100 text-blue-800 border-blue-200', 
+        label: 'Đã xác nhận',
+        icon: UserCheck
+      },
+      'DeliveringKit': { 
+        color: 'bg-purple-100 text-purple-800 border-purple-200', 
+        label: 'Đang giao kit',
+        icon: Truck
+      },
+      'KitDelivered': { 
+        color: 'bg-indigo-100 text-indigo-800 border-indigo-200', 
+        label: 'Đã giao kit',
+        icon: Package
+      },
+      'SampleReceived': { 
+        color: 'bg-cyan-100 text-cyan-800 border-cyan-200', 
+        label: 'Đã nhận mẫu',
+        icon: TestTube
+      },
+      'Testing': { 
+        color: 'bg-orange-100 text-orange-800 border-orange-200', 
+        label: 'Đang xét nghiệm', // ✅ FIXED: Consistent label
+        icon: AlertCircle
+      },
+      'Completed': { 
+        color: 'bg-green-100 text-green-800 border-green-200', 
+        label: 'Hoàn thành', // ✅ FIXED: Properly shows completed
+        icon: CheckCircle
+      },
+      'Cancelled': { 
+        color: 'bg-red-100 text-red-800 border-red-200', 
+        label: 'Đã hủy',
+        icon: XCircle
+      }
+    };
+    return configs[mappedStatus] || configs['Pending'];
+  };
+
+  // ✅ FIXED: Proper next status flow for both service types
+  const getNextStatus = (currentStatus: string, locationType: string): string | null => {
+    const mappedStatus = mapApiStatusToCode(currentStatus);
+    
+    if (locationType === 'Tại nhà') {
+      const homeStatusFlow = {
+        'Pending': 'DeliveringKit',
+        'DeliveringKit': 'KitDelivered', 
+        'KitDelivered': 'SampleReceived',
+        'SampleReceived': 'Testing',
+        'Testing': 'Completed',
+        // ✅ FIXED: Remove auto-progression from Confirmed to DeliveringKit for home service
+      };
+      return homeStatusFlow[mappedStatus] || null;
+    } else {
+      // ✅ FIXED: Proper facility flow - MUST go through Confirmed step
+      const facilityStatusFlow = {
+        'Pending': 'Confirmed',        // ✅ MUST be confirmed first
+        'Confirmed': 'SampleReceived', // ✅ After confirmation, can proceed to sample collection
+        'SampleReceived': 'Testing',
+        'Testing': 'Completed',
+        // ✅ FIXED: Remove invalid transitions
+      };
+      return facilityStatusFlow[mappedStatus] || null;
     }
   };
-  return configs[mappedStatus] || configs['Pending'];
-};
 
-  // Get next possible status for progression based on location type
-  const getNextStatus = (currentStatus: string, locationType: string): string | null => {
-  const mappedStatus = mapApiStatusToCode(currentStatus);
-  
-  if (locationType === 'Tại nhà') {
-    const homeStatusFlow = {
-      'Pending': 'DeliveringKit',
-      'DeliveringKit': 'KitDelivered', 
-      'KitDelivered': 'SampleReceived',
-      'SampleReceived': 'Testing',
-      'Testing': 'Completed',
-      'Confirmed': 'DeliveringKit'  
-    };
-    return homeStatusFlow[mappedStatus] || null;
-  } else {
-    const facilityStatusFlow = {
-      'Pending': 'Confirmed',
-      'Confirmed': 'SampleReceived', 
-      'SampleReceived': 'Testing',
-      'Testing': 'Completed',
-      'DeliveringKit': 'SampleReceived',
-      'KitDelivered': 'SampleReceived'
-    };
-    return facilityStatusFlow[mappedStatus] || null;
-  }
-};
-
-const normalizeStatusForLocationType = (status: string, locationType: string): string => {
-  const mappedStatus = mapApiStatusToCode(status);
-  
-  if (locationType === 'Tại nhà' && mappedStatus === 'Confirmed') {
-    return 'DeliveringKit';
-  }
-  
-  if (locationType === 'Cơ sở y tế') {
-    if (mappedStatus === 'DeliveringKit' || mappedStatus === 'KitDelivered') {
-      return 'Confirmed';
-    }
-  }
-  
-  return mappedStatus;
-};
+  // ✅ FIXED: Remove problematic normalization function that was causing auto-acceptance
+  // const normalizeStatusForLocationType = (status: string, locationType: string): string => {
+  //   // This function was causing the auto-acceptance issue - removed
+  //   return mapApiStatusToCode(status);
+  // };
 
   // ✅ Updated handler for step progression
   const handleStepProgression = (
@@ -253,47 +266,35 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
     onUpdateStatus(
       appointment.id, 
       nextStatus as Appointment['status'], 
-      event.currentTarget // ✅ Pass the button that was clicked
+      event.currentTarget
     );
   };
-  const mapApiStatusToCode = (apiStatus: string): string => {
-  // Map từ status hiển thị (tiếng Việt) sang status code (tiếng Anh)
-  const statusMapping = {
-    "Chờ xử lý": "Pending",
-    "Đã xác nhận": "Confirmed", 
-    "Đang giao kit": "DeliveringKit",
-    "Đã giao kit": "KitDelivered",
-    "Đã nhận mẫu": "SampleReceived",
-    "Đang xét nghiệm": "Testing",
-    "Đang thực hiện": "Testing", // ← FIX: Mapping này thiếu!
-    "Hoàn thành": "Completed",
-    "Đã hủy": "Cancelled"
-  };
-  
-  return statusMapping[apiStatus] || apiStatus;
-};
 
   // ✅ Get appropriate step configuration based on location type
   const steps = getStepsConfig(appointment.locationType);
-  const getCurrentStepIndex = () => {
-  console.log("🔍 Debug status:", {
-    originalStatus: appointment.status,
-    mappedStatus: mapApiStatusToCode(appointment.status),
-    availableSteps: steps.map(s => s.key)
-  });
   
-  const mappedStatus = mapApiStatusToCode(appointment.status);
-  const index = steps.findIndex(step => step.key === mappedStatus);
-  return index >= 0 ? index : 0;
-};
+  // ✅ FIXED: Proper current step calculation
+  const getCurrentStepIndex = () => {
+    const mappedStatus = mapApiStatusToCode(appointment.status);
+    
+    console.log("🔍 Debug status:", {
+      originalStatus: appointment.status,
+      mappedStatus: mappedStatus,
+      locationType: appointment.locationType,
+      availableSteps: steps.map(s => s.key)
+    });
+    
+    const index = steps.findIndex(step => step.key === mappedStatus);
+    return index >= 0 ? index : 0;
+  };
 
   const statusConfig = getStatusConfig(appointment.status);
   const StatusIcon = statusConfig.icon;
-  const normalizedStatus = normalizeStatusForLocationType(appointment.status, appointment.locationType);
-  const nextStatus = getNextStatus(normalizedStatus, appointment.locationType );
-  const currentStepIndex = getCurrentStepIndex();
   
-
+  // ✅ FIXED: Use mapped status directly instead of normalization
+  const mappedStatus = mapApiStatusToCode(appointment.status);
+  const nextStatus = getNextStatus(mappedStatus, appointment.locationType);
+  const currentStepIndex = getCurrentStepIndex();
   
   // Format date and time
   const formatDate = (dateStr: string) => {
@@ -414,54 +415,67 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
         </div>
       )}
 
-      {participants.length > 0 && (
-  <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-    <div className="flex items-center gap-2 mb-2">
-      <Users className="w-4 h-4 text-indigo-600" />
-      <span className="text-sm font-medium text-indigo-800">
-        Người tham gia xét nghiệm ({participants.length})
-      </span>
-    </div>
-    
-    <div className="space-y-2">
-      {participants.slice(0, 2).map((participant, index) => (
-        <div key={participant.id} className="flex items-center justify-between text-sm">
-          <div className="text-indigo-900">
-            <span className="font-medium">{participant.participant_name}</span>
-            {participant.age && (
-              <span className="text-indigo-700"> ({participant.age} tuổi)</span>
-            )}
+      {/* ✅ FIXED: Emphasize confirmation requirement for facility appointments */}
+      {appointment.locationType === 'Cơ sở y tế' && mappedStatus === 'Pending' && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertCircle className="w-4 h-4 text-yellow-600" />
+            <span className="text-sm font-medium text-yellow-800">Yêu cầu xác nhận</span>
           </div>
-          <span className="text-indigo-600 text-xs px-2 py-1 bg-indigo-100 rounded">
-            {OrderParticipantsService.getRelationshipDisplayText(participant.relationship)}
-          </span>
-        </div>
-      ))}
-      
-      {participants.length > 2 && (
-        <div className="text-xs text-indigo-600 font-medium">
-          +{participants.length - 2} người khác
+          <p className="text-sm text-yellow-700">
+            Lịch hẹn tại cơ sở y tế cần được xác nhận trước khi khách hàng đến. 
+            Vui lòng nhấn "Xác nhận" để xử lý lịch hẹn này.
+          </p>
         </div>
       )}
-    </div>
-    
-    {loadingParticipants && (
-      <div className="text-xs text-indigo-600 italic">
-        Đang tải thông tin người tham gia...
-      </div>
-    )}
-  </div>
-)}
 
-      {/* ✅ Updated Progress Steps - using dynamic steps based on location type */}
-     {(appointment.locationType === 'Tại nhà' || appointment.locationType === 'Cơ sở y tế') && 
-       appointment.status !== 'Pending' && appointment.status !== 'Cancelled' && (
+      {participants.length > 0 && (
+        <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-4 h-4 text-indigo-600" />
+            <span className="text-sm font-medium text-indigo-800">
+              Người tham gia xét nghiệm ({participants.length})
+            </span>
+          </div>
+          
+          <div className="space-y-2">
+            {participants.slice(0, 2).map((participant, index) => (
+              <div key={participant.id} className="flex items-center justify-between text-sm">
+                <div className="text-indigo-900">
+                  <span className="font-medium">{participant.participant_name}</span>
+                  {participant.age && (
+                    <span className="text-indigo-700"> ({participant.age} tuổi)</span>
+                  )}
+                </div>
+                <span className="text-indigo-600 text-xs px-2 py-1 bg-indigo-100 rounded">
+                  {OrderParticipantsService.getRelationshipDisplayText(participant.relationship)}
+                </span>
+              </div>
+            ))}
+            
+            {participants.length > 2 && (
+              <div className="text-xs text-indigo-600 font-medium">
+                +{participants.length - 2} người khác
+              </div>
+            )}
+          </div>
+          
+          {loadingParticipants && (
+            <div className="text-xs text-indigo-600 italic">
+              Đang tải thông tin người tham gia...
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ✅ FIXED: Updated Progress Steps with proper status handling */}
+      {(appointment.locationType === 'Tại nhà' || appointment.locationType === 'Cơ sở y tế') && 
+       mappedStatus !== 'Pending' && mappedStatus !== 'Cancelled' && (
         <div className="mb-4">
           <p className="text-sm font-medium text-gray-700 mb-3">
             Tiến trình {appointment.locationType === 'Tại nhà' ? '(Tại nhà)' : '(Tại cơ sở)'}
           </p>
           
-          {/* Detailed steps for both service types */}
           <div className="w-full">
             <div className="space-y-3">
               {steps.map((step, index) => {
@@ -524,7 +538,8 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
                                 : 'bg-purple-100 text-purple-700'
                             }`}>
                               <Clock className="w-3 h-3 mr-1" />
-                              Đang thực hiện
+                              {/* ✅ FIXED: Show correct status for current step */}
+                              {step.key === 'Completed' ? 'Hoàn thành' : 'Đang thực hiện'}
                             </span>
                           )}
                           {isPending && (
@@ -550,6 +565,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
                               {step.key === 'KitDelivered' && '📦 Vui lòng kiểm tra kit và làm theo hướng dẫn'}
                               {step.key === 'SampleReceived' && '🧪 Mẫu sẽ được xử lý trong 1-2 ngày làm việc'}
                               {step.key === 'Testing' && '🔬 Thời gian xét nghiệm: 3-5 ngày làm việc'}
+                              {step.key === 'Completed' && '✅ Kết quả đã sẵn sàng'}
                             </>
                           )}
                           
@@ -559,6 +575,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
                               {step.key === 'Confirmed' && '🏥 Vui lòng đến cơ sở y tế đúng giờ hẹn'}
                               {step.key === 'SampleReceived' && '🧪 Mẫu sẽ được xử lý ngay sau khi thu thập'}
                               {step.key === 'Testing' && '🔬 Thời gian xét nghiệm: 3-5 ngày làm việc'}
+                              {step.key === 'Completed' && '✅ Kết quả đã sẵn sàng'}
                             </>
                           )}
                         </div>
@@ -583,10 +600,10 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
         </button>
 
         <div className="flex items-center gap-2">
-          {/* Status progression button */}
+          {/* ✅ FIXED: Proper status progression logic */}
           {(() => {
-            // For Pending status - show Confirm button
-            if (appointment.status === 'Pending') {
+            // ✅ For Pending status - ALWAYS show Confirm button for ALL appointment types
+            if (mappedStatus === 'Pending') {
               return (
                 <button
                   onClick={() => onConfirm(appointment)}
@@ -599,11 +616,11 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
             }
             
             // For other statuses with next step - show progression button
-            if (nextStatus && appointment.status !== 'Cancelled' && appointment.status !== 'Completed') {
+            if (nextStatus && mappedStatus !== 'Cancelled' && mappedStatus !== 'Completed') {
               const getNextStepLabel = (status: string) => {
                 const labels = {
                   'DeliveringKit': 'Giao kit',
-                  'Confirmed': 'Check-in',
+                  'Confirmed': 'Xác nhận', // ✅ FIXED: Proper label for facility confirmation
                   'KitDelivered': 'Đã giao kit', 
                   'SampleReceived': 'Nhận mẫu',
                   'Testing': 'Bắt đầu XN',
@@ -614,7 +631,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
 
               return (
                 <button
-                  onClick={(event) => handleStepProgression(appointment, nextStatus, event)} // ✅ Pass event
+                  onClick={(event) => handleStepProgression(appointment, nextStatus, event)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium shadow-sm"
                 >
                   <ArrowRight className="w-4 h-4" />
@@ -623,8 +640,8 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
               );
             }
 
-            // For completed status - show completion indicator
-            if (appointment.status === 'Completed') {
+            // ✅ FIXED: For completed status - show proper completion indicator
+            if (mappedStatus === 'Completed') {
               return (
                 <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-medium">
                   <CheckCircle className="w-4 h-4" />
@@ -634,7 +651,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
             }
 
             // For cancelled status - show cancellation indicator  
-            if (appointment.status === 'Cancelled') {
+            if (mappedStatus === 'Cancelled') {
               return (
                 <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium">
                   <XCircle className="w-4 h-4" />
@@ -647,7 +664,7 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
           })()}
 
           {/* Cancel button - for non-completed appointments */}
-          {appointment.status !== 'Cancelled' && appointment.status !== 'Completed' && (
+          {mappedStatus !== 'Cancelled' && mappedStatus !== 'Completed' && (
             <button
               onClick={() => onCancel(appointment.id)}
               className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors text-sm font-medium"
@@ -670,4 +687,5 @@ const normalizeStatusForLocationType = (status: string, locationType: string): s
     </div>
   );
 };
+
 export default AppointmentCard;
