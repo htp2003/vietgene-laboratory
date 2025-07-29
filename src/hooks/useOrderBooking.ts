@@ -320,9 +320,9 @@ export const useOrderBooking = () => {
       const timeSlots = await orderService.getDoctorTimeSlots(doctorId);
       console.log("📅 Raw time slots:", timeSlots);
 
-      // Enhanced time slot filtering
+      // ✅ UPDATED: Don't filter by isAvailable here - let UI handle it
+      // Enhanced time slot validation (but keep unavailable slots)
       const validTimeSlots = timeSlots.filter((slot) => {
-        const isAvailable = slot.isAvailable !== false;
         const hasValidTime = slot.startTime && slot.endTime;
         const hasValidDay =
           typeof slot.dayOfWeek === "number" &&
@@ -330,10 +330,14 @@ export const useOrderBooking = () => {
           slot.dayOfWeek <= 6;
 
         console.log(
-          `🕐 Time slot ${slot.id}: available=${isAvailable}, validTime=${hasValidTime}, validDay=${hasValidDay}`
+          `🕐 Time slot ${slot.id}: available=${slot.isAvailable}, validTime=${hasValidTime}, validDay=${hasValidDay}`
         );
 
-        return isAvailable && hasValidTime && hasValidDay;
+        // ✅ CHANGED: Return slots even if not available (for UI to show disabled)
+        return hasValidTime && hasValidDay;
+
+        // ❌ OLD CODE (removed):
+        // return slot.isAvailable && hasValidTime && hasValidDay;
       });
 
       setAvailableTimeSlots(validTimeSlots);
@@ -345,11 +349,14 @@ export const useOrderBooking = () => {
         appointmentTime: "", // Reset appointment time
       });
 
+      const availableCount = validTimeSlots.filter(
+        (slot) => slot.isAvailable
+      ).length;
       console.log(
-        `✅ Time slots loaded: ${validTimeSlots.length} available slots out of ${timeSlots.length} total`
+        `✅ Time slots loaded: ${availableCount} available / ${validTimeSlots.length} total slots`
       );
 
-      if (validTimeSlots.length === 0) {
+      if (availableCount === 0) {
         console.warn("⚠️ No available time slots for this doctor");
       }
     } catch (error) {
