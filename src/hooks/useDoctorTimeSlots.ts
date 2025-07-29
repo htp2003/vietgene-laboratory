@@ -14,6 +14,91 @@ export const useDoctorTimeSlots = (doctorId: string) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
+  // Check if time slot is expired (past end time)
+  const isTimeSlotExpired = useCallback((specificDate: string, endTime: string): boolean => {
+    try {
+      const now = new Date();
+      const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:mm
+
+      // Nếu ngày đã qua
+      if (specificDate < currentDate) {
+        return true;
+      }
+
+      // Nếu là hôm nay và giờ kết thúc đã qua
+      if (specificDate === currentDate && endTime <= currentTime) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error checking if time slot is expired:', error);
+      return false;
+    }
+  }, []);
+
+  // Auto update expired time slots
+  const autoUpdateExpiredSlots = useCallback(async (slots: DoctorTimeSlot[]) => {
+    const expiredSlots = slots.filter(slot => 
+      slot.isAvailable && isTimeSlotExpired(slot.specificDate, slot.endTime)
+    );
+
+    if (expiredSlots.length === 0) {
+      return slots; // No expired slots, return original
+    }
+
+    console.log(`🔄 Found ${expiredSlots.length} expired slots, updating...`);
+
+    // Update expired slots in parallel
+    const updatePromises = expiredSlots.map(async (slot) => {
+      try {
+        console.log(`⏱️ Auto-updating expired slot: ${slot.specificDate} ${slot.startTime}-${slot.endTime}`);
+        
+        const result = await doctorTimeSlotService.updateTimeSlot(slot.id, {
+          isAvailable: false,
+          dayOfWeek: slot.dayOfWeek,
+          specificDate: slot.specificDate,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          doctorId: slot.doctorId
+        });
+
+        if (result.success && result.data) {
+          return result.data;
+        } else {
+          console.error(`Failed to update expired slot ${slot.id}:`, result.message);
+          return { ...slot, isAvailable: false }; // Fallback to local update
+        }
+      } catch (error) {
+        console.error(`Error updating expired slot ${slot.id}:`, error);
+        return { ...slot, isAvailable: false }; // Fallback to local update
+      }
+    });
+
+    try {
+      const updatedExpiredSlots = await Promise.all(updatePromises);
+      
+      // Merge updated slots back into the full list
+      const updatedSlots = slots.map(slot => {
+        const updatedSlot = updatedExpiredSlots.find(updated => updated.id === slot.id);
+        return updatedSlot || slot;
+      });
+
+      console.log(`✅ Successfully updated ${expiredSlots.length} expired slots`);
+      return updatedSlots;
+      
+    } catch (error) {
+      console.error('Error updating expired slots:', error);
+      // Fallback: locally update expired slots
+      return slots.map(slot => 
+        expiredSlots.some(expired => expired.id === slot.id)
+          ? { ...slot, isAvailable: false }
+          : slot
+      );
+    }
+  }, [isTimeSlotExpired]);
+
   // Fetch time slots for a specific doctor
   const fetchTimeSlots = useCallback(async () => {
     if (!doctorId) {
@@ -36,14 +121,17 @@ export const useDoctorTimeSlots = (doctorId: string) => {
           startTime: slot.startTime.includes(':') ? slot.startTime.substring(0, 5) : slot.startTime, // Convert "07:00:00" to "07:00"
           endTime: slot.endTime.includes(':') ? slot.endTime.substring(0, 5) : slot.endTime
         }));
+
+        // Auto-update expired slots
+        const updatedSlots = await autoUpdateExpiredSlots(normalizedSlots);
         
-        const sortedSlots = normalizedSlots.sort((a, b) => {
+        const sortedSlots = updatedSlots.sort((a, b) => {
           const dateCompare = new Date(a.specificDate).getTime() - new Date(b.specificDate).getTime();
           if (dateCompare !== 0) return dateCompare;
           return a.startTime.localeCompare(b.startTime);
         });
         
-        console.log('Filtered and normalized slots:', sortedSlots);
+        console.log('Filtered, normalized and auto-updated slots:', sortedSlots);
         setTimeSlots(sortedSlots);
       } else {
         setError(new Error(response.message));
@@ -54,7 +142,7 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     } finally {
       setLoading(false);
     }
-  }, [doctorId]);
+  }, [doctorId, autoUpdateExpiredSlots]);
 
   // Create new time slot
   const createTimeSlot = useCallback(async (timeSlotData: TimeSlotRequest) => {
@@ -319,18 +407,35 @@ export const useDoctorTimeSlots = (doctorId: string) => {
 
   // Get time slot display info
   const getTimeSlotDisplay = useCallback((timeSlot: DoctorTimeSlot) => {
+    const isExpired = isTimeSlotExpired(timeSlot.specificDate, timeSlot.endTime);
+    const isToday = new Date(timeSlot.specificDate).toDateString() === new Date().toDateString();
+    const isPast = new Date(timeSlot.specificDate) < new Date() || isExpired;
+    
     return {
       dayName: getDayName(timeSlot.dayOfWeek),
       fullDate: formatDate(timeSlot.specificDate),
       shortDate: formatShortDate(timeSlot.specificDate),
       timeRange: `${formatTime(timeSlot.startTime)} - ${formatTime(timeSlot.endTime)}`,
-      status: timeSlot.isAvailable ? 'Có sẵn' : 'Không có sẵn',
-      statusColor: timeSlot.isAvailable ? 'text-green-600' : 'text-red-600',
-      statusBg: timeSlot.isAvailable ? 'bg-green-100' : 'bg-red-100',
-      isToday: new Date(timeSlot.specificDate).toDateString() === new Date().toDateString(),
-      isPast: new Date(timeSlot.specificDate) < new Date()
+      status: isPast 
+        ? 'Đã kết thúc' 
+        : timeSlot.isAvailable 
+          ? 'Có sẵn' 
+          : 'Không có sẵn',
+      statusColor: isPast 
+        ? 'text-gray-500' 
+        : timeSlot.isAvailable 
+          ? 'text-green-600' 
+          : 'text-red-600',
+      statusBg: isPast 
+        ? 'bg-gray-100' 
+        : timeSlot.isAvailable 
+          ? 'bg-green-100' 
+          : 'bg-red-100',
+      isToday,
+      isPast,
+      isExpired
     };
-  }, [getDayName, formatTime]);
+  }, [getDayName, formatTime, isTimeSlotExpired]);
 
   // Search time slots
   const searchTimeSlots = useCallback((searchTerm: string) => {
@@ -445,6 +550,41 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     }
   }, [fetchTimeSlots, doctorId]);
 
+  // Auto-update expired slots every 5 minutes
+  useEffect(() => {
+    if (!doctorId || timeSlots.length === 0) return;
+
+    console.log('🚀 Setting up auto-update interval for expired slots');
+    
+    const interval = setInterval(async () => {
+      console.log('⏰ Running auto-update check for expired slots...');
+      
+      const expiredSlots = timeSlots.filter(slot => 
+        slot.isAvailable && isTimeSlotExpired(slot.specificDate, slot.endTime)
+      );
+
+      if (expiredSlots.length > 0) {
+        console.log(`🔄 Found ${expiredSlots.length} expired slots during interval check`);
+        const updatedSlots = await autoUpdateExpiredSlots(timeSlots);
+        
+        // Only update state if there were actual changes
+        const hasChanges = updatedSlots.some((slot, index) => 
+          slot.isAvailable !== timeSlots[index]?.isAvailable
+        );
+        
+        if (hasChanges) {
+          setTimeSlots(updatedSlots);
+          console.log('✅ Updated expired slots during interval');
+        }
+      }
+    }, 5 * 60 * 1000); 
+
+    return () => {
+      console.log('🛑 Clearing auto-update interval');
+      clearInterval(interval);
+    };
+  }, [doctorId, timeSlots, isTimeSlotExpired, autoUpdateExpiredSlots]);
+
   return {
     // State
     timeSlots,
@@ -463,6 +603,7 @@ export const useDoctorTimeSlots = (doctorId: string) => {
     formatTime,
     getDayName,
     getTimeSlotDisplay,
+    isTimeSlotExpired,
     
     // Filtering & Search
     getTimeSlotsByDay,
