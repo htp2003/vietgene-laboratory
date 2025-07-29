@@ -5,6 +5,7 @@ export interface BlogFormData {
   title: string;
   content: string;
   imageUrl: string;
+  imageFile?: File | null;
   status?: 'draft' | 'published'; // ✅ Removed 'pending'
 }
 

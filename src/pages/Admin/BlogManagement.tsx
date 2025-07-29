@@ -6,7 +6,6 @@ import BlogModal from '../../components/admin/blog/BlogModal';
 import BlogList from '../../components/admin/blog/BlogList';
 
 export default function BlogManagement() {
-  // Use the blog hook
   const {
     posts,
     loading,
@@ -19,24 +18,24 @@ export default function BlogManagement() {
     getBlogStats,
   } = useBlog();
 
-  // Local state for UI
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<NewsArticle | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form state
-  const [form, setForm] = useState<BlogFormData>({
+  const [form, setForm] = useState({
     title: '',
     content: '',
-    imageUrl: '',
-    status: 'draft',
+    imageUrl: '', 
+    status: 'draft' as 'draft' | 'published',
   });
 
-  // Filter state
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Open modal for create/edit
+
+  const handleFileChange = (file: File | null) => {
+  };
+
   const handleOpenModal = (post: NewsArticle | null = null) => {
     if (post) {
       setForm({
@@ -58,7 +57,6 @@ export default function BlogManagement() {
     setModalOpen(true);
   };
 
-  // Close modal
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingPost(null);
@@ -70,17 +68,15 @@ export default function BlogManagement() {
     });
   };
 
-  // Handle form changes
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'status') {
-      setForm(prev => ({ ...prev, status: value as 'draft' | 'published' })); // ✅ Fixed type
+      setForm(prev => ({ ...prev, status: value as 'draft' | 'published' })); 
     } else {
       setForm(prev => ({ ...prev, [name]: value }));
     }
   };
 
-  // Submit form (create/update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -92,18 +88,22 @@ export default function BlogManagement() {
     setSubmitting(true);
 
     try {
+      const apiData = {
+        title: form.title.trim(),
+        content: form.content.trim(),
+        imageUrl: form.imageUrl.trim(),
+      };
+
+      console.log('📤 Sending to API:', apiData);
+
       let response;
       
       if (editingPost) {
-        // Update existing post
-        response = await updatePost(editingPost.id, {
-          title: form.title.trim(),
-          content: form.content.trim(),
-          imageUrl: form.imageUrl.trim(),
-        });
+
+        response = await updatePost(editingPost.id, apiData);
       } else {
-        // Create new post
-        response = await createPost(form);
+
+        response = await createPost(apiData as any);
       }
 
       if (response.success) {
@@ -120,12 +120,10 @@ export default function BlogManagement() {
     }
   };
 
-  // Delete post
   const handleDelete = async (post: NewsArticle) => {
     if (window.confirm('Bạn có chắc muốn xóa bài viết này?')) {
       try {
         const response = await deletePost(post.id);
-        
         if (response.success) {
           alert(response.message);
         } else {
@@ -138,11 +136,9 @@ export default function BlogManagement() {
     }
   };
 
-  // Approve post (change status to published)
   const handleApprove = async (post: NewsArticle) => {
     try {
       const response = await approvePost(post);
-      
       if (response.success) {
         alert(response.message);
       } else {
@@ -154,7 +150,6 @@ export default function BlogManagement() {
     }
   };
 
-  // Get filtered posts and statistics
   const filteredPosts = getFilteredPosts(searchTerm, filterStatus);
   const stats = getBlogStats();
 
@@ -176,7 +171,7 @@ export default function BlogManagement() {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-blue-100 text-blue-600">
@@ -216,7 +211,7 @@ export default function BlogManagement() {
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-gray-100 text-gray-600">
-              <FaNewspaper size={24} />
+              <FaEye size={24} />
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Lượt xem</p>
@@ -294,8 +289,8 @@ export default function BlogManagement() {
           
           <BlogList
             posts={filteredPosts}
-            categories={[]} // Empty since we're not using categories in this implementation
-            users={[]} // Empty since we're not using separate users
+            categories={[]}
+            users={[]}
             loading={false}
             error={null}
             onEdit={handleOpenModal}
@@ -339,10 +334,12 @@ export default function BlogManagement() {
         isOpen={modalOpen}
         onClose={handleCloseModal}
         onSubmit={handleSubmit}
+        onFileChange={handleFileChange} // Dummy function
         form={form}
         onFormChange={handleFormChange}
-        categories={[]} // Empty since we're not using categories
+        categories={[]} 
         editing={!!editingPost}
+        submitting={submitting}
       />
     </div>
   );

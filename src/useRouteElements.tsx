@@ -14,7 +14,7 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import AdminLayout from "./layouts/AdminLayout/AdminLayout";
 import ServicesManagement from "./pages/Admin/ServicesManagement";
-import BlogManagement from "./pages/admin/BlogManagement";
+import BlogManagement from "./pages/Admin/BlogManagement";
 import AppointmentService from "./pages/staff/appointment";
 import StaffLayout from "./layouts/StaffLayout/StaffLayout";
 import UserManagement from "./pages/Admin/UserManagement";

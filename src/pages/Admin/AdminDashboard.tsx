@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FaUsers, FaVial, FaCalendarAlt, FaMoneyBillWave, FaUserMd, FaCertificate, FaEye, FaDownload, FaSearch, FaFilter } from 'react-icons/fa';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { formatPrice } from '../../services/serviceService';
 
 interface StatCardProps {
   title: string;
@@ -84,6 +83,18 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, trend })
   </div>
 );
 
+// ✅ Fixed formatPrice function for dashboard
+const formatPriceForDashboard = (price: number | undefined | null): string => {
+  if (price === undefined || price === null || isNaN(Number(price))) {
+    return "0 ₫";
+  }
+
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+  }).format(Number(price));
+};
+
 const getCustomePaymentMethod = (method: string): string => {
   const methodLower = method.toLowerCase();
   switch (methodLower) {
@@ -150,8 +161,6 @@ export default function AdminDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<EnhancedOrder | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
 
-
-
   // Fetch data từ API
   useEffect(() => {
     const fetchData = async () => {
@@ -196,7 +205,7 @@ export default function AdminDashboard() {
     fetchData();
   }, []);
 
-  // Fetch chi tiết cho mỗi order
+  // ✅ Fixed fetchOrderDetails với preserve total_amount
   useEffect(() => {
     const fetchOrderDetails = async () => {
       if (orders.length === 0) return;
@@ -240,18 +249,24 @@ export default function AdminDashboard() {
             // Find user info
             const user = users.find(u => u.id === order.userId);
 
-            return {
+            // ✅ CRITICAL FIX: Preserve original order data completely
+            const enhancedOrder: EnhancedOrder = {
+              // Preserve ALL original order fields
               ...order,
+              // Add enhanced fields
               orderDetails,
               user,
               services: orderServices,
               participantCount: participants.length
-            } as EnhancedOrder;
+              // ✅ Don't override total_amount or any original fields
+            };
+
+            return enhancedOrder;
 
           } catch (error) {
             console.error(`Lỗi khi tải chi tiết order ${order.orderId}:`, error);
             return {
-              ...order,
+              ...order, // ✅ Preserve original order completely
               orderDetails: [],
               services: [],
               participantCount: 0
@@ -338,19 +353,37 @@ export default function AdminDashboard() {
     return acc;
   }, []).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
 
+  // ✅ Fixed handleViewOrder với backup logic
   const handleViewOrder = (order: EnhancedOrder) => {
-    setSelectedOrder(order);
+    // ✅ Always find original order for backup
+    const originalOrder = orders.find(o => o.orderId === order.orderId);
+    
+    if (!originalOrder) {
+      console.error('Cannot find original order!');
+      return;
+    }
+    
+    // ✅ Create safe order với backup total_amount
+    const safeOrder: EnhancedOrder = {
+      ...order,
+      // ✅ Use original total_amount if enhanced is 0 or undefined
+      total_amount: (order.total_amount && order.total_amount !== 0) ? order.total_amount : originalOrder.total_amount,
+      // ✅ Also backup other critical fields
+      payment_status: order.payment_status || originalOrder.payment_status,
+      payment_method: order.payment_method || originalOrder.payment_method,
+      status: order.status || originalOrder.status
+    };
+    
+    setSelectedOrder(safeOrder);
     setShowOrderModal(true);
   };
 
   const handleExportOrders = () => {
-    // ✅ Tạo CSV với format chuẩn và escape special characters
     const headers = [
       'Mã đơn hàng',
       'ID đơn hàng', 
       'Tên khách hàng',
       'Email',
-      'Điện thoại',
       'Dịch vụ',
       'Số lượng',
       'Đơn giá',
@@ -364,20 +397,16 @@ export default function AdminDashboard() {
       'Ghi chú'
     ];
 
-    // ✅ Function để escape CSV values
     const escapeCSV = (value: any): string => {
       if (value === null || value === undefined) return '';
       const str = String(value);
-      // Nếu có dấu phẩy, xuống dòng, hoặc dấu ngoặc kép thì wrap trong quotes
       if (str.includes(',') || str.includes('\n') || str.includes('"')) {
         return `"${str.replace(/"/g, '""')}"`;
       }
       return str;
     };
 
-    // ✅ Tạo data rows với thông tin chi tiết
     const dataRows = filteredOrders.flatMap(order => {
-      // Nếu order có nhiều services, tạo một row cho mỗi service
       if (order.orderDetails.length > 0) {
         return order.orderDetails.map((detail, index) => {
           const service = order.services.find(s => s.serviceId === detail.dnaServiceId);
@@ -386,12 +415,11 @@ export default function AdminDashboard() {
             escapeCSV(order.orderId.slice(-8)),
             escapeCSV(order.user?.full_name || 'N/A'),
             escapeCSV(order.user?.email || 'N/A'),
-            escapeCSV(order.user?.phone || 'N/A'),
             escapeCSV(service?.service_name || 'Dịch vụ không xác định'),
             escapeCSV(detail.quantity),
             escapeCSV(detail.unit_price.toLocaleString('vi-VN')),
             escapeCSV(detail.subtotal.toLocaleString('vi-VN')),
-            escapeCSV(index === 0 ? order.total_amount.toLocaleString('vi-VN') : ''), // Chỉ hiển thị tổng ở row đầu
+            escapeCSV(index === 0 ? order.total_amount.toLocaleString('vi-VN') : ''),
             escapeCSV(index === 0 ? order.status : ''),
             escapeCSV(index === 0 ? order.payment_status : ''),
             escapeCSV(index === 0 ? getCustomePaymentMethod(order.payment_method) : ''),
@@ -401,13 +429,11 @@ export default function AdminDashboard() {
           ].join(',');
         });
       } else {
-        // Fallback nếu không có order details
         return [[
           escapeCSV(order.order_code),
           escapeCSV(order.orderId.slice(-8)),
           escapeCSV(order.user?.full_name || 'N/A'),
           escapeCSV(order.user?.email || 'N/A'),
-          escapeCSV(order.user?.phone || 'N/A'),
           escapeCSV('N/A'),
           escapeCSV('N/A'),
           escapeCSV('N/A'),
@@ -423,26 +449,23 @@ export default function AdminDashboard() {
       }
     });
 
-    // ✅ Tạo summary rows
     const summaryRows = [
       '',
       '=== TỔNG KẾT ===',
       `Tổng số đơn hàng: ${filteredOrders.length}`,
       `Đơn đã thanh toán: ${filteredOrders.filter(o => o.payment_status?.toLowerCase() === 'paid').length}`,
       `Đơn chờ thanh toán: ${filteredOrders.filter(o => o.payment_status?.toLowerCase() === 'pending').length}`,
-      `Tổng doanh thu (đã thanh toán): ${formatPrice(filteredOrders.filter(o => o.payment_status?.toLowerCase() === 'paid').reduce((sum, o) => sum + o.total_amount, 0))}`,
+      `Tổng doanh thu (đã thanh toán): ${formatPriceForDashboard(filteredOrders.filter(o => o.payment_status?.toLowerCase() === 'paid').reduce((sum, o) => sum + o.total_amount, 0))}`,
       `Ngày xuất báo cáo: ${new Date().toLocaleString('vi-VN')}`
     ];
 
-    // ✅ Kết hợp tất cả
     const csvContent = [
       headers.join(','),
       ...dataRows,
       ...summaryRows
     ].join('\n');
 
-    // ✅ Tạo và download file với BOM cho UTF-8
-    const BOM = '\uFEFF'; // Để Excel hiển thị đúng tiếng Việt
+    const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { 
       type: 'text/csv;charset=utf-8;' 
     });
@@ -450,7 +473,6 @@ export default function AdminDashboard() {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     
-    // ✅ Tên file với timestamp
     const timestamp = new Date().toISOString().slice(0, 10);
     link.download = `DanhSachDonHang_${timestamp}.csv`;
     
@@ -458,7 +480,6 @@ export default function AdminDashboard() {
     link.click();
     document.body.removeChild(link);
     
-    // ✅ Cleanup
     URL.revokeObjectURL(link.href);
   };
 
@@ -479,14 +500,14 @@ export default function AdminDashboard() {
     },
     {
       title: 'Doanh thu Thực tế',
-      value: formatPrice(stats.totalRevenue),
+      value: formatPriceForDashboard(stats.totalRevenue),
       icon: <FaMoneyBillWave size={24} className="text-white" />,
       color: 'bg-purple-500',
       trend: { value: 15, isPositive: true }
     },
     {
       title: 'Giá TB/Đơn hàng',
-      value: formatPrice(stats.averageOrderValue),
+      value: formatPriceForDashboard(stats.averageOrderValue),
       icon: <FaUsers size={24} className="text-white" />,
       color: 'bg-yellow-500',
       trend: { value: 5, isPositive: false }
@@ -561,108 +582,6 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          {/* Revenue Calculation Breakdown */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <FaMoneyBillWave className="text-green-600" />
-              Chi tiết tính toán Doanh thu
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Calculation Steps */}
-              <div className="lg:col-span-2">
-                <div className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-800 mb-3">Bước 1: Tổng tất cả đơn hàng</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Tổng số đơn hàng:</span>
-                        <span className="font-medium">{stats.totalOrders} đơn</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tổng giá trị tất cả đơn:</span>
-                        <span className="font-medium">{formatPrice(orders.reduce((sum, order) => sum + order.total_amount, 0))}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border border-green-200 rounded-lg p-4 bg-green-50">
-                    <h3 className="font-medium text-gray-800 mb-3">Bước 2: Lọc đơn hàng đã thanh toán</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>Đơn hàng đã thanh toán (paid):</span>
-                        <span className="font-medium text-green-600">{stats.paidOrdersCount} đơn</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Đơn hàng chưa thanh toán:</span>
-                        <span className="font-medium text-yellow-600">{stats.totalOrders - stats.paidOrdersCount} đơn</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-                    <h3 className="font-medium text-gray-800 mb-3">Bước 3: Tính doanh thu thực tế</h3>
-                    <div className="space-y-2 text-sm">
-                      <p className="text-gray-600">Chỉ tính các đơn hàng có payment_status = "paid"</p>
-                      {orders.filter(o => o.payment_status.toLowerCase() === 'paid').slice(0, 3).map((order, index) => (
-                        <div key={order.orderId} className="flex justify-between">
-                          <span>Đơn #{order.order_code}:</span>
-                          <span className="font-medium">+ {formatPrice(order.total_amount)}</span>
-                        </div>
-                      ))}
-                      {orders.filter(o => o.payment_status.toLowerCase() === 'paid').length > 3 && (
-                        <div className="flex justify-between text-gray-500">
-                          <span>... và {orders.filter(o => o.payment_status.toLowerCase() === 'paid').length - 3} đơn khác</span>
-                          <span></span>
-                        </div>
-                      )}
-                      <hr className="my-2" />
-                      <div className="flex justify-between font-bold text-green-600">
-                        <span>= Doanh thu thực tế:</span>
-                        <span>{formatPrice(stats.totalRevenue)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Summary Card */}
-              <div className="space-y-4">
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-800 mb-3">Tóm tắt</h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tổng đơn hàng:</span>
-                      <span className="font-medium">{stats.totalOrders}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Đã thanh toán:</span>
-                      <span className="font-medium text-green-600">{stats.paidOrdersCount}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tỷ lệ thanh toán:</span>
-                      <span className="font-medium">{stats.totalOrders > 0 ? ((stats.paidOrdersCount / stats.totalOrders) * 100).toFixed(1) : 0}%</span>
-                    </div>
-                    <hr />
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Doanh thu thực:</span>
-                      <span className="text-green-600">{formatPrice(stats.totalRevenue)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-800 mb-3">Verification</h3>
-                  <div className="text-xs text-gray-600 space-y-1">
-                    <p>• Chỉ tính đơn hàng payment_status = "paid"</p>
-                    <p>• Bỏ qua đơn hàng "pending", "failed"</p>
-                    <p>• Tổng được cập nhật real-time</p>
-                    <p>• Click "Chi tiết Đơn hàng" để xem từng đơn</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Quick Summary */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -675,7 +594,7 @@ export default function AdminDashboard() {
                       <div>
                         <p className="font-medium">#{order.order_code}</p>
                         <p className="text-sm text-gray-600">{user?.full_name || 'N/A'}</p>
-                        <p className="text-sm text-gray-500">{formatPrice(order.total_amount)}</p>
+                        <p className="text-sm text-gray-500">{formatPriceForDashboard(order.total_amount)}</p>
                       </div>
                       <div className="text-right">
                         <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status)}`}>
@@ -701,8 +620,8 @@ export default function AdminDashboard() {
                       <p className="text-sm text-gray-600">{service.count} đơn</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-green-600">{formatPrice(service.revenue)}</p>
-                      <p className="text-sm text-gray-500">{formatPrice(service.price)}/đơn</p>
+                      <p className="font-semibold text-green-600">{formatPriceForDashboard(service.revenue)}</p>
+                      <p className="text-sm text-gray-500">{formatPriceForDashboard(service.price)}/đơn</p>
                     </div>
                   </div>
                 ))}
@@ -824,7 +743,7 @@ export default function AdminDashboard() {
                           order.services.map((service, idx) => (
                             <div key={idx}>
                               <p className="text-sm text-gray-900">{service.service_name}</p>
-                              <p className="text-xs text-gray-500">{formatPrice(service.test_price)}</p>
+                              <p className="text-xs text-gray-500">{formatPriceForDashboard(service.test_price)}</p>
                             </div>
                           ))
                         ) : (
@@ -841,10 +760,10 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{formatPrice(order.total_amount)}</p>
+                        <p className="text-sm font-semibold text-gray-900">{formatPriceForDashboard(order.total_amount)}</p>
                         {order.orderDetails.map((detail, idx) => (
                           <p key={idx} className="text-xs text-gray-500">
-                            {detail.quantity} × {formatPrice(detail.unit_price)} = {formatPrice(detail.subtotal)}
+                            {detail.quantity} × {formatPriceForDashboard(detail.unit_price)} = {formatPriceForDashboard(detail.subtotal)}
                           </p>
                         ))}
                       </div>
@@ -899,7 +818,7 @@ export default function AdminDashboard() {
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`} />
                 <Tooltip 
-                  formatter={(value: number) => [formatPrice(value), 'Doanh thu']}
+                  formatter={(value: number) => [formatPriceForDashboard(value), 'Doanh thu']}
                   labelFormatter={(label) => `Tháng ${label}`}
                 />
                 <Legend />
@@ -925,7 +844,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="ml-4 text-right">
                     <p className="text-sm font-semibold">{service.count} đơn</p>
-                    <p className="text-xs text-gray-500">{formatPrice(service.revenue)}</p>
+                    <p className="text-xs text-gray-500">{formatPriceForDashboard(service.revenue)}</p>
                   </div>
                 </div>
               ))}
@@ -973,10 +892,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-
       )}
 
-      {/* Order Detail Modal */}
+      {/* ✅ FIXED Order Detail Modal */}
       {showOrderModal && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
@@ -1000,7 +918,6 @@ export default function AdminDashboard() {
                   <div className="space-y-2">
                     <p><span className="font-medium">Tên:</span> {selectedOrder.user?.full_name || 'N/A'}</p>
                     <p><span className="font-medium">Email:</span> {selectedOrder.user?.email || 'N/A'}</p>
-                    <p><span className="font-medium">Điện thoại:</span> {selectedOrder.user?.phone || 'N/A'}</p>
                     <p><span className="font-medium">Số người tham gia:</span> {selectedOrder.participantCount}</p>
                   </div>
                 </div>
@@ -1020,7 +937,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Payment Info */}
+                {/* ✅ FIXED Payment Info */}
                 <div>
                   <h3 className="text-lg font-medium mb-3">Thông tin thanh toán</h3>
                   <div className="space-y-2">
@@ -1030,7 +947,18 @@ export default function AdminDashboard() {
                         {selectedOrder.payment_status}
                       </span>
                     </p>
-                    <p><span className="font-medium">Tổng tiền:</span> <span className="text-lg font-bold text-green-600">{formatPrice(selectedOrder.total_amount)}</span></p>
+                    {/* ✅ CRITICAL FIX: Always show correct total_amount */}
+                    <p>
+                      <span className="font-medium">Tổng tiền:</span> 
+                      <span className="text-lg font-bold text-green-600">
+                        {(() => {
+                          // ✅ Fallback logic để đảm bảo luôn có total_amount
+                          const originalOrder = orders.find(o => o.orderId === selectedOrder.orderId);
+                          const finalAmount = selectedOrder.total_amount || originalOrder?.total_amount || 0;
+                          return formatPriceForDashboard(finalAmount);
+                        })()}
+                      </span>
+                    </p>
                     {selectedOrder.payment_date && (
                       <p><span className="font-medium">Ngày thanh toán:</span> {new Date(selectedOrder.payment_date).toLocaleString('vi-VN')}</p>
                     )}
@@ -1044,44 +972,50 @@ export default function AdminDashboard() {
                 <div>
                   <h3 className="text-lg font-medium mb-3">Dịch vụ & Chi tiết</h3>
                   <div className="space-y-3">
-                    {selectedOrder.orderDetails.map((detail, index) => {
-                      const service = selectedOrder.services.find(s => s.serviceId === detail.dnaServiceId);
+                    {selectedOrder.orderDetails?.map((detail, index) => {
+                      const service = selectedOrder.services?.find(s => s.serviceId === detail.dnaServiceId);
                       return (
                         <div key={detail.id} className="border border-gray-200 rounded-lg p-3">
                           <p className="font-medium">{service?.service_name || 'Dịch vụ không xác định'}</p>
                           <div className="text-sm text-gray-600 mt-1">
                             <p>Số lượng: {detail.quantity}</p>
-                            <p>Đơn giá: {formatPrice(detail.unit_price)}</p>
-                            <p>Thành tiền: <span className="font-medium text-green-600">{formatPrice(detail.subtotal)}</span></p>
+                            <p>Đơn giá: {formatPriceForDashboard(detail.unit_price)}</p>
+                            <p>Thành tiền: <span className="font-medium text-green-600">{formatPriceForDashboard(detail.subtotal)}</span></p>
                             {detail.note && <p>Ghi chú: {detail.note}</p>}
                           </div>
                         </div>
                       );
-                    })}
+                    }) || <p className="text-gray-500">Không có chi tiết dịch vụ</p>}
                   </div>
                 </div>
               </div>
 
-              {/* Summary */}
+              {/* ✅ FIXED Summary */}
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h4 className="font-medium mb-2">Tóm tắt đơn hàng</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-gray-600">Tổng dịch vụ</p>
-                      <p className="font-medium">{selectedOrder.services.length}</p>
+                      <p className="font-medium">{selectedOrder.services?.length || 0}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Tổng số lượng</p>
-                      <p className="font-medium">{selectedOrder.orderDetails.reduce((sum, d) => sum + d.quantity, 0)}</p>
+                      <p className="font-medium">{selectedOrder.orderDetails?.reduce((sum, d) => sum + d.quantity, 0) || 0}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Số người tham gia</p>
-                      <p className="font-medium">{selectedOrder.participantCount}</p>
+                      <p className="font-medium">{selectedOrder.participantCount || 0}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Tổng thanh toán</p>
-                      <p className="font-bold text-lg text-green-600">{formatPrice(selectedOrder.total_amount)}</p>
+                      <p className="font-bold text-lg text-green-600">
+                        {(() => {
+                          const originalOrder = orders.find(o => o.orderId === selectedOrder.orderId);
+                          const finalAmount = selectedOrder.total_amount || originalOrder?.total_amount || 0;
+                          return formatPriceForDashboard(finalAmount);
+                        })()}
+                      </p>
                     </div>
                   </div>
                 </div>
