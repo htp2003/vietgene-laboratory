@@ -994,7 +994,6 @@ class OrderService {
   }
 
   // ===== 🎯 MAIN COMPLETE ORDER FLOW - FIXED & SIMPLIFIED =====
-  // ===== 🎯 MAIN COMPLETE ORDER FLOW - FIXED & SIMPLIFIED =====
   async createCompleteOrder(orderData: CreateOrderRequest): Promise<string> {
     console.log("🚀 Starting complete order creation flow...");
     const overallStartTime = Date.now();
@@ -1029,7 +1028,13 @@ class OrderService {
         unitPrice = orderData.serviceInfo.unitPrice || 2500000;
       }
 
-      const totalAmount = unitPrice * orderData.serviceInfo.quantity;
+      // ✅ FIX: Calculate total based on participants count, not quantity
+      const participantCount = orderData.participantInfo.participants.length;
+      const totalAmount = unitPrice * participantCount; // ✅ ĐÚNG: price x participants
+
+      console.log(
+        `💰 Calculating total: ${unitPrice} x ${participantCount} participants = ${totalAmount}`
+      );
 
       // ✅ STEP 1: Handle user (CRITICAL - must succeed)
       console.log("👤 Step 1: Handling user...");
@@ -1040,9 +1045,9 @@ class OrderService {
       const orderResult = await this.createOrder({
         customerId: userId,
         serviceId: orderData.serviceInfo.serviceId,
-        quantity: orderData.serviceInfo.quantity,
+        quantity: participantCount, // ✅ FIX: Use participant count as quantity
         unitPrice: unitPrice,
-        totalAmount: totalAmount,
+        totalAmount: totalAmount, // ✅ FIX: Correct total amount
         collectionMethod: orderData.serviceInfo.collectionMethod,
         notes: orderData.serviceInfo.notes,
       });
@@ -1054,8 +1059,8 @@ class OrderService {
       const parallelTasks = [
         // Step 3: Add order details
         this.createOrderDetail(orderId, orderData.serviceInfo.serviceId, {
-          quantity: orderData.serviceInfo.quantity,
-          unitPrice: unitPrice, // Sử dụng unitPrice đã fetch được
+          quantity: participantCount, // ✅ FIX: Use participant count
+          unitPrice: unitPrice,
           notes: orderData.serviceInfo.notes,
         }),
 
@@ -1073,7 +1078,7 @@ class OrderService {
         // Step 5: Process payment
         this.processPayment(orderId, {
           method: orderData.paymentInfo.method,
-          amount: totalAmount, // Sử dụng totalAmount đã tính
+          amount: totalAmount, // ✅ Correct total amount
           customerName: orderData.customerInfo.fullName,
         }),
       ];
@@ -1175,20 +1180,12 @@ class OrderService {
       console.log(`👨‍⚕️ Next: Staff will create samples based on sample kit IDs`);
 
       return orderId;
-    } catch (error: any) {
-      const totalTime = Date.now() - overallStartTime;
-      console.error(`❌ Order creation failed after ${totalTime}ms:`, error);
-
-      if (orderId) {
-        console.warn(
-          `⚠️ Order ${orderId} created but some steps failed - staff can complete manually`
-        );
-        return orderId; // ✅ Partial success
-      }
-
+    } catch (err) {
+      console.error("❌ Critical order creation error:", err);
       throw new Error(
-        "Có lỗi xảy ra khi tạo đơn hàng: " +
-          (error.message || "Vui lòng thử lại sau")
+        err instanceof Error
+          ? err.message
+          : "Không thể tạo đơn hàng. Vui lòng thử lại sau."
       );
     }
   }
