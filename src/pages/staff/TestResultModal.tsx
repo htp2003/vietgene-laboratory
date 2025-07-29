@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { XCircle, Upload, FileText, Save, AlertTriangle, CheckCircle } from 'lucide-react';
 import { TestResultService } from '../../services/staffService/testResultService';
 
@@ -9,7 +9,8 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
   appointment,
   isOpen,
   onClose,
-  onSaveResult
+  onSaveResult,
+  triggerElement
 }) => {
   // ✅ ALL HOOKS MUST BE AT THE TOP - BEFORE ANY EARLY RETURNS
   const [formData, setFormData] = useState({
@@ -28,6 +29,14 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
   const [orderSamples, setOrderSamples] = useState<any[]>([]);
   const [loadingSamples, setLoadingSamples] = useState(false);
   const [samplesError, setSamplesError] = useState<string>('');
+  const [modalPosition, setModalPosition] = useState({ 
+      top: 0, 
+      left: 0, 
+      width: 0,
+      positioning: 'center' as 'center' | 'below-card' 
+    });
+    
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // ✅ Load samples when modal opens
   const loadOrderSamples = async (orderId: string) => {
@@ -48,7 +57,50 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
       setLoadingSamples(false);
     }
   };
-
+  
+  useEffect(() => {
+      if (isOpen) {
+        if (triggerElement) {
+          // ✅ Position below the card
+          const rect = triggerElement.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+          
+          // ✅ Calculate available space
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceAbove = rect.top;
+          const modalHeight = 600; // Estimated modal height
+          
+          let top = rect.bottom + scrollTop + 8; // 8px gap
+          let positioning: 'center' | 'below-card' = 'below-card';
+          
+          // ✅ If not enough space below, check if we should center instead
+          if (spaceBelow < modalHeight && spaceAbove < modalHeight) {
+            // ✅ Center the modal if no good position near card
+            top = scrollTop + (window.innerHeight - modalHeight) / 2;
+            positioning = 'center';
+          } else if (spaceBelow < modalHeight) {
+            // ✅ Position above the card
+            top = rect.top + scrollTop - modalHeight - 8;
+          }
+          
+          setModalPosition({
+            top: Math.max(top, scrollTop + 20), // Ensure minimum top margin
+            left: Math.max(rect.left + scrollLeft, 20), // Ensure minimum left margin
+            width: Math.max(rect.width, 800), // Minimum width
+            positioning
+          });
+        } else {
+          // ✅ Fallback to center if no trigger element
+          setModalPosition({
+            top: window.pageYOffset + 100,
+            left: (window.innerWidth - 800) / 2,
+            width: 800,
+            positioning: 'center'
+          });
+        }
+      }
+    }, [isOpen, triggerElement]);
   // ✅ Reset form when modal opens/closes to prevent stale data
   useEffect(() => {
     if (isOpen && appointment) {
@@ -86,7 +138,19 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
   // ✅ Check if we have samples loaded
   if (loadingSamples) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50 bg-black bg-opacity-50">
+      <div ref={modalRef}
+        className="absolute z-50 transition-all duration-200 ease-out"
+        style={{
+          top: `${modalPosition.top}px`,
+          left: `${modalPosition.left}px`,
+          width: `${Math.min(modalPosition.width, window.innerWidth - 40)}px`, // Respect screen width
+          maxWidth: 'calc(100vw - 40px)',
+          maxHeight: 'calc(100vh - 40px)',
+          // ✅ Ensure modal doesn't go off screen
+          transform: modalPosition.left + modalPosition.width > window.innerWidth 
+            ? `translateX(-${(modalPosition.left + modalPosition.width) - window.innerWidth + 20}px)` 
+            : 'none'
+        }}>
         <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -335,8 +399,20 @@ const TestResultModal: React.FC<TestResultModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-y-auto bg-black bg-opacity-50"
       onClick={handleClose}
+      ref={modalRef}
+        className="absolute z-50 transition-all duration-200 ease-out"
+        style={{
+          top: `${modalPosition.top}px`,
+          left: `${modalPosition.left}px`,
+          width: `${Math.min(modalPosition.width, window.innerWidth - 40)}px`, // Respect screen width
+          maxWidth: 'calc(100vw - 40px)',
+          maxHeight: 'calc(100vh - 40px)',
+          // ✅ Ensure modal doesn't go off screen
+          transform: modalPosition.left + modalPosition.width > window.innerWidth 
+            ? `translateX(-${(modalPosition.left + modalPosition.width) - window.innerWidth + 20}px)` 
+            : 'none'
+        }}
     >
       <div
         className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto my-8 shadow-2xl"

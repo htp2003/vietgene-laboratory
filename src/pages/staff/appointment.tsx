@@ -14,14 +14,14 @@ import {
 } from "lucide-react";
 import AppointmentCard from "../../components/appointment/AppointmentCard";
 import AppointmentModal from "../../components/appointment/AppointmentModal";
-import SampleCreationModal from "../../components/appointment/SampleCreationModal"; // ✅ Import new modal
+import SampleCreationModal from "../../components/appointment/SampleCreationModal"; 
 import TestResultModal from "./TestResultModal";
 import { AppointmentService } from "../../services/staffService/staffAppointmentService";
 import { NotificationService } from "../../services/staffService/notificationService";
 import { StatusUtils } from "../../utils/status";
 import NotificationBell from "../../components/appointment/NotificationBell";
 import { AppointmentSampleIntegration } from "../../services/staffService/appointmentSampleIntegration";
-import { SampleStatusManager } from "../../services/staffService/sampleStatusManager";
+import {OrderService} from "../../services/staffService/orderService";
 import {
   Appointment,
   TestResult,
@@ -119,7 +119,7 @@ const StaffAppointments: React.FC = () => {
 
       console.log("📅 Loading appointments with simplified doctor info...");
 
-      const serviceAppointments = await AppointmentService.getAllAppointments();
+      const serviceAppointments = await AppointmentService.getAllAppointmentsAndOrders();
 
       setAppointments(serviceAppointments);
       console.log("✅ Loaded appointments:", serviceAppointments.length);
@@ -228,7 +228,7 @@ const StaffAppointments: React.FC = () => {
     try {
       console.log("✅ Confirming appointment:", appointment.id);
 
-      const success = await AppointmentService.confirmAppointment(
+      const success = await AppointmentService.confirmAppointmentOrOrder(
         appointment.id
       );
 
@@ -274,7 +274,7 @@ const StaffAppointments: React.FC = () => {
       const appointment = appointments.find((a) => a.id === appointmentId);
       if (!appointment) return;
 
-      const success = await AppointmentService.cancelAppointment(
+      const success = await AppointmentService.cancelAppointmentOrOrder(
         appointmentId,
         "Cancelled by staff"
       );
@@ -374,12 +374,13 @@ const StaffAppointments: React.FC = () => {
       return;
     }
 
-    // ✅ SỬ DỤNG AppointmentSampleIntegration để update cả appointment và samples
-    const updateResult = await AppointmentSampleIntegration.updateAppointmentWithSamples(
+   // ✅ 🚀 NEW: Use OrderService to sync appointment AND order status
+    const syncResult = await OrderService.updateAppointmentAndSyncOrder(
+      appointmentId,
       appointment,
       newStatus,
+      // Appointment update callback
       async (appointmentId: string, status: Appointment["status"]) => {
-        // Original appointment update logic
         StatusUtils.saveAppointmentStatus(
           appointmentId,
           status,
@@ -401,6 +402,29 @@ const StaffAppointments: React.FC = () => {
             return a;
           })
         );
+      }
+    );
+
+    // ✅ Show result notifications
+    if (syncResult.appointmentUpdated && syncResult.orderSynced) {
+      console.log("✅ Both appointment and order updated successfully");
+      // You can show a success notification here
+    } else if (syncResult.appointmentUpdated && !syncResult.orderSynced) {
+      console.warn("⚠️ Appointment updated but order sync failed");
+      setError("Lịch hẹn đã cập nhật nhưng không thể đồng bộ trạng thái đơn hàng");
+    } else {
+      console.error("❌ Failed to update appointment");
+      setError("Không thể cập nhật trạng thái lịch hẹn");
+      return;
+    }
+
+    // ✅ CONTINUE with sample integration if needed
+    const updateResult = await AppointmentSampleIntegration.updateAppointmentWithSamples(
+      appointment,
+      newStatus,
+      async (appointmentId: string, status: Appointment["status"]) => {
+        // This callback is now empty since we already updated via OrderService
+        console.log(`ℹ️ Sample integration callback for ${appointmentId}: ${status}`);
       }
     );
 
@@ -459,22 +483,41 @@ const StaffAppointments: React.FC = () => {
 
     if (!testResultAppointment) return;
 
-    // ✅ result.appointmentId sẽ match với appointment.id
-    setAppointments((prev) =>
-      prev.map((a) => {
-        if (a.id === result.appointmentId) { // ✅ This will work correctly
-          StatusUtils.saveAppointmentStatus(a.id, "Completed", 6);
-          return {
-            ...a,
-            status: "Completed",
-            currentStep: 6,
-            completedSteps: StatusUtils.getCompletedSteps(6),
-            lastStatusUpdate: new Date().toISOString(),
-          };
-        }
-        return a;
-      })
+    const appointment = appointments.find(a => a.id === result.appointmentId);
+    if (!appointment) return;
+
+    // ✅ 🚀 NEW: Use OrderService to sync appointment AND order status
+    const syncResult = await OrderService.updateAppointmentAndSyncOrder(
+      result.appointmentId,
+      appointment,
+      "Completed",
+      // Appointment update callback
+      async (appointmentId: string, status: Appointment["status"]) => {
+        StatusUtils.saveAppointmentStatus(appointmentId, "Completed", 6);
+        
+        setAppointments((prev) =>
+          prev.map((a) => {
+            if (a.id === appointmentId) {
+              return {
+                ...a,
+                status: "Completed",
+                currentStep: 6,
+                completedSteps: StatusUtils.getCompletedSteps(6),
+                lastStatusUpdate: new Date().toISOString(),
+              };
+            }
+            return a;
+          })
+        );
+      }
     );
+
+    if (syncResult.appointmentUpdated && syncResult.orderSynced) {
+      console.log("✅ Test result saved, appointment and order completed");
+    } else if (syncResult.appointmentUpdated && !syncResult.orderSynced) {
+      console.warn("⚠️ Test result saved, appointment completed but order sync failed");
+      setError("Kết quả đã lưu nhưng không thể đồng bộ trạng thái đơn hàng");
+    }
 
     // Send notification
     await NotificationService.notifyStaffAboutStatusChange(
@@ -484,7 +527,7 @@ const StaffAppointments: React.FC = () => {
     );
 
     setTestResultAppointment(null);
-    console.log("✅ Test result saved and appointment completed");
+
   } catch (error: any) {
     console.error("❌ Error saving test result:", error);
     setError("Có lỗi xảy ra khi lưu kết quả xét nghiệm");
@@ -589,18 +632,6 @@ const StaffAppointments: React.FC = () => {
           <div className="flex items-center gap-4">
             {/* ✅ Notification Bell */}
             <NotificationBell />
-
-            {/* Refresh Button */}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
-              />
-              {refreshing ? "Đang tải..." : "Làm mới"}
-            </button>
 
             {/* User Menu */}
             <div className="relative">

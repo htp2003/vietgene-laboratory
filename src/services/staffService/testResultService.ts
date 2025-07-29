@@ -52,15 +52,15 @@ export class TestResultService {
   /**
    * ✅ Map frontend result type to API expected format
    */
-  private static mapResultTypeToAPI(resultType: string): string {
-    const typeMapping = {
-      'Positive': 'DNA_PATERNITY',        // For DNA paternity tests
-      'Negative': 'DNA_PATERNITY_NEGATIVE', 
-      'Inconclusive': 'DNA_INCONCLUSIVE'
-    };
+  // private static mapResultTypeToAPI(resultType: string): string {
+  //   const typeMapping = {
+  //     'Positive': 'DNA_PATERNITY',        // For DNA paternity tests
+  //     'Negative': 'DNA_PATERNITY_NEGATIVE', 
+  //     'Inconclusive': 'DNA_INCONCLUSIVE'
+  //   };
     
-    return typeMapping[resultType as keyof typeof typeMapping] || 'DNA_PATERNITY';
-  }
+  //   return typeMapping[resultType as keyof typeof typeMapping] || 'DNA_PATERNITY';
+  // }
 
   /**
    * Debug current user role and permissions
@@ -217,7 +217,7 @@ static async createTestResultBySample(params: CreateTestResultBySampleParams): P
 
     // ✅ Step 4: Prepare request data with CORRECT API format - SINGLE REQUEST FOR ALL SAMPLES
     const requestData: any = {
-      result_type: this.mapResultTypeToAPI(params.resultType),
+      result_type: params.resultType,
       result_percentage: resultPercentage,
       conclusion: params.conclusion,
       result_file: params.resultFile,

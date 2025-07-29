@@ -428,7 +428,11 @@ export interface AppointmentCardProps {
   onViewDetails: (appointment: Appointment) => void;
   onConfirm: (appointment: Appointment) => void;
   onCancel: (appointmentId: string) => void;
-  onUpdateStatus: (appointmentId: string, status: Appointment['status']) => void;
+  onUpdateStatus: (
+    appointmentId: string, 
+    newStatus: Appointment['status'],
+    triggerElement?: HTMLElement // ✅ Add optional trigger element
+  ) => void;
 }
 
 export interface AppointmentModalProps {
@@ -464,12 +468,13 @@ export interface TestResultRequest {
   sample_id: string;
 }
 
-// ✅ Updated TestResultModalProps to be more flexible
 export interface TestResultModalProps {
   appointment: Appointment | null;
   isOpen: boolean;
   onClose: () => void;
   onSaveResult: (result: TestResult) => void;
+  triggerElement?: HTMLElement | null; // ✅ Add trigger element
+  preferredPosition?: 'right' | 'left' | 'center'; // ✅ Add position preference
 }
 
 // ✅ Add sample creation modal props

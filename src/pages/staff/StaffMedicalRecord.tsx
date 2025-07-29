@@ -30,13 +30,10 @@ import {
 const StaffMedicalRecordPage: React.FC = () => {
   // ✅ State management
   const [allRecords, setAllRecords] = useState<ApiMedicalRecord[]>([]);
-  const [filteredRecords, setFilteredRecords] = useState<ApiMedicalRecord[]>(
-    []
-  );
-  const [selectedRecord, setSelectedRecord] = useState<ApiMedicalRecord | null>(
-    null
-  );
+  const [filteredRecords, setFilteredRecords] = useState<ApiMedicalRecord[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<ApiMedicalRecord | null>(null);
   const [users, setUsers] = useState<ApiUser[]>([]);
+  const [customerUsers, setCustomerUsers] = useState<ApiUser[]>([]); // ✅ Thêm state riêng cho customer users
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -63,10 +60,24 @@ const StaffMedicalRecordPage: React.FC = () => {
     loadAllData();
   }, []);
 
+  // ✅ Filter customer users when users data changes
+  useEffect(() => {
+    filterCustomerUsers();
+  }, [users]);
+
   // ✅ Filter records when search term or user filter changes
   useEffect(() => {
     filterRecords();
   }, [searchTerm, userFilter, allRecords]);
+
+  // ✅ Filter chỉ lấy users có role ROLE_USER
+  const filterCustomerUsers = () => {
+    const customers = users.filter((user) => 
+      user.roles?.some(role => role.name === "ROLE_USER")
+    );
+    setCustomerUsers(customers);
+    console.log("🎯 Filtered customer users:", customers.length, "customers");
+  };
 
   // ✅ Load tất cả data cần thiết
   const loadAllData = async () => {
@@ -76,7 +87,7 @@ const StaffMedicalRecordPage: React.FC = () => {
 
       console.log("🏥 Loading all medical records and users...");
 
-      // Load tất cả medical records
+      // Load tất cả medical records và users
       const [medicalRecords, allUsers] = await Promise.all([
         MedicalRecordService.getAllMedicalRecords(),
         UserService.getAllUsers(),
@@ -95,7 +106,7 @@ const StaffMedicalRecordPage: React.FC = () => {
         medicalRecords.length,
         "records and",
         allUsers.length,
-        "users"
+        "total users"
       );
     } catch (err: any) {
       console.error("❌ Error loading data:", err);
@@ -125,7 +136,7 @@ const StaffMedicalRecordPage: React.FC = () => {
       );
     }
 
-    // Filter by user
+    // Filter by user (chỉ filter trong danh sách customer users)
     if (userFilter) {
       filtered = filtered.filter((record) => record.userId === userFilter);
     }
@@ -133,9 +144,9 @@ const StaffMedicalRecordPage: React.FC = () => {
     setFilteredRecords(filtered);
   };
 
-  // ✅ Get user info by userId
+  // ✅ Get user info by userId (chỉ lấy customer users)
   const getUserInfo = (userId: string): ApiUser | undefined => {
-    return users.find((user) => user.id === userId);
+    return customerUsers.find((user) => user.id === userId);
   };
 
   // ✅ Handle input changes
@@ -419,7 +430,7 @@ const StaffMedicalRecordPage: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Khách hàng</p>
               <p className="text-2xl font-bold text-green-600">
-                {new Set(allRecords.map((r) => r.userId)).size}
+                {customerUsers.length}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -461,14 +472,14 @@ const StaffMedicalRecordPage: React.FC = () => {
                 />
               </div>
 
-              {/* User Filter */}
+              {/* User Filter - Chỉ hiển thị customer users */}
               <select
                 value={userFilter}
                 onChange={(e) => setUserFilter(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Tất cả khách hàng</option>
-                {users.map((user) => (
+                {customerUsers.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.full_name || user.username} ({user.email})
                   </option>
@@ -582,6 +593,8 @@ const StaffMedicalRecordPage: React.FC = () => {
                     disabled={!createMode}
                   />
                 </div>
+                
+                {/* Customer Selection - Chỉ hiển thị customer users */}
                 {createMode && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -594,29 +607,25 @@ const StaffMedicalRecordPage: React.FC = () => {
                       required
                     >
                       <option value="">-- Chọn khách hàng --</option>
-                      {users
-                        .filter(
-                          (user) =>
-                            !user.roles?.some(
-                              (role) =>
-                                role.name === "ADMIN" ||
-                                role.name === "STAFF" ||
-                                role.name === "MANAGER"
-                            )
-                        )
-                        .map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.full_name || user.username} - {user.email}
-                          </option>
-                        ))}
+                      {customerUsers.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.full_name || user.username} - {user.email}
+                        </option>
+                      ))}
                     </select>
                     {!selectedUserId && (
                       <p className="text-sm text-red-600 mt-1">
                         Vui lòng chọn khách hàng để tạo hồ sơ y tế
                       </p>
                     )}
+                    
+                    {/* ✅ Hiển thị số lượng customer users */}
+                    <p className="text-sm text-gray-500 mt-1">
+                      Có {customerUsers.length} khách hàng có thể chọn
+                    </p>
                   </div>
                 )}
+
                 {/* Medical History */}
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
@@ -761,6 +770,7 @@ const StaffMedicalRecordPage: React.FC = () => {
                   <p className="text-sm text-gray-600 mt-1">
                     Khách hàng:{" "}
                     {getUserInfo(selectedRecord.userId)?.full_name ||
+                      getUserInfo(selectedRecord.userId)?.username ||
                       "Unknown User"}
                   </p>
                 </div>
@@ -940,7 +950,7 @@ const StaffMedicalRecordPage: React.FC = () => {
                       </div>
                     ) : (
                       <p className="text-gray-600">
-                        Không tìm thấy thông tin khách hàng
+                        Không tìm thấy thông tin khách hàng (có thể không phải customer)
                       </p>
                     )}
                   </div>
