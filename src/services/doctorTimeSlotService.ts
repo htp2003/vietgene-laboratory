@@ -161,6 +161,30 @@ export const formatDateSafe = (dateString: string): string => {
   }
 };
 
+// Check if time slot is expired - THÊM MỚI
+export const isTimeSlotExpired = (specificDate: string, endTime: string): boolean => {
+  try {
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:mm
+
+    // Nếu ngày đã qua
+    if (specificDate < currentDate) {
+      return true;
+    }
+
+    // Nếu là hôm nay và giờ kết thúc đã qua
+    if (specificDate === currentDate && endTime <= currentTime) {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking if time slot is expired:', error);
+    return false;
+  }
+};
+
 // Doctor Time Slot Service
 export const doctorTimeSlotService = {
   // Get all time slots
@@ -420,6 +444,104 @@ export const doctorTimeSlotService = {
     } catch (error: any) {
       console.error("❌ Delete time slot error:", error);
       return handleApiError(error);
+    }
+  },
+
+  // Bulk update expired time slots - THÊM MỚI
+  updateExpiredTimeSlots: async (doctorId?: string): Promise<{ 
+    success: boolean; 
+    message: string; 
+    updatedCount: number;
+    expiredSlots: DoctorTimeSlot[];
+  }> => {
+    try {
+      console.log('🔄 Bulk updating expired time slots...');
+      
+      // Get time slots
+      let timeSlots: DoctorTimeSlot[] = [];
+      if (doctorId) {
+        const response = await doctorTimeSlotService.getTimeSlotsByDoctorId(doctorId);
+        if (!response.success || !response.data) {
+          return {
+            success: false,
+            message: response.message || 'Không thể lấy danh sách time slots',
+            updatedCount: 0,
+            expiredSlots: []
+          };
+        }
+        timeSlots = response.data;
+      } else {
+        const response = await doctorTimeSlotService.getAllTimeSlots();
+        if (!response.success || !response.data) {
+          return {
+            success: false,
+            message: response.message || 'Không thể lấy danh sách time slots',
+            updatedCount: 0,
+            expiredSlots: []
+          };
+        }
+        timeSlots = response.data;
+      }
+
+      // Find expired slots that are still available
+      const expiredSlots = timeSlots.filter(slot => 
+        slot.isAvailable && isTimeSlotExpired(slot.specificDate, slot.endTime)
+      );
+
+      if (expiredSlots.length === 0) {
+        return {
+          success: true,
+          message: 'Không có time slot nào đã hết hạn',
+          updatedCount: 0,
+          expiredSlots: []
+        };
+      }
+
+      console.log(`⏰ Found ${expiredSlots.length} expired slots to update`);
+
+      // Update each expired slot
+      let updatedCount = 0;
+      const errors: string[] = [];
+      const updatedSlots: DoctorTimeSlot[] = [];
+
+      for (const slot of expiredSlots) {
+        try {
+          const result = await doctorTimeSlotService.updateTimeSlot(slot.id, {
+            isAvailable: false,
+            dayOfWeek: slot.dayOfWeek,
+            specificDate: slot.specificDate,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            doctorId: slot.doctorId
+          });
+
+          if (result.success && result.data) {
+            updatedCount++;
+            updatedSlots.push(result.data);
+            console.log(`✅ Updated expired slot: ${slot.specificDate} ${slot.startTime}-${slot.endTime}`);
+          } else {
+            errors.push(`Slot ${slot.id}: ${result.message}`);
+          }
+        } catch (error: any) {
+          errors.push(`Slot ${slot.id}: ${error.message}`);
+        }
+      }
+
+      return {
+        success: updatedCount > 0,
+        message: `Đã cập nhật ${updatedCount}/${expiredSlots.length} time slots đã hết hạn`,
+        updatedCount,
+        expiredSlots: updatedSlots
+      };
+
+    } catch (error: any) {
+      console.error('❌ Bulk update expired time slots error:', error);
+      return {
+        success: false,
+        message: `Lỗi hệ thống: ${error.message}`,
+        updatedCount: 0,
+        expiredSlots: []
+      };
     }
   },
 };

@@ -249,16 +249,13 @@ export default function AdminDashboard() {
             // Find user info
             const user = users.find(u => u.id === order.userId);
 
-            // ✅ CRITICAL FIX: Preserve original order data completely
             const enhancedOrder: EnhancedOrder = {
-              // Preserve ALL original order fields
               ...order,
-              // Add enhanced fields
               orderDetails,
               user,
               services: orderServices,
               participantCount: participants.length
-              // ✅ Don't override total_amount or any original fields
+             
             };
 
             return enhancedOrder;
@@ -266,7 +263,7 @@ export default function AdminDashboard() {
           } catch (error) {
             console.error(`Lỗi khi tải chi tiết order ${order.orderId}:`, error);
             return {
-              ...order, // ✅ Preserve original order completely
+              ...order, 
               orderDetails: [],
               services: [],
               participantCount: 0
@@ -385,7 +382,6 @@ export default function AdminDashboard() {
       'Tên khách hàng',
       'Email',
       'Dịch vụ',
-      'Số lượng',
       'Đơn giá',
       'Thành tiền',
       'Tổng tiền đơn hàng',
@@ -505,13 +501,6 @@ export default function AdminDashboard() {
       color: 'bg-purple-500',
       trend: { value: 15, isPositive: true }
     },
-    {
-      title: 'Giá TB/Đơn hàng',
-      value: formatPriceForDashboard(stats.averageOrderValue),
-      icon: <FaUsers size={24} className="text-white" />,
-      color: 'bg-yellow-500',
-      trend: { value: 5, isPositive: false }
-    }
   ];
 
   if (loading) {
@@ -702,9 +691,6 @@ export default function AdminDashboard() {
                     Dịch vụ
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Số lượng
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Tổng tiền
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -726,8 +712,7 @@ export default function AdminDashboard() {
                   <tr key={order.orderId} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">#{order.order_code}</p>
-                        <p className="text-xs text-gray-500">{order.orderId.slice(-8)}</p>
+                        <p className="text-sm font-medium text-gray-900">#{order.orderId}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -753,19 +738,7 @@ export default function AdminDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
-                        {order.orderDetails.map((detail, idx) => (
-                          <p key={idx} className="text-sm text-gray-900">{detail.quantity}x</p>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
                         <p className="text-sm font-semibold text-gray-900">{formatPriceForDashboard(order.total_amount)}</p>
-                        {order.orderDetails.map((detail, idx) => (
-                          <p key={idx} className="text-xs text-gray-500">
-                            {detail.quantity} × {formatPriceForDashboard(detail.unit_price)} = {formatPriceForDashboard(detail.subtotal)}
-                          </p>
-                        ))}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -978,7 +951,6 @@ export default function AdminDashboard() {
                         <div key={detail.id} className="border border-gray-200 rounded-lg p-3">
                           <p className="font-medium">{service?.service_name || 'Dịch vụ không xác định'}</p>
                           <div className="text-sm text-gray-600 mt-1">
-                            <p>Số lượng: {detail.quantity}</p>
                             <p>Đơn giá: {formatPriceForDashboard(detail.unit_price)}</p>
                             <p>Thành tiền: <span className="font-medium text-green-600">{formatPriceForDashboard(detail.subtotal)}</span></p>
                             {detail.note && <p>Ghi chú: {detail.note}</p>}
@@ -998,10 +970,6 @@ export default function AdminDashboard() {
                     <div>
                       <p className="text-gray-600">Tổng dịch vụ</p>
                       <p className="font-medium">{selectedOrder.services?.length || 0}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Tổng số lượng</p>
-                      <p className="font-medium">{selectedOrder.orderDetails?.reduce((sum, d) => sum + d.quantity, 0) || 0}</p>
                     </div>
                     <div>
                       <p className="text-gray-600">Số người tham gia</p>
