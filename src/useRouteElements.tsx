@@ -21,7 +21,7 @@ import UserManagement from "./pages/Admin/UserManagement";
 import DoctorManagement from "./pages/Admin/DoctorManagement";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Profile from "./pages/profile/Profile";
-import News from "./pages/News/News";
+import News from "./pages/news/News";
 import NewsDetail from "./pages/news/NewsDetail";
 import StaffProfileComponent from "./pages/staff/StaffProfile";
 import DoctorLayout from "./layouts/DoctorLayout/DoctorLayout";
