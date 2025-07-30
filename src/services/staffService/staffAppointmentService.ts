@@ -21,7 +21,7 @@ export class AppointmentService {
       const appointmentsResponse = await Promise.race([
         apiClient.get<ApiResponse<ApiAppointment[]>>("/appointment/all"),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('API timeout after 15s')), 15000)
+          setTimeout(() => reject(new Error('API timeout after 15s')), 50000)
         )
       ]) as any;
       
